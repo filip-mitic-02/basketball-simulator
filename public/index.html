@@ -387,6 +387,48 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .bench .spot .ring{width:48px;height:48px;font-size:17px}
 .courthint{margin-top:12px}
 @media(max-width:560px){.spot{width:72px}.spot .nm{font-size:11px;max-width:70px}.spot .ring{width:42px;height:42px;font-size:15px}.spot svg.avatar{width:44px;height:44px}}
+/* rating badges: framed so they stay readable on any background */
+.ovr{display:inline-block;text-align:center;padding:2px 9px 1px;min-width:44px;border-radius:8px;background:#080c14;border:2px solid currentColor;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.ovr.t4{color:#ffc43d;background:#2a1d05;box-shadow:0 0 10px rgba(255,182,39,.45)}
+.ovr.t3{color:#46e08a;background:#07210f}
+.ovr.t2{color:#e3ecfa;background:#0d1626}
+.ovr.t1{color:#a3b0c4;background:#0d1219}
+.ovr.tq{color:#8593a8;background:#0d1219;border-style:dashed}
+.slot .ovr{min-width:0;padding:1px 6px}
+/* court spots: bigger labels, jersey-shaped empty spots */
+.spot{width:104px}
+.spot .nm{font-size:15px;max-width:104px;color:#fff}
+.spot .pp{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:2px;font-size:inherit;color:inherit}
+.spot .pl{font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:.08em;color:#0b1220;background:#d9e3f5;border-radius:5px;padding:1px 7px 0;line-height:1.25}
+.spot .pl.dim{background:transparent;color:var(--mute);font-size:12px;font-weight:700;padding:0}
+.spot .pp .ovr{font-size:19px;min-width:38px;padding:1px 6px 0}
+.spot .ring{width:auto;height:auto;border:0;background:none;border-radius:0;display:block;animation:none!important;box-shadow:none!important}
+.spot .ej .ejb{fill:rgba(16,24,40,.72);stroke:#6a80a8;stroke-width:2;stroke-dasharray:4 3;stroke-linejoin:round}
+.spot .ej .ejt{fill:#b9c8e4}
+.spot.ok .ej{animation:spotp 1.3s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(255,182,39,.6))}
+.spot.ok .ej .ejb{stroke:var(--amber);stroke-dasharray:none;stroke-width:2.6;fill:rgba(255,182,39,.16)}
+.spot.ok .ej .ejt{fill:var(--amber)}
+.spot.pick .ej .ejb{stroke:var(--amber);stroke-dasharray:none;stroke-width:3;fill:rgba(255,182,39,.28)}
+.spot.pick .ej .ejt{fill:#fff}
+.spot.ok .pl.dim{color:var(--amber)}
+.spot.ghost .gh{background:none;box-shadow:none!important;filter:drop-shadow(0 0 10px rgba(255,182,39,.65))}
+.spot.pick.ghost .gh{box-shadow:none!important}
+.spot.lock .pl{background:#6d7a90}
+.bench .spot{margin-top:10px}
+.bench .spot .nm{font-size:13px}
+.bench .spot .pl{font-size:14px;padding:0 5px}
+.bench .spot .pp .ovr{font-size:16px;min-width:32px}
+.bench .spot svg.avatar{width:54px;height:54px}
+@media(max-width:560px){.spot{width:80px}.spot .nm{font-size:12px;max-width:78px}.spot svg.avatar{width:48px;height:48px}.spot .pp .ovr{font-size:15px;min-width:30px}}
+/* keep the draft header inside its column */
+.stage{grid-template-columns:minmax(0,1fr) auto}
+.reelbox{min-width:0}
+.reelbox .t{min-width:0;flex:1}
+.reelbox .v{font-size:clamp(24px,2.6vw,36px);overflow-wrap:anywhere}
+.reelbox .y{font-size:clamp(40px,4vw,56px)}
+.actions{min-width:200px}
+.spot .pl.dim,.spot.lock .pl.dim{background:transparent}
+.bench .spot .nm{font-size:12px;letter-spacing:0}
 </style>
 </head>
 <body>

@@ -359,18 +359,23 @@
   // Spots on the half court, in percent of the court box (basket at the top).
   const SPOT = { PG: [50, 78], SG: [83, 61], SF: [17, 61], PF: [73, 34], C: [27, 34] };
   const shortName = n => { const t = String(n).split(' '); return t.length > 1 ? t.slice(1).join(' ') : n; };
+  const JERSEY = 'M14 3h5c0 6 10 6 10 0h5c2 6 4 11 4 17v25H10V20c0-6 2-11 4-17z';
+  // Empty spot: an outline of the same jersey that a drafted player will occupy.
+  const emptyJersey = (pos, size) => `<svg class="avatar ej" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><path d="${JERSEY}" class="ejb"/><text x="24" y="34" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="15" class="ejt">${pos}</text></svg>`;
   function spotHtml(pos, p, st, ghost, bench) {
     // st: '' | 'ok' (can be placed here) | 'lock' (selected player cannot play here) | 'pick' (chosen target)
     const vis = !S.hard || S.revealed;
     const act = st === 'ok' || st === 'pick' ? `data-a="place" data-v="${pos}"` : 'disabled';
-    const tag = bench ? 'onbench' : 'oncourt';
+    const tag = bench ? 'onbench' : 'oncourt', sz = bench ? 54 : 64;
+    const pos0 = bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`;
+    const lab = (pl, who) => `<span class="pp"><span class="pl">${pl}</span>${who && vis ? `<span class="ovr ${ovrCls(dp(who))}">${dp(who)}</span>` : ''}</span>`;
     if (p) {
-      return `<button class="spot filled ${tag} ${st}" ${bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`} disabled aria-label="${esc(p.name)} at ${pos}">${avatar(p.name, p.fromTm, 56, vis ? dp(p) : null, p.pos, p.fromSeason)}<span class="nm">${esc(shortName(p.name))}</span><span class="pp">${pos}${vis ? ' &middot; ' + dp(p) : ''}</span></button>`;
+      return `<button class="spot filled ${tag} ${st}" ${pos0} disabled aria-label="${esc(p.name)} at ${pos}">${avatar(p.name, p.fromTm, sz, vis ? dp(p) : null, p.pos, p.fromSeason)}<span class="nm">${esc(shortName(p.name))}</span>${lab(pos, p)}</button>`;
     }
     if (ghost) {
-      return `<button class="spot ghost ${tag} ${st}" ${bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`} ${act} aria-label="Place ${esc(ghost.name)} at ${pos}"><span class="gh">${avatar(ghost.name, S.D.cur.tm, 56, statsVisible() ? dp(ghost) : null, ghost.pos, S.D.cur.season)}</span><span class="nm">${esc(shortName(ghost.name))}</span><span class="pp">${pos}</span></button>`;
+      return `<button class="spot ghost ${tag} ${st}" ${pos0} ${act} aria-label="Place ${esc(ghost.name)} at ${pos}"><span class="gh">${avatar(ghost.name, S.D.cur.tm, sz, vis ? dp(ghost) : null, ghost.pos, S.D.cur.season)}</span><span class="nm">${esc(shortName(ghost.name))}</span>${lab(pos, ghost)}</button>`;
     }
-    return `<button class="spot empty ${tag} ${st}" ${bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`} ${act} aria-label="${pos} ${bench ? 'bench' : 'starter'} spot"><span class="ring">${pos}</span><span class="pp">${bench ? 'Bench' : 'Starter'}</span></button>`;
+    return `<button class="spot empty ${tag} ${st}" ${pos0} ${act} aria-label="${pos} ${bench ? 'bench' : 'starter'} spot"><span class="ring">${emptyJersey(pos, sz)}</span><span class="pp"><span class="pl dim">${bench ? 'Bench' : 'Starter'}</span></span></button>`;
   }
   const COURT_SVG = `<svg class="court-art" viewBox="0 0 500 520" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2a40"/><stop offset="1" stop-color="#121b2b"/></linearGradient></defs>
     <rect x="6" y="6" width="488" height="508" rx="10" fill="url(#wood)" stroke="#3b4e6e" stroke-width="3"/>
@@ -394,7 +399,7 @@
     const cell = (pos, k) => {
       const p = byPos[pos][k], st = stOf(pos);
       const target = sp && fp.includes(pos) && !p && byPos[pos].length === k;   // next free spot at this position
-      if (p) return spotHtml(pos, p, sp ? (st === 'lock' ? 'lock' : '') : '', null, k === 1);
+      if (p) return spotHtml(pos, p, '', null, k === 1);
       if (target) return spotHtml(pos, null, st, D.selPos === pos ? sp : null, k === 1);
       return spotHtml(pos, null, sp ? 'lock' : '', null, k === 1);
     };
