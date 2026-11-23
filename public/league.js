@@ -62,7 +62,7 @@
     for (const t of shuffle(ranked.slice(), r)) { if (opp.length >= nOpp) break; if (!seen.has(t.id) && !seenTm.has(t.tm)) take(t); }
     for (const t of shuffle(ranked.slice(), r)) { if (opp.length >= nOpp) break; if (!seen.has(t.id)) take(t); }
     const SF = opts.stretch != null ? opts.stretch : 1.6;
-    const stretched = opp.map(t => Object.assign({}, t, { players: t.players.map(p => { const q = Object.assign({}, p, { ovr: 54 + (p.ovr - 54) * SF }); ['p2', 'p3'].forEach(k => { q[k] = p[k] * SF; }); ['ast', 'orb', 'drb', 'stl', 'blk'].forEach(k => { q[k] = 1 + (p[k] - 1) * SF; }); return q; }) }));
+    const stretched = opp.map(t => Object.assign({}, t, { players: t.players.map(p => { const q = Object.assign({}, p, { ovr: 54 + (p.ovr - 54) * SF, ovr0: p.ovr }); ['p2', 'p3'].forEach(k => { q[k] = p[k] * SF; }); ['ast', 'orb', 'drb', 'stl', 'blk'].forEach(k => { q[k] = 1 + (p[k] - 1) * SF; }); return q; }) }));
     opp.length = 0; stretched.forEach(t => opp.push(t));
     const teams = [user].concat(opp);
     const n = teams.length;

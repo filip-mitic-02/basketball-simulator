@@ -21,21 +21,87 @@
   const pct = v => (v == null || v === 0) ? '--' : (v * 100).toFixed(1);
   const dec = v => v == null ? '--' : v.toFixed(1);
   const od = v => Math.min(99, Math.round(55 + (v - 30) * 0.62));
+  // Displayed player rating: the raw game-score rating, stretched at the top, plus a bonus for big
+  // box-score production (points + rebounds + assists + stocks relative to the season) and for averaging
+  // a triple-double. Display only: the simulation engine keeps using the raw rating.
+  function dispRating(raw, bon) {
+    let t = 55 + (raw - 30) * 0.62 + 0.30 * Math.max(0, raw - 78) + (bon || 0);
+    if (t > 92) t = 92 + 8 * (1 - Math.exp(-(t - 92) / 9));
+    return Math.max(0, Math.min(99, Math.round(t)));
+  }
+  const dp = p => dispRating(p.ovr0 != null ? p.ovr0 : p.ovr, p.bon);
+  function addBonus(D) {
+    const F = D.fields, ix = {}; F.forEach((f, i) => { ix[f] = i; });
+    const pr = r => (r[ix.ppg] || 0) + 1.2 * (r[ix.rpg] || 0) + 1.6 * (r[ix.apg] || 0) + 2.2 * (r[ix.spg] || 0) + 2.0 * (r[ix.bpg] || 0);
+    const by = {};
+    D.teams.forEach(t => t[4].forEach(r => { if (r[ix.mpg] >= 20 && r[ix.g] >= 40) { const o = by[t[1]] || (by[t[1]] = { n: 0, s: 0, q: 0 }), v = pr(r); o.n++; o.s += v; o.q += v * v; } }));
+    D.teams.forEach(t => {
+      const o = by[t[1]], mu = o ? o.s / o.n : 0, sd = o && o.n > 2 ? Math.sqrt(Math.max(1e-6, (o.q - o.n * mu * mu) / (o.n - 1))) : 1;
+      t[4].forEach(r => {
+        let b = 0;
+        if (r[ix.mpg] >= 20 && r[ix.g] >= 40) b += 2.0 * Math.max(0, (pr(r) - mu) / sd - 2.0);
+        if (r[ix.ppg] >= 10 && r[ix.rpg] >= 10 && r[ix.apg] >= 10) b += 3;
+        r.push(Math.round(b * 10) / 10);
+      });
+    });
+    F.push('bon');
+  }
   const LEGACY = { 'Šampion': 'Champion', 'Sampion': 'Champion', 'Prvak': 'Champion', 'Nije u plejofu': 'Missed playoffs', 'Propustio plejof': 'Missed playoffs' };
   const trRes = s => { s = String(s == null ? '' : s); if (LEGACY[s]) return LEGACY[s]; return s.replace(/^Eliminisan:\s*/i, 'Eliminated: ').replace('Šampion', 'Champion'); };
-  const ovrCls = v => v >= 85 ? 't4' : v >= 70 ? 't3' : v >= 55 ? 't2' : 't1';
+  const ovrCls = v => v >= 90 ? 't4' : v >= 80 ? 't3' : v >= 68 ? 't2' : 't1';
   const rnd = n => Math.floor(Math.random() * n);
   const mmss = c => Math.floor(c / 60) + ':' + String(c % 60).padStart(2, '0');
   const eraLabel = () => (S.from === MIN_Y && S.to === MAX_Y) ? 'All-Time' : S.from + '-' + S.to;
   function hueOf(key) { let h = 0; for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+  const hashOf = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   function crest(tm, size, hue) {
     tm = String(tm || '?').slice(0, 4); hue = hue == null ? hueOf(tm) : hue; size = size || 28;
-    return `<svg class="crest" width="${size}" height="${Math.round(size * 1.12)}" viewBox="0 0 32 36" aria-hidden="true"><path d="M16 1 30 6v12c0 9-7 15-14 17C9 33 2 27 2 18V6z" fill="hsl(${hue} 55% 28%)" stroke="hsl(${hue} 75% 62%)" stroke-width="1.6"/><path d="M16 1 30 6v7H2V6z" fill="hsl(${hue} 65% 45%)" opacity=".5"/><text x="16" y="25" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${tm.length > 3 ? 8.5 : 11}" fill="#fff">${esc(tm)}</text></svg>`;
+    const h = hashOf(tm), pat = h % 5, h2 = (hue + 150 + (h >> 4) % 60) % 360;
+    const c1 = `hsl(${hue} 62% 30%)`, c2 = `hsl(${hue} 72% 48%)`, c3 = `hsl(${h2} 78% 62%)`, ed = `hsl(${hue} 80% 70%)`;
+    const id = 'cr' + h.toString(36) + size;
+    const shield = 'M16 1 30 6v12c0 9-7 15-14 17C9 33 2 27 2 18V6z';
+    const deco = [
+      `<path d="M2 6 16 1l14 5v6H2z" fill="${c2}"/><path d="M2 12h28v3H2z" fill="${c3}"/>`,
+      `<path d="M16 1 30 6v12c0 9-7 15-14 17z" fill="${c2}"/>`,
+      `<path d="M2 14 16 8l14 6v4L16 12 2 18z" fill="${c3}"/><path d="M2 6 16 1l14 5v3L16 4 2 9z" fill="${c2}"/>`,
+      `<circle cx="16" cy="19" r="11" fill="${c2}"/><path d="M5 19h22M16 8v22" stroke="${c3}" stroke-width="1.1" fill="none"/>`,
+      `<path d="M2 6 16 1l14 5v5H2z" fill="${c3}"/><path d="M8 11l8 5 8-5v4l-8 5-8-5z" fill="${c2}"/>`
+    ][pat];
+    return `<svg class="crest" width="${size}" height="${Math.round(size * 1.12)}" viewBox="0 0 32 36" aria-hidden="true"><defs><clipPath id="${id}"><path d="${shield}"/></clipPath></defs><path d="${shield}" fill="${c1}"/><g clip-path="url(#${id})">${deco}</g><path d="${shield}" fill="none" stroke="${ed}" stroke-width="1.6"/><text x="16" y="${pat === 3 ? 23.5 : 26}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${tm.length > 3 ? 8.5 : 11}" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width=".9" paint-order="stroke">${esc(tm)}</text></svg>`;
   }
-  function avatar(name, hue, size) {
+  // Player card mark: team-colour jersey, initials and a rarity ring driven by the displayed rating.
+  // Purely typographic and geometric, so it carries no likeness of any real person.
+  function avatar(name, hue, size, ovr, pos) {
     size = size || 40;
-    const ini = String(name).split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-    return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="hsl(${hue} 40% 22%)" stroke="hsl(${hue} 55% 50%)" stroke-width="1.5"/><path d="M6 36c2-8 8-11 14-11s12 3 14 11" fill="hsl(${hue} 45% 32%)"/><circle cx="20" cy="15" r="6.5" fill="hsl(${hue} 35% 55%)"/><text x="20" y="38.5" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="700" font-size="9" fill="#fff" opacity=".0">${esc(ini)}</text></svg>`;
+    const parts = String(name || '?').replace(/[.,]/g, '').split(/\s+/).filter(Boolean);
+    const ini = ((parts[0] || '?')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+    const tier = ovr == null ? 0 : ovr >= 90 ? 4 : ovr >= 80 ? 3 : ovr >= 68 ? 2 : 1;
+    const ring = ['#6b7686', '#b87333', '#c3ccd8', '#ffb627', '#ffe08a'][tier];
+    const glow = tier === 4 ? `<circle cx="24" cy="24" r="23.4" fill="none" stroke="#ff8a1f" stroke-width="1" opacity=".85"/>` : '';
+    const h = hashOf(name), id = 'av' + h.toString(36) + size;
+    const stripe = h % 3;
+    const deco = [
+      `<path d="M0 30h48v5H0z" fill="hsl(${hue} 85% 72%)" opacity=".9"/>`,
+      `<path d="M-4 40 26 4l6 0L2 44z" fill="hsl(${hue} 85% 72%)" opacity=".28"/><path d="M12 44 42 8l5 0L17 48z" fill="hsl(${hue} 85% 72%)" opacity=".28"/>`,
+      `<path d="M24 4 44 24 24 44 4 24z" fill="hsl(${hue} 85% 72%)" opacity=".22"/>`
+    ][stripe];
+    const fs = ini.length > 1 ? 17 : 20;
+    return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="${id}"><circle cx="24" cy="24" r="22.4"/></clipPath><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue} 58% 40%)"/><stop offset="1" stop-color="hsl(${hue} 62% 22%)"/></linearGradient></defs><g clip-path="url(#${id})"><rect width="48" height="48" fill="url(#${id}g)"/>${deco}<text x="24" y="${ini.length > 1 ? 30 : 31}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${fs}" letter-spacing=".5" fill="#fff" stroke="rgba(0,0,0,.45)" stroke-width=".8" paint-order="stroke">${esc(ini)}</text>${pos ? `<text x="24" y="42" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="700" font-size="7.5" letter-spacing="1" fill="rgba(255,255,255,.8)">${esc(String(pos).split(',')[0])}</text>` : ''}</g>${glow}<circle cx="24" cy="24" r="22.4" fill="none" stroke="${ring}" stroke-width="${tier >= 3 ? 2.4 : 1.8}"/></svg>`;
+  }
+  // ---------- trophies (original vector art) ----------
+  function trophy(kind, label, size) {
+    size = size || 48;
+    const G1 = '#ffd36b', G2 = '#ffb627', G3 = '#c47a10', EDGE = '#7a4a08';
+    const base = `<rect x="15" y="39" width="18" height="4" rx="1.5" fill="${G3}" stroke="${EDGE}" stroke-width=".8"/><rect x="20" y="33" width="8" height="7" fill="${G2}" stroke="${EDGE}" stroke-width=".8"/>`;
+    const shapes = {
+      cup: `<path d="M13 8h22v10c0 8-5 13-11 13S13 26 13 18z" fill="${G2}" stroke="${EDGE}" stroke-width="1"/><path d="M13 12H8c0 8 3 11 7 12M35 12h5c0 8-3 11-7 12" fill="none" stroke="${G2}" stroke-width="2.6"/><path d="M17 10v9c0 4 2 7 5 9" stroke="${G1}" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>${base}`,
+      ball: `<circle cx="24" cy="15" r="11" fill="${G2}" stroke="${EDGE}" stroke-width="1"/><path d="M13 15h22M24 4v22M16 7c4 4 4 12 0 16M32 7c-4 4-4 12 0 16" stroke="${EDGE}" stroke-width="1.1" fill="none"/><path d="M19 27l-2 8h14l-2-8z" fill="${G3}" stroke="${EDGE}" stroke-width=".8"/>${base}`,
+      shield: `<path d="M24 5l15 5v11c0 9-6 15-15 19C15 36 9 30 9 21V10z" fill="${G2}" stroke="${EDGE}" stroke-width="1"/><path d="M24 10l10 3.5V21c0 6-4.5 10.5-10 13-5.500-2.500-10-7-10-13v-7.500z" fill="none" stroke="${G1}" stroke-width="1.8"/><path d="M24 15v14M18 21h12" stroke="${G1}" stroke-width="2" stroke-linecap="round"/>`,
+      star: `<circle cx="24" cy="22" r="17" fill="${G3}" stroke="${EDGE}" stroke-width="1"/><path d="M24 9l3.9 8 8.8 1.2-6.4 6.1 1.6 8.7-7.9-4.2-7.9 4.2 1.6-8.7-6.4-6.1 8.8-1.2z" fill="${G1}" stroke="${EDGE}" stroke-width=".8" stroke-linejoin="round"/>`,
+      clip: `<rect x="11" y="7" width="26" height="34" rx="3" fill="${G2}" stroke="${EDGE}" stroke-width="1"/><rect x="18" y="4" width="12" height="7" rx="2" fill="${G3}" stroke="${EDGE}" stroke-width=".8"/><path d="M16 18h16M16 24h16M16 30h10" stroke="${G1}" stroke-width="2.2" stroke-linecap="round"/><path d="M33 29l2 2 4-5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+      medal: `<path d="M14 3h8l4 14h-8zM34 3h-8l-4 14h8z" fill="#e8523a" stroke="${EDGE}" stroke-width=".6"/><circle cx="24" cy="29" r="13" fill="${G2}" stroke="${EDGE}" stroke-width="1"/><circle cx="24" cy="29" r="9.5" fill="none" stroke="${G1}" stroke-width="1.4"/><text x="24" y="32.5" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${label && label.length > 2 ? 8.5 : 10}" fill="#4a2c05">${esc(label || '')}</text>`
+    };
+    return `<svg class="trophy" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true">${shapes[kind] || shapes.cup}</svg>`;
   }
   function go(screen) { S.screen = screen; render(); window.scrollTo(0, 0); }
   function render() {
@@ -202,8 +268,8 @@
     const vis = statsVisible();
     const st = (l, v) => `<div>${l}<b>${vis ? v : '&nbsp;'}</b></div>`;
     return `<button class="pcard ${D.sel === i ? 'sel' : ''} ${dis ? 'dis' : ''}" style="--h:${hue}" data-a="sel" data-i="${i}" ${dis ? 'aria-disabled="true"' : ''}>
-      <div class="hd">${crest(t.tm, 20)}<span>${t.season} ${esc(t.tm)}</span><span class="ovr ${vis ? ovrCls(p.ovr) : 'tq'}" style="font-size:24px">${vis ? od(p.ovr) : '??'}</span></div>
-      <div class="bd"><div class="who">${avatar(p.name, hue, 44)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
+      <div class="hd">${crest(t.tm, 20)}<span>${t.season} ${esc(t.tm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:24px">${vis ? dp(p) : '??'}</span></div>
+      <div class="bd"><div class="who">${avatar(p.name, hue, 46, vis ? dp(p) : null, p.pos)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
         <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
       </div>${fitBadge(p, taken, fits)}</button>`;
   }
@@ -226,9 +292,9 @@
     const byPos = {}; E.POS.forEach(x => byPos[x] = []);
     P.forEach((p, i) => { byPos[as[i] || E.eligible(p)[0]].push(p); });
     const vis = !S.hard || S.revealed;
-    const slotHtml = p => p ? `<div class="slot full">${crest(p.fromTm, 22)}<div class="who"><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span></div>${vis ? `<div class="ovr ${ovrCls(p.ovr)}">${od(p.ovr)}</div>` : ''}</div>` : '<div class="slot empty">open</div>';
+    const slotHtml = p => p ? `<div class="slot full">${crest(p.fromTm, 22)}<div class="who"><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span></div>${vis ? `<div class="ovr ${ovrCls(dp(p))}">${dp(p)}</div>` : ''}</div>` : '<div class="slot empty">open</div>';
     const grp = E.POS.map(pos => `<div class="sgrp"><div class="lb">${pos}</div>${slotHtml(byPos[pos][0])}${slotHtml(byPos[pos][1])}</div>`).join('');
-    const avg = P.length && vis ? (P.reduce((a, p) => a + od(p.ovr), 0) / P.length).toFixed(1) : '--';
+    const avg = P.length && vis ? (P.reduce((a, p) => a + dp(p), 0) / P.length).toFixed(1) : '--';
     return `<div class="panel"><div class="eyebrow">Roster ${P.length}/10</div><div class="slots">${grp}</div>
       <div class="note" style="margin-top:10px">Two players per position. Versatile players can fill more than one position, so you can't stack five centers.${vis ? ' Team average: <b>' + avg + '</b>' : ' Ratings are hidden until the draft ends.'}</div></div>`;
   }
@@ -263,11 +329,11 @@
     const P = S.user.players, plan = S.plan, tot = plan.mins.reduce((a, b) => a + b, 0);
     const five = plan.starters.map((pi, k) => {
       const p = P[pi];
-      return `<div class="starter"><div class="sl">${esc(p.slot)}</div><div class="sw">${crest(p.fromTm, 30)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span></div><div class="ovr ${ovrCls(p.ovr)}" style="margin-left:auto">${od(p.ovr)}</div></div>
+      return `<div class="starter"><div class="sl">${esc(p.slot)}</div><div class="sw">${crest(p.fromTm, 30)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span></div><div class="ovr ${ovrCls(dp(p))}" style="margin-left:auto">${dp(p)}</div></div>
         <select data-a="starter" data-k="${k}" aria-label="Starter ${k + 1}">${P.map((q, i) => `<option value="${i}" ${pi === i ? 'selected' : ''}>${esc(q.name)} (${esc(q.slot)})</option>`).join('')}</select></div>`;
     }).join('');
     const rows = P.map((p, i) => `<tr><td><div class="rn">${crest(p.fromTm, 20)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span></div></div></td>
-      <td><span class="pill">${esc(p.slot)}</span></td><td class="r"><span class="ovr ${ovrCls(p.ovr)}" style="font-size:20px">${od(p.ovr)}</span></td>
+      <td><span class="pill">${esc(p.slot)}</span></td><td class="r"><span class="ovr ${ovrCls(dp(p))}" style="font-size:20px">${dp(p)}</span></td>
       <td class="r num">${dec(p.ppg)}</td><td class="r num">${dec(p.rpg)}</td><td class="r num">${dec(p.apg)}</td>
       <td><div class="mrow"><input class="mins" type="range" min="0" max="44" step="1" value="${plan.mins[i]}" data-a="mins" data-i="${i}" aria-label="Minutes for ${esc(p.name)}"><span class="num mv" id="m${i}">${plan.mins[i]}</span></div></td></tr>`).join('');
     return `<div class="coach-grid">
@@ -287,7 +353,7 @@
           <div class="tiles">${Object.keys(AUTO_I).map(k => `<button class="tile ${plan.auto === k ? 'on' : ''}" data-a="auto" data-v="${k}"><b>${AUTO_I[k]}</b><span>${k === 'auto' ? 'The assistant coach rotates by your minute targets, fatigue and fouls.' : k === 'forced' ? 'Only fouled-out players are replaced. You do the rest.' : 'No automatic changes. Quick sims still rotate automatically.'}</span></button>`).join('')}</div></div>
       </div></div>`;
   }
-  const teamAvg = () => (S.user.players.reduce((a, p) => a + od(p.ovr), 0) / S.user.players.length).toFixed(1);
+  const teamAvg = () => (S.user.players.reduce((a, p) => a + dp(p), 0) / S.user.players.length).toFixed(1);
   SCREENS.prep = () => `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Roster complete</h2>
       <div class="row"><input type="text" id="tname" value="${esc(S.teamName)}" maxlength="24" aria-label="Team name"><button class="btn pri" data-a="beginSeason">Start season</button></div></div>
       ${S.hard ? '<div class="banner">Hard mode: your players are revealed so you can set the rotation.</div>' : ''}
@@ -321,24 +387,31 @@
   // ---------- awards ----------
   function awardsHtml(L) {
     const A = L.awards || LG.computeAwards(L), f = v => v.toFixed(1);
-    const card = (t, x, sub) => x ? `<div class="awc ${x.isUser ? 'me' : ''}"><div class="al">${t}</div><div class="an">${esc(x.name)}</div><div class="at">${x.isUser ? esc(S.teamName) : esc(x.team)}</div><div class="as">${sub}</div></div>` : '';
-    const lead = (t, x, k) => x ? card(t, x, f(x[k]) + ' per game') : '';
-    const teams = (arr, names) => arr.map((tm, i) => `<div class="awt"><div class="al">${names[i]}</div>${tm.map(x => `<div class="awp ${x.isUser ? 'me' : ''}"><span class="pill">${x.grp}</span><b>${esc(x.name)}</b><em>${x.isUser ? esc(S.teamName) : esc(x.team)}</em></div>`).join('')}</div>`).join('');
-    return `<div class="awg">${card('Most Valuable Player', A.mvp, f(A.mvp.ppg) + ' pts &middot; ' + f(A.mvp.rpg) + ' reb &middot; ' + f(A.mvp.apg) + ' ast')}
-      ${card('Defensive Player of the Year', A.dpoy, f(A.dpoy.spg) + ' stl &middot; ' + f(A.dpoy.bpg) + ' blk')}
-      ${A.sixth ? card('Sixth Man of the Year', A.sixth, f(A.sixth.ppg) + ' pts off the bench') : ''}
-      <div class="awc ${A.coach.isUser ? 'me' : ''}"><div class="al">Coach of the Year</div><div class="an">${A.coach.isUser ? 'You' : esc(A.coach.team)}</div><div class="at">${A.coach.w}&ndash;${A.coach.l}</div></div></div>
-      <div class="awg" style="margin-top:10px">${lead('Scoring leader', A.leaders.pts, 'ppg')}${lead('Rebounding leader', A.leaders.reb, 'rpg')}${lead('Assists leader', A.leaders.ast, 'apg')}${lead('Steals leader', A.leaders.stl, 'spg')}${lead('Blocks leader', A.leaders.blk, 'bpg')}</div>
+    const card = (t, x, sub, ic, lb) => x ? `<div class="awc ${x.isUser ? 'me' : ''}">${trophy(ic, lb, 54)}<div class="awx">${x.isUser ? '<div class="yours">Yours</div>' : ''}<div class="al">${t}</div><div class="an">${esc(x.name)}</div><div class="at">${x.isUser ? esc(S.teamName) : esc(x.team)}</div><div class="as">${sub}</div></div></div>` : '';
+    const lead = (t, x, k, lb) => x ? card(t, x, f(x[k]) + ' per game', 'medal', lb) : '';
+    const teams = (arr, names) => arr.map((tm, i) => `<div class="awt"><div class="al">${trophy('star', '', 18)} ${names[i]}</div>${tm.map(x => `<div class="awp ${x.isUser ? 'me' : ''}"><span class="pill">${x.grp}</span><b>${esc(x.name)}</b><em>${x.isUser ? esc(S.teamName) : esc(x.team)}</em></div>`).join('')}</div>`).join('');
+    return `<div class="awg big">${card('Most Valuable Player', A.mvp, f(A.mvp.ppg) + ' pts &middot; ' + f(A.mvp.rpg) + ' reb &middot; ' + f(A.mvp.apg) + ' ast', 'cup')}
+      ${card('Defensive Player of the Year', A.dpoy, f(A.dpoy.spg) + ' stl &middot; ' + f(A.dpoy.bpg) + ' blk', 'shield')}
+      ${A.sixth ? card('Sixth Man of the Year', A.sixth, f(A.sixth.ppg) + ' pts off the bench', 'star') : ''}
+      <div class="awc ${A.coach.isUser ? 'me' : ''}">${trophy('clip', '', 54)}<div class="awx">${A.coach.isUser ? '<div class="yours">Yours</div>' : ''}<div class="al">Coach of the Year</div><div class="an">${A.coach.isUser ? 'You' : esc(A.coach.team)}</div><div class="at">${A.coach.w}&ndash;${A.coach.l}</div></div></div></div>
+      <div class="awg" style="margin-top:10px">${lead('Scoring leader', A.leaders.pts, 'ppg', 'PTS')}${lead('Rebounding leader', A.leaders.reb, 'rpg', 'REB')}${lead('Assists leader', A.leaders.ast, 'apg', 'AST')}${lead('Steals leader', A.leaders.stl, 'spg', 'STL')}${lead('Blocks leader', A.leaders.blk, 'bpg', 'BLK')}</div>
       <div class="eyebrow" style="margin-top:16px">All-League</div><div class="awts">${teams(A.allLeague, ['First Team', 'Second Team', 'Third Team'])}</div>
       <div class="eyebrow" style="margin-top:16px">All-Defensive</div><div class="awts">${teams(A.allDef, ['First Team', 'Second Team'])}</div>`;
   }
   function poAwardsHtml(L) {
     const P = L.poAwards || LG.poAwards(L); if (!P || !P.finals) return '';
     const f = v => v.toFixed(1), c = P.champ === 0 ? S.teamName : L.teams[P.champ].label;
-    const card = (t, x) => x ? `<div class="awc ${x.isUser ? 'me' : ''}"><div class="al">${t}</div><div class="an">${esc(x.name)}</div><div class="at">${x.isUser ? esc(S.teamName) : esc(x.team)}</div><div class="as">${f(x.ppg)} pts &middot; ${f(x.rpg)} reb &middot; ${f(x.apg)} ast</div></div>` : '';
-    return `<div class="awg"><div class="awc champ"><div class="al">Champions</div><div class="an">${esc(c)}</div><div class="at">${P.champ === 0 ? 'That is you' : ''}</div></div>${card('Finals MVP', P.finals.mvp)}${P.confs.map((x, i) => card('Conference Finals MVP', x.mvp)).join('')}</div>`;
+    const card = (t, x, ic) => x ? `<div class="awc ${x.isUser ? 'me' : ''}">${trophy(ic, '', 54)}<div class="awx">${x.isUser ? '<div class="yours">Yours</div>' : ''}<div class="al">${t}</div><div class="an">${esc(x.name)}</div><div class="at">${x.isUser ? esc(S.teamName) : esc(x.team)}</div><div class="as">${f(x.ppg)} pts &middot; ${f(x.rpg)} reb &middot; ${f(x.apg)} ast</div></div></div>` : '';
+    return `<div class="awg big"><div class="awc champ ${P.champ === 0 ? 'me' : ''}">${trophy('ball', '', 64)}<div class="awx">${P.champ === 0 ? '<div class="yours">Yours</div>' : ''}<div class="al">Champions</div><div class="an">${esc(c)}</div><div class="at">${P.champ === 0 ? 'That is you' : ''}</div></div></div>${card('Finals MVP', P.finals.mvp, 'cup')}${P.confs.map(x => card('Conference Finals MVP', x.mvp, 'star')).join('')}</div>`;
   }
-
+  // Big showcase of the honours the user earned this season
+  function trophyCase(L) {
+    const mine = ((L.awards && L.awards.mine) || []).concat((L.poAwards && L.poAwards.mine) || []);
+    if (L.phase === 'champion') mine.unshift('NBA Champions');
+    if (!mine.length) return '';
+    const icon = s => /Champions/.test(s) ? ['ball', ''] : /Finals MVP|^MVP/.test(s) ? ['cup', ''] : /Defensive Player/.test(s) ? ['shield', ''] : /Coach/.test(s) ? ['clip', ''] : /Scoring/.test(s) ? ['medal', 'PTS'] : /Rebound/.test(s) ? ['medal', 'REB'] : /Assist/.test(s) ? ['medal', 'AST'] : /Steal/.test(s) ? ['medal', 'STL'] : /Block/.test(s) ? ['medal', 'BLK'] : ['star', ''];
+    return `<div class="tcase"><div class="eyebrow">Trophy case</div><div class="tc-row">${mine.map(s => { const i = s.indexOf(': '), ic = icon(s); return `<div class="tc">${trophy(ic[0], ic[1], 76)}<div class="tcn">${esc(i > 0 ? s.slice(0, i) : s)}</div>${i > 0 ? `<div class="tcp">${esc(s.slice(i + 2))}</div>` : ''}</div>`; }).join('')}</div></div>`;
+  }
   SCREENS.hub = () => {
     const L = S.L, r = L.rec[0];
     if (L.phase === 'seasonDone') {
@@ -346,7 +419,7 @@
         <div class="rec led num">${r.w}&ndash;${r.l}</div>${r.l === 0 ? '<h2 style="color:var(--good)">Undefeated. 82-0.</h2>' : ''}
         <p class="note">Conference seed: ${LG.standings(L).filter(x => x.conf === L.conf[0]).findIndex(x => x.i === 0) + 1}</p>${pipsHtml()}
         <div style="margin-top:20px"><button class="btn pri" data-a="startpo">Start playoffs</button></div></div>
-        <div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
+        ${trophyCase(L)}<div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
         <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Standings</div>${standingsHtml()}</div><div class="panel"><div class="eyebrow">Season stats</div>${statsHtml()}</div></div>`;
     }
     const g = LG.nextUserGame(L), o = oppSummary(g.opp);
@@ -357,7 +430,7 @@
         <p class="note" style="margin-top:12px">${r.l > 0 ? 'The undefeated run is over. Keep winning for seeding and the playoffs.' : 'Still undefeated. One loss ends the 82-0 chase.'}</p></div>
       <div class="panel opp"><div class="vs">${g.userHome ? 'Home vs' : 'Away at'}</div>
         <div class="row" style="flex-wrap:nowrap">${crest(o.t.tm, 44)}<div class="t">${esc(o.t.label)}</div></div>
-        <div class="note">${o.top.map(p => esc(p.name) + ' (' + od(p.ovr) + ')').join(' &middot; ')}</div>
+        <div class="note">${o.top.map(p => esc(p.name) + ' (' + dp(p) + ')').join(' &middot; ')}</div>
         <div class="note">Roster strength <b>${od(o.ovr).toFixed(0)}</b> &middot; yours <b>${od(E.teamOvr(S.user, S.plan)).toFixed(0)}</b></div>
         <div class="ctrl" style="margin-top:4px"><button class="btn pri" data-a="play">Coach this game</button><button class="btn" data-a="quick">Quick sim</button></div>
         <div class="ctrl" style="margin-top:0"><button class="btn sm" data-a="sim10">Sim 10 games</button><button class="btn sm" data-a="simall">Sim to end of season</button><button class="btn sm" data-a="gocoach">Tactics</button></div></div></div>
@@ -436,6 +509,7 @@
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff run</div>${pathHtml(L)}</div>
       <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Achievements</div>${ach.length ? ach.map(x => `<div class="ach"><div><b>${x[0]}</b><div class="note">${x[1]}</div></div></div>`).join('') : '<p class="note">No achievements this time. Try a tighter rotation.</p>'}</div>
       <div class="panel"><div class="eyebrow">Season stats</div>${statsHtml()}</div></div>
+      ${trophyCase(L)}
       ${L.po && L.po.champ != null ? `<div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff awards</div>${poAwardsHtml(L)}</div>` : ''}
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
       <div class="panel" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-a="newgame">New game</button><button class="btn" data-a="copy">Copy result</button><span class="note" id="saveInfo">${S.acct ? 'Saving result...' : 'Playing as guest: this result is not saved. Sign in with Google to keep results and achievements.'}</span></div>`;
@@ -452,7 +526,7 @@
   const canCoach = () => S.live.window && !S.G.over;
   SCREENS.game = () => `<div id="alerts"></div><div id="sb" class="sb"></div>
     <div class="gm"><div class="panel"><div class="eyebrow">Play by play</div><div class="feed" id="feed"></div><div class="ctrl" id="ctrl"></div></div>
-    <div class="panel" id="side"></div></div>`;
+    <div class="panel"><div id="sidetabs"></div><div id="sidebody"></div><div class="ctrl" id="sidectl"></div></div></div>`;
   AFTER.game = () => { S.live.fed = 0; updateGame(true); };
 
   function evHtml(G, e) {
@@ -465,6 +539,8 @@
     const sc = scoring ? `${e.sc[side]}-${e.sc[1 - side]}` : '';
     return `<div class="ev ${cls.join(' ')}"><div class="tm">${e.q > 4 ? 'OT' : 'Q' + e.q} ${mmss(e.c)}</div><div class="tx">${esc(E.describe(G, e))}</div><div class="sc">${sc}</div></div>`;
   }
+  // Only touch the DOM when the markup really changed, so a button is never replaced between mousedown and mouseup.
+  function setHTML(id, html) { const el = document.getElementById(id); if (el && el._h !== html) { el.innerHTML = html; el._h = html; } }
   function updateGame(full) {
     const G = S.G, live = S.live, side = mySide();
     const sb = document.getElementById('sb'); if (!sb) return;
@@ -478,14 +554,14 @@
     if (h) feed.insertAdjacentHTML('afterbegin', h);
     live.fed = log.length;
     const spd = [1, 2, 4, 8].map(s => `<button class="chip ${live.speed === s ? 'on' : ''}" data-a="speed" data-v="${s}">${s}x</button>`).join('');
-    document.getElementById('ctrl').innerHTML = G.over ? '<button class="btn pri" data-a="finish">Continue</button>' :
+    setHTML('ctrl', G.over ? '<button class="btn pri" data-a="finish">Continue</button>' :
       `${live.playing ? '<button class="btn pri" data-a="pause">Pause</button>' : '<button class="btn pri" data-a="resume">' + (live.window ? 'Resume game' : 'Resume') + '</button>'}${spd}
-       <button class="btn" data-a="skipq">Sim to end of quarter</button><button class="btn" data-a="skipg">Sim to final</button>`;
+       <button class="btn" data-a="skipq">Sim to end of quarter</button><button class="btn" data-a="skipg">Sim to final</button>`);
     let banner = '';
     if (live.window && !G.over) banner += `<div class="banner win">Coaching window open (${esc(live.winLabel)}). Make your changes, then resume the game.</div>`;
     else if (!G.over) banner += '<div class="banner" style="background:#141b27;border-color:var(--line2);color:var(--mute)">Changes are locked while the clock runs. You can coach at quarter breaks or by calling a timeout.</div>';
     if (live.alert) banner += `<div class="banner">${esc(live.alert)}</div>`;
-    document.getElementById('alerts').innerHTML = banner;
+    setHTML('alerts', banner);
     renderSide();
   }
   function renderSide() {
@@ -512,7 +588,6 @@
         ${sec('Substitutions', AUTO_I, plan.auto, 'auto')}
         <div class="tsec"><div class="th">Feed the ball to</div><div class="chips">${on.map(i => `<button class="chip ${G.feed[side] === i && G.feedLeft[side] > 0 ? 'on' : ''}" data-a="feed" data-i="${i}">${esc(P[i].name.split(' ').slice(-1)[0])}</button>`).join('')}</div><div class="td">The chosen player gets more shots for the next 8 possessions. A hot hand pays off, a cold one does not.</div></div>
         <div class="tsec"><div class="th">Double-team</div><div class="chips">${oppOn.map(i => `<button class="chip ${G.dbl[side] === i ? 'on' : ''}" data-a="dbl" data-i="${i}">${esc(oppP[i].name.split(' ').slice(-1)[0])}</button>`).join('')}</div><div class="td">Cuts that player's shooting and forces turnovers for the next 8 possessions, but opens shots for everyone else.</div></div></div>
-        <div class="ctrl"><button class="btn amb" data-a="timeout" ${G.to[side] <= 0 || G.over ? 'disabled' : ''}>Call timeout (${G.to[side]} left)</button></div>
         <div class="note">A timeout stops play, restores energy to the players on the floor, kills the opponent's run and opens a coaching window.</div>`;
     } else if (live.tab === 'team') {
       const sum = t => { const o = { fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, reb: 0, oreb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, pts: 0 }; G.st[t].forEach(x => Object.keys(o).forEach(k => o[k] += x[k] || 0)); return o; };
@@ -531,7 +606,8 @@
         Pt.map((p, i) => s[i].sec > 0 ? `<tr><td>${esc(p.name)}</td><td class="r num">${Math.round(s[i].sec / 60)}</td><td class="r num">${s[i].pts}</td><td class="r num">${s[i].reb}</td><td class="r num">${s[i].ast}</td><td class="r num">${s[i].fgm}/${s[i].fga}</td><td class="r num">${s[i].tpm}/${s[i].tpa}</td><td class="r num">${s[i].ftm}/${s[i].fta}</td><td class="r num">${s[i].pf}</td></tr>` : '').join('') + '</table></div>'; };
       body = box(side) + '<div style="height:12px"></div>' + box(opp);
     }
-    document.getElementById('side').innerHTML = tabs + body + (live.tab !== 'tac' && live.tab !== 'team' && !G.over ? `<div class="ctrl"><button class="btn amb" data-a="timeout" ${G.to[side] <= 0 ? 'disabled' : ''}>Call timeout (${G.to[side]} left)</button></div>` : '');
+    setHTML('sidetabs', tabs); setHTML('sidebody', body);
+    setHTML('sidectl', G.over ? '' : `<button class="btn amb" data-a="timeout" ${G.to[side] <= 0 ? 'disabled' : ''}>Call timeout (${G.to[side]} left)</button> <span class="note">Space pauses / resumes</span>`);
   }
 
   // live loop
@@ -708,6 +784,12 @@
   };
   function refreshCoach() { if (S.screen === 'game') updateGame(); else render(); }
 
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' || S.screen !== 'game' || !S.G || e.target.closest('input,select,textarea,button')) return;
+    e.preventDefault();
+    if (S.G.over) return;
+    if (S.live.playing) ACTIONS.pause(); else ACTIONS.resume();
+  });
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-a]');
     if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
@@ -736,8 +818,9 @@
   });
 
   fetch('data.json').then(r => r.json()).then(D => {
+    addBonus(D);
     S.teams = D.teams.map(r => E.mkTeam(r, D.fields));
     setPool(); S.screen = 'menu'; render(); initAccount();
   }).catch(err => { app.innerHTML = '<div class="loading">Could not load data: ' + esc(err.message) + '</div>'; });
-  window.__S = S;
+  window.__S = S; window.__dp = dp;
 })();
