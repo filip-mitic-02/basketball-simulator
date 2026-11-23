@@ -181,6 +181,7 @@
 
   // ---------- Jedan posed ----------
   function possession(G) {
+    G.np = (G.np | 0) + 1;                   // possessions played so far (used to place coaching actions in the replay log)
     const o = G.poss, d = 1 - o;
     const P = G.teams[o].players, Q = G.teams[d].players;
     const po = G.plans[o], pd = G.plans[d];

@@ -35,5 +35,15 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/runs.js": {
+      "maxDuration": 30,
+      "includeFiles": "public/{engine.js,league.js,core.js,data.json}"
+    },
+    "api/draft.js": {
+      "maxDuration": 15,
+      "includeFiles": "public/{engine.js,league.js,core.js,data.json}"
+    }
+  }
 }

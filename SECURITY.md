@@ -10,17 +10,24 @@
 | XSS | `script-src 'self'` (no inline scripts, no `eval`), all dynamic text is HTML-escaped in the UI, stored strings are stripped of control characters and angle brackets on the server. `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'`. |
 | Transport / headers | HSTS (preload), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, COOP. API responses are `no-store`. |
 | Injection | Neon client with tagged templates: all values are bound parameters. DB constraints (`check`) duplicate the validation. |
-| Integrity of scores | The server ignores the client score and recomputes it from the record, playoff wins, title and mode. Records, playoff wins and round labels must be mutually consistent. Max one saved season per 20 seconds and 150 per day per user. |
+| Integrity of scores | The leaderboard only contains runs the server verified by replaying the whole season. Signed-in players draft through `/api/draft`: the server rolls every team with an HMAC keyed by a per-draft secret the browser never sees, validates every pick, and only then issues the season seed. When the season ends the browser sends only its decisions (lineups, timeouts, tactics, which games were quick-simmed), never a result. The server replays them with the same simulation code (`public/engine.js`, `league.js`, `core.js`), rejects any log that breaks the rules (coaching outside a window, impossible lineups, unfinished season, runaway input) and derives the record, title, score and achievements itself. One run per draft (unique `draft_id`), at most three rejected submissions per draft, one draft started per request cycle with a per-hour cap, one saved season per 20 seconds and 150 per day per user. Every run stores its simulation version and log. |
 | Privacy | Stored: Google account ID (`sub`), first name + last initial, finished seasons. No email, no profile picture, no tracking. Leaderboard shows first name + last initial. `DELETE /api/me` removes the account and all runs. |
 | Secrets | Only in environment variables. `.env` is git-ignored. CI runs `npm audit`. |
 
 ## Known limits (please read)
 
-- **The game simulation runs in the browser.** A determined player can forge a request with an impossible but self-consistent season
-  (for example 82-0 and a title). The server checks consistency and rate limits, it cannot prove the season was actually played.
-  Fully fixing this means running the simulation on the server and sending only coaching decisions, which is a larger change.
-  Until then treat the leaderboard as casual, and delete outliers in SQL if needed:
+- **The season seed is known to the player.** The server hands it out after the draft so the browser can play the season. A player
+  who reads it can simulate the season offline many times and look for lineup and timing decisions that win, then submit exactly
+  those decisions. The server will accept them because they are a legal, honestly replayable season. This is "perfect play with
+  hindsight", not forging. It cannot be removed without running every game on the server (one request per quarter), which does not
+  fit the Vercel Hobby plan. Treat top scores as "best of an unlimited number of attempts" and delete outliers in SQL if needed:
   `delete from runs where id = ...;`
+- Anyone can write a bot that plays the game well. Bots are not distinguishable from people.
+- Guests play fully locally and nothing they do is stored or ranked.
+- **Version pinning.** `tests/sim-lock.test.js` fails if the simulation or data changes without a new `Core.VERSION` and a refreshed
+  `tests/sim.lock.json` (`node scripts/update-sim-lock.mjs`). A draft started on an older version is refused with 409 and the
+  player is asked to reload. Runs saved before this protection exist as unverified history and never appear on the leaderboard.
+- The replay costs about two seconds of CPU per season, so `api/runs.js` has `maxDuration: 30` in `vercel.json`.
 - Rate limiting for the login endpoints relies on Vercel's platform protections. Turn on Vercel Firewall / Attack Challenge Mode if you see abuse.
 - `style-src` still allows `'unsafe-inline'` because the UI uses inline `style=""` attributes. Scripts remain locked down.
 

@@ -11,7 +11,7 @@ test('draft screen shows jersey cards and ratings, and hides ratings in Hard mod
   w.scrollTo = () => {};
   const data = readFileSync(new URL('data.json', dir), 'utf8');
   w.fetch = async (u) => String(u).startsWith('data.json') ? { ok: true, json: async () => JSON.parse(data) } : { ok: false, status: 401, json: async () => ({}) };
-  for (const f of ['engine.js', 'league.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
+  for (const f of ['engine.js', 'league.js', 'core.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
   await new Promise(r => setTimeout(r, 1200));
   const doc = w.document, click = sel => doc.querySelector(sel).dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   assert.equal(doc.querySelectorAll('.mode').length, 2);

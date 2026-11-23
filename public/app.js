@@ -30,21 +30,6 @@
     return Math.max(0, Math.min(99, Math.round(t)));
   }
   const dp = p => dispRating(p.ovr0 != null ? p.ovr0 : p.ovr);
-  function addBonus(D) {
-    const F = D.fields, ix = {}; F.forEach((f, i) => { ix[f] = i; });
-    const pr = r => (r[ix.ppg] || 0) + 1.2 * (r[ix.rpg] || 0) + 1.6 * (r[ix.apg] || 0) + 2.2 * (r[ix.spg] || 0) + 2.0 * (r[ix.bpg] || 0);
-    const by = {};
-    D.teams.forEach(t => t[4].forEach(r => { if (r[ix.mpg] >= 20 && r[ix.g] >= 40) { const o = by[t[1]] || (by[t[1]] = { n: 0, s: 0, q: 0 }), v = pr(r); o.n++; o.s += v; o.q += v * v; } }));
-    D.teams.forEach(t => {
-      const o = by[t[1]], mu = o ? o.s / o.n : 0, sd = o && o.n > 2 ? Math.sqrt(Math.max(1e-6, (o.q - o.n * mu * mu) / (o.n - 1))) : 1;
-      t[4].forEach(r => {
-        let b = 0;
-        if (r[ix.mpg] >= 20 && r[ix.g] >= 40) b += 2.0 * Math.max(0, (pr(r) - mu) / sd - 2.0);
-        if (r[ix.ppg] >= 10 && r[ix.rpg] >= 10 && r[ix.apg] >= 10) b += 3;
-        r[ix.ovr] = Math.round(r[ix.ovr] + b / 0.62);
-      });
-    });
-  }
   const LEGACY = { 'Šampion': 'Champion', 'Sampion': 'Champion', 'Prvak': 'Champion', 'Nije u plejofu': 'Missed playoffs', 'Propustio plejof': 'Missed playoffs' };
   const trRes = s => { s = String(s == null ? '' : s); if (LEGACY[s]) return LEGACY[s]; return s.replace(/^Eliminisan:\s*/i, 'Eliminated: ').replace('Šampion', 'Champion'); };
   const ovrCls = v => v >= 90 ? 't4' : v >= 80 ? 't3' : v >= 68 ? 't2' : 't1';
@@ -184,7 +169,7 @@
   async function api(path, opts) {
     opts = opts || {};
     const r = await fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': '82-0-coach' } }, opts));
-    if (!r.ok) { const err = new Error('http ' + r.status); err.status = r.status; throw err; }
+    if (!r.ok) { const err = new Error('http ' + r.status); err.status = r.status; try { err.code = (await r.json()).error; } catch (e) { } throw err; }
     return r.json();
   }
   function renderAcct() {
@@ -206,13 +191,16 @@
     if (!S.acct) { S.runs = []; return; }
     try { S.runs = (await api('/api/runs')).runs || []; } catch (e) { S.runs = []; }
   }
-  async function saveRun(run) {
-    if (!S.acct) return false;
+  // Sends only the decisions made during the season. The server replays them and the result shown afterwards is the server's.
+  async function submitRun() {
+    if (!S.acct || !S.D || !S.D.id) return { state: 'guest' };
     try {
-      await api('/api/runs', { method: 'POST', body: JSON.stringify({ w: run.w, l: run.l, poW: run.poW, champ: run.champ, hard: run.hard, res: run.res, eraFrom: run.eraFrom, eraTo: run.eraTo, eraLabel: run.eraLabel, names: run.names, ach: run.ach }) });
+      const r = await api('/api/runs', { method: 'POST', body: JSON.stringify({ id: S.D.id, log: S.SE.log }) });
       await loadProfile();
-      return true;
-    } catch (e) { return false; }
+      return { state: 'saved', summary: r.summary };
+    } catch (e) {
+      return { state: e && e.status === 409 && e.code === 'version' ? 'version' : e && e.status === 409 ? 'dup' : e && e.status === 400 ? 'invalid' : 'error' };
+    }
   }
 
   // ---------- screens ----------
@@ -266,7 +254,7 @@
           <button class="mode ${S.hard ? 'on' : ''}" data-a="hard" data-v="1"><span class="mi">${ICON_BLIND}</span><span class="mt"><span class="mh"><h3>Hard</h3><span class="tag hot">Score x1.5</span></span><p>Stats and overalls are hidden. One Scout per draft reveals a full roll.</p></span></button>
         </div>
         <div class="note" style="margin:10px 0 18px">The season plays exactly the same in both modes. Hard only changes how you draft.</div>
-        <button class="btn pri go" data-a="start" id="startbtn" ${S.pool.length < MIN_POOL ? 'disabled' : ''}>Start draft</button>
+        <button class="btn pri go" data-a="start" id="startbtn" ${S.pool.length < MIN_POOL ? 'disabled' : ''}>Start draft</button><p class="note" id="startErr" role="alert"></p>
         <div class="note" style="margin-top:8px">Opponents are 29 historical rosters from the same era.</div>
       </section>
     </div>
@@ -301,25 +289,36 @@
     S.D = { round: 0, picks: [], cur: null, phase: 'idle', skips: 2, sel: null, reel: null, scouts: S.hard ? 1 : 0, scoutedId: null };
     S.revealed = false;
   }
-  function pickable(t) { const have = new Set(S.D.picks.map(p => p.name)); return t.players.filter(p => !have.has(p.name) && E.canAdd(S.D.picks, p)); }
-  function randomTeam() {
-    for (let i = 0; i < 120; i++) { const t = S.pool[rnd(S.pool.length)]; if (pickable(t).length >= 3) return t; }
-    for (let i = 0; i < 400; i++) { const t = S.pool[rnd(S.pool.length)]; if (pickable(t).length >= 1) return t; }
-    return S.pool[rnd(S.pool.length)];
+  const newSeed = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0]; };
+  function draftError(e) {
+    S.D.phase = S.D.cur ? 'choose' : 'idle'; S.D.busy = false; S.D.err = e && e.status === 409 && e.code === 'version' ? 'A new version of the game is available. Reload the page to continue.'
+      : e && e.status === 429 ? 'Too many drafts started. Try again in a little while.'
+      : e && e.status === 401 ? 'Your session expired. Sign in again to continue.' : 'The server could not process that. Try again.';
+    render();
   }
-  function doSpin(isRespin) {
+  async function doSpin(isRespin) {
     const D = S.D;
     if (D.phase === 'spinning' || D.round >= 10) return;
-    if (isRespin) { if (D.skips <= 0) return; D.skips--; }
-    D.phase = 'spinning'; D.sel = null;
-    const final = randomTeam();
+    if (isRespin && D.skips <= 0) return;
+    D.phase = 'spinning'; D.sel = null; D.err = null; render();
+    let final;
+    if (D.id) {                                   // signed in: the server rolls with a secret only it knows
+      try {
+        const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: isRespin ? 'respin' : 'spin', id: D.id }) });
+        final = S.byId.get(r.team); D.skips = Core.MAX_SKIPS - r.skips;
+        if (!final) throw new Error('team');
+      } catch (e) { return draftError(e); }
+    } else {                                      // guest: local roll, nothing is saved anyway
+      if (isRespin) D.skips--;
+      final = Core.rollTeam(S.pool, D.picks, rnd);
+    }
     let n = 0;
     const tick = () => {
       n++; D.reel = S.pool[rnd(S.pool.length)]; updateReels();
       if (n < 16) setTimeout(tick, 60 + n * 8);
       else { D.cur = final; D.reel = final; D.phase = 'choose'; render(); }
     };
-    render(); tick();
+    tick();
   }
   function updateReels() {
     const t = S.D.reel, a = document.getElementById('reelT'), y = document.getElementById('reelY'), c = document.getElementById('reelC');
@@ -343,11 +342,7 @@
         <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
       </div>${fitBadge(p, taken, fits)}</button>`;
   }
-  function fitPositions(p) {
-    const orig = E.eligible(p).slice(), out = [];
-    for (const pos of orig) { p._el = [pos]; if (E.canAdd(S.D.picks, p)) out.push(pos); }
-    p._el = orig; return out;
-  }
+  const fitPositions = p => Core.fitPositions(S.D.picks, p);
   const IC_OK = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5 5.5 10.5 11.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const IC_NO = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   const IC_TAKEN = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 7h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
@@ -426,6 +421,7 @@
     else if (D.phase === 'idle') cards = '<p class="note">Spin to get a random team and season, then pick one player from that roster.</p>';
     return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Draft &middot; pick ${Math.min(D.round + 1, 10)} of 10</h2>
       <div class="row"><span class="pill">${S.hard ? 'Hard' : 'Normal'}</span><span class="pill">${eraLabel()}</span></div></div>
+      ${D.err ? `<div class="banner" role="alert">${esc(D.err)}</div>` : ''}
       <div class="grid2"><div><div class="stage">${reel}${acts}</div>${cards}</div>${rosterPanel()}</div>`;
   };
 
@@ -562,24 +558,7 @@
   };
 
   // ---------- season end ----------
-  function achievements(L) {
-    const a = [], w = L.rec[0].w, champ = L.phase === 'champion', poL = (L.poGames || []).filter(g => !g.win).length;
-    if (w === 82) a.push(['Undefeated', 'A perfect 82-0 regular season.']);
-    if (w === 82 && champ && poL === 0) a.push(['Perfect year', '82-0 and 16-0 in the playoffs. No loss all year.']);
-    if (champ) a.push(['Champion', 'Won the title.']);
-    if (champ && S.hard) a.push(['Blind champion', 'Won the title after a Hard mode draft.']);
-    if (w >= 70) a.push(['70 wins', 'A season of 70 or more wins.']);
-    if (L.longestW >= 40) a.push(['Streak of 40', 'At least 40 wins in a row.']); else if (L.longestW >= 25) a.push(['Streak of 25', 'At least 25 wins in a row.']);
-    if (champ && poL <= 3) a.push(['Clean sweep run', 'Won the title with 3 or fewer playoff losses.']);
-    const mine = ((L.awards && L.awards.mine) || []).concat((L.poAwards && L.poAwards.mine) || []);
-    mine.forEach(s => { const i = s.indexOf(': '); a.push(i > 0 ? [s.slice(0, i), s.slice(i + 2) + ' earned this honor.'] : [s, 'One of your players or you won this award.']); });
-    return a;
-  }
-  function calcScore(L) {
-    const w = L.rec[0].w, poW = (L.poGames || []).filter(g => g.win).length;
-    return Math.round((w * 10 + poW * 8 + (L.phase === 'champion' ? 300 : 0) + (w === 82 ? 1000 : 0)) * (S.hard ? 1.5 : 1));
-  }
-  function resultLabel(L) { return L.phase === 'champion' ? 'Champion' : !L.userInPlayoffs ? 'Missed playoffs' : 'Eliminated: ' + LG.roundName(L.po.elimRound != null ? L.po.elimRound : L.po.round); }
+  const resultLabel = L => Core.resultLabel(L);
   function seedOf(L) { const st = LG.standings(L).filter(x => x.conf === L.conf[0]); return st.findIndex(x => x.i === 0) + 1; }
   function pathHtml(L) {
     const po = L.po; if (!po || !L.userInPlayoffs) return '<p class="note">The team did not qualify for the playoffs.</p>';
@@ -593,12 +572,16 @@
   }
   SCREENS.end = () => {
     const L = S.L; if (!L.awards) LG.computeAwards(L); if (L.po && L.po.champ != null && !L.poAwards) LG.poAwards(L);
-    const r = L.rec[0], ach = achievements(L), score = calcScore(L), res = resultLabel(L);
+    const r = L.rec[0], ach = Core.achievements(L, S.hard), score = Core.calcScore(L, S.hard), res = resultLabel(L);
     const G = Math.max(1, r.w + r.l), champ = L.phase === 'champion';
     if (!S.saved) {
       S.saved = true;
-      S.lastRun = { kind: 'run', ts: Date.now(), w: r.w, l: r.l, poW: (L.poGames || []).filter(g => g.win).length, eraFrom: S.from, eraTo: S.to, res, score, hard: S.hard, eraLabel: eraLabel(), champ, names: S.user.players.map(p => p.name), ach: ach.map(x => x[0]) };
-      saveRun(S.lastRun).then(ok => { const el = document.getElementById('saveInfo'); if (el) el.textContent = ok ? 'Result saved to your account.' : (S.acct ? 'Saving failed. Try again later.' : 'Sign in with Google to save results.'); });
+      const msg = { saved: 'Result verified and saved to your account.', guest: 'Sign in with Google to save results.', version: 'The game was updated while you played, so this result cannot be saved. Reload to play the new version.',
+        dup: 'This season was already submitted.', invalid: 'The server could not verify this season, so it was not saved.', error: 'Saving failed. Try again later.' };
+      submitRun().then(v => {
+        S.verdict = v;
+        const el = document.getElementById('saveInfo'); if (el) el.textContent = msg[v.state];
+      });
     }
     const margin = (r.pf - r.pa) / G, pw = (L.poGames || []).filter(g => g.win).length, pl = (L.poGames || []).filter(g => !g.win).length;
     const tile = (lb, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="kl">${lb}</div><div class="kv led num">${v}</div><div class="ks">${sub || ''}</div></div>`;
@@ -620,7 +603,7 @@
       ${trophyCase(L)}
       ${L.po && L.po.champ != null ? `<div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff awards</div>${poAwardsHtml(L)}</div>` : ''}
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
-      <div class="panel" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-a="newgame">New game</button><button class="btn" data-a="copy">Copy result</button><span class="note" id="saveInfo">${S.acct ? 'Saving result...' : 'Playing as guest: this result is not saved. Sign in with Google to keep results and achievements.'}</span></div>`;
+      <div class="panel" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-a="newgame">New game</button><button class="btn" data-a="copy">Copy result</button><span class="note" id="saveInfo">${S.acct && S.D && S.D.id ? 'Verifying and saving result...' : 'Playing as guest: this result is not saved. Sign in with Google to keep results and achievements.'}</span></div>`;
   };
 
   // ---------- GAME ----------
@@ -631,7 +614,7 @@
     S.screen = 'game'; render(); window.scrollTo(0, 0);
   }
   const mySide = () => S.G.userSide;
-  const canCoach = () => S.live.window && !S.G.over;
+  const canCoach = () => S.live.window && S.G.coachOpen && !S.G.over;
   SCREENS.game = () => `<div id="alerts"></div><div id="sb" class="sb"></div>
     <div class="gm"><div class="panel"><div class="eyebrow">Play by play</div><div class="feed" id="feed"></div><div class="ctrl" id="ctrl"></div></div>
     <div class="panel"><div id="sidetabs"></div><div id="sidebody"></div><div class="ctrl" id="sidectl"></div></div></div>`;
@@ -734,7 +717,7 @@
     for (const i of G.on[side]) { if (G.st[side][i].pf === 5 && !live.foulAlerted[i]) { live.foulAlerted[i] = 1; live.alert = G.teams[side].players[i].name + ' has 5 fouls. Call a timeout to sub him out, or leave it to the auto-subs.'; return true; } }
     return false;
   }
-  function stepOnce() { const G = S.G, b = G.log.length; E.step(G); runTrack(G.log.slice(b)); }
+  function stepOnce() { const G = S.G, b = G.log.length; Core.step(S.SE, G); runTrack(G.log.slice(b)); }
   function openWindow(label) { S.live.window = true; S.live.winLabel = label; S.live.sel = null; }
   function loop() {
     const G = S.G, live = S.live;
@@ -774,7 +757,7 @@
     const L = S.L; let n = 0;
     const step = () => {
       const t0 = performance.now();
-      while (n < days && L.phase === 'season' && performance.now() - t0 < 40) { LG.quickUserGame(L); n++; }
+      while (n < days && L.phase === 'season' && performance.now() - t0 < 40) { Core.quick(S.SE); n++; }
       if (n < days && L.phase === 'season') { app.innerHTML = '<div class="loading">Simulating season... ' + L.userGames.length + ' / 82</div>'; setTimeout(step, 0); } else go('hub');
     };
     step();
@@ -796,7 +779,24 @@
     closemodal() { closeModal(); },
     preset(d) { S.from = +d.f; S.to = +d.t; setPool(); updateRangeUI(); const a = document.getElementById('rf'), b = document.getElementById('rt'); if (a) { a.value = S.from; b.value = S.to; } },
     hard(d) { S.hard = d.v === '1'; document.querySelectorAll('.mode').forEach((m, i) => m.classList.toggle('on', (i === 1) === S.hard)); },
-    start() { setPool(); if (S.pool.length < MIN_POOL) return; newDraft(); go('draft'); },
+    async start() {
+      setPool(); if (S.pool.length < MIN_POOL || S.starting) return;
+      newDraft();
+      if (S.acct) {                               // signed in: the draft lives on the server so results can be verified
+        S.starting = true;
+        try {
+          const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'start', hard: S.hard, from: S.from, to: S.to, ver: Core.VERSION }) });
+          S.D.id = r.id;
+        } catch (e) {
+          S.starting = false;
+          const msg = e && e.status === 409 ? 'A new version of the game is available. Reload the page to continue.' : e && e.status === 429 ? 'Too many drafts started. Try again in a little while.' : 'Could not start the draft. Try again.';
+          const el = document.getElementById('startErr'); if (el) el.textContent = msg; else alert(msg);
+          return;
+        }
+        S.starting = false;
+      }
+      go('draft');
+    },
     spin() { doSpin(false); },
     respin() { doSpin(true); },
     scout() { const D = S.D; if (D.scouts > 0 && D.cur) { D.scouts--; D.scoutedId = D.cur.id; render(); } },
@@ -806,16 +806,22 @@
       D.selPos = fp.includes(main) ? main : fp[0]; render();
     },
     place(d) { const D = S.D; if (D.sel == null) return; if (fitPositions(D.cur.players[D.sel]).includes(d.v)) { D.selPos = d.v; render(); } },
-    confirm() {
-      const D = S.D; if (D.sel == null) return;
-      const p = D.cur.players[D.sel];
-      const np = Object.assign({}, p, { fromLabel: D.cur.label, fromSeason: D.cur.season, fromTm: D.cur.tm });
-      if (D.selPos) np._el = [D.selPos];
-      if (!E.canAdd(D.picks, np)) { delete np._el; }
+    async confirm() {
+      const D = S.D; if (D.sel == null || D.phase !== 'choose' || D.busy) return;
+      const i = D.sel, pos = D.selPos || null, np = Core.makePick(D.picks, D.cur, i, pos);
+      if (!np) return;
+      if (D.busy) return;
+      let seed = null;
+      if (D.id) {
+        D.busy = true;
+        try { const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'pick', id: D.id, i, pos }) }); if (r.done) seed = r.seed; }
+        catch (e) { return draftError(e); }
+        D.busy = false;
+      }
       D.picks.push(np); D.selPos = null;
       D.round++; D.sel = null; D.cur = null; D.phase = 'idle'; D.reel = null;
       if (D.round >= 10) {
-        S.revealed = true;
+        S.revealed = true; S.seed = D.id ? seed : newSeed();
         S.user = E.userTeam(D.picks, S.teamName); S.plan = E.defaultPlan(S.user);
         go('prep');
       } else render();
@@ -835,21 +841,22 @@
     resetplan() { const k = { t: S.plan.tempo, o: S.plan.off, d: S.plan.def, a: S.plan.auto }; const np = E.defaultPlan(S.user); np.tempo = k.t; np.off = k.o; np.def = k.d; np.auto = k.a; Object.assign(S.plan, np); refreshCoach(); },
     beginSeason() {
       const nm = document.getElementById('tname'); if (nm && nm.value.trim()) S.teamName = nm.value.trim();
-      S.user.name = S.user.label = S.teamName;
-      S.L = LG.create(S.user, S.pool, {});
-      S.L.userPlan = S.plan; S.L.plans[0] = S.plan; S.saved = false;
+      const SE = Core.createSeason({ picks: S.D.picks, pool: S.pool, seed: S.seed, hard: S.hard, name: S.teamName });
+      Object.assign(SE.plan, { starters: S.plan.starters.slice(), mins: S.plan.mins.slice(), tempo: S.plan.tempo, off: S.plan.off, def: S.plan.def, auto: S.plan.auto });
+      SE.user.name = SE.user.label = S.teamName;
+      S.SE = SE; S.L = SE.L; S.user = SE.user; S.plan = SE.plan; S.saved = false; S.lastRun = null; S.verdict = null;
       go('hub');
     },
     gocoach() { S.coachBack = S.screen; go('coach'); },
     coachBack() { go(S.coachBack || 'hub'); },
-    play() { beginGame(LG.startUserGame(S.L)); },
-    quick() { LG.quickUserGame(S.L); go('hub'); },
+    play() { beginGame(Core.beginLive(S.SE, false)); },
+    quick() { Core.quick(S.SE); go('hub'); },
     sim10() { chunkSim(10); },
     simall() { chunkSim(82); },
-    startpo() { LG.startPlayoffs(S.L); S.saved = false; routeByPhase(); },
-    playpo() { beginGame(LG.startPlayoffGame(S.L)); },
-    quickpo() { LG.quickPlayoffGame(S.L); routeByPhase(); },
-    simseries() { const s = LG.seriesOfUser(S.L); let n = 0; while (s && !s.done && S.L.phase === 'playoffs' && n++ < 8) LG.quickPlayoffGame(S.L); routeByPhase(); },
+    startpo() { Core.startPlayoffs(S.SE); S.saved = false; routeByPhase(); },
+    playpo() { beginGame(Core.beginLive(S.SE, true)); },
+    quickpo() { Core.quickPo(S.SE); routeByPhase(); },
+    simseries() { const s = LG.seriesOfUser(S.L); let n = 0; while (s && !s.done && S.L.phase === 'playoffs' && n++ < 8) Core.quickPo(S.SE); routeByPhase(); },
     resume() { const live = S.live; if (S.G.over || live.playing) return; live.playing = true; live.window = false; live.alert = ''; live.sel = null; live.timer = setTimeout(loop, 50); updateGame(); },
     pause() { S.live.playing = false; stopLive(); updateGame(); },
     speed(d) { S.live.speed = +d.v; updateGame(); },
@@ -865,21 +872,21 @@
       const a = live.sel, aOn = on.includes(a), bOn = on.includes(i);
       if (aOn === bOn) { live.sel = i; renderSide(); return; }
       const outP = aOn ? a : i, inP = aOn ? i : a;
-      E.setLineup(G, side, on.map(x => x === outP ? inP : x));
+      Core.lineup(S.SE, G, on.map(x => x === outP ? inP : x));
       live.sel = null; updateGame();
     },
     timeout() {
       const G = S.G, live = S.live;
       if (G.over || G.to[mySide()] <= 0) return;
       live.playing = false; stopLive();
-      if (E.callTimeout(G, mySide())) { live.run = { t: -1, pts: 0 }; live.alert = ''; openWindow('timeout'); updateGame(); }
+      if (Core.timeout(S.SE, G)) { live.run = { t: -1, pts: 0 }; live.alert = ''; openWindow('timeout'); updateGame(); }
     },
-    feed(d) { if (!canCoach()) return locked(); E.feedPlayer(S.G, mySide(), +d.i, 8); updateGame(); },
-    dbl(d) { if (!canCoach()) return locked(); E.doubleTeam(S.G, mySide(), +d.i, 8); updateGame(); },
+    feed(d) { if (!canCoach()) return locked(); Core.feed(S.SE, S.G, +d.i); updateGame(); },
+    dbl(d) { if (!canCoach()) return locked(); Core.double(S.SE, S.G, +d.i); updateGame(); },
     finish() {
       closeModal();
       const G = S.G; if (!G || !G.over) return;
-      if (G.playoff) LG.finishPlayoffGame(S.L, G); else LG.finishUserGame(S.L, G);
+      Core.finishLive(S.SE, G);
       S.G = null; routeByPhase();
     },
     newgame() { S.saved = false; go('menu'); },
@@ -926,8 +933,8 @@
   });
 
   fetch('data.json').then(r => r.json()).then(D => {
-    addBonus(D);
-    S.teams = D.teams.map(r => E.mkTeam(r, D.fields));
+    S.teams = Core.mkTeams(D);
+    S.byId = new Map(S.teams.map(t => [t.id, t]));
     setPool(); S.screen = 'menu'; render(); initAccount();
   }).catch(err => { app.innerHTML = '<div class="loading">Could not load data: ' + esc(err.message) + '</div>'; });
   window.__S = S; window.__dp = dp;

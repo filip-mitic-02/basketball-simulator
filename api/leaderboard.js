@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     const rows = await sql()`select * from (
         select distinct on (r.user_id) u.name, r.wins, r.losses, r.result, r.hard, r.era_label, r.score
         from runs r join users u on u.id = r.user_id
+        where r.verified
         order by r.user_id, r.score desc
       ) t order by score desc limit 20`;
     res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
