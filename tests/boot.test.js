@@ -13,7 +13,7 @@ test('page boots as a guest and offers Google sign-in', async () => {
     if (String(u).startsWith('data.json')) return { ok: true, json: async () => JSON.parse(data) };
     return { ok: false, status: 401, json: async () => ({}) };
   };
-  for (const f of ['engine.js', 'league.js', 'core.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
+  for (const f of ['engine.js', 'league.js', 'core.js', 'report.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
   await new Promise(r => setTimeout(r, 1500));
   assert.match(w.document.getElementById('acct').innerHTML, /Sign in with Google/);
   assert.match(w.document.getElementById('app').innerHTML, /Start draft/);

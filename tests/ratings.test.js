@@ -10,7 +10,7 @@ test('displayed ratings reward elite and triple-double seasons without inflating
   const w = dom.window;
   const data = readFileSync(new URL('data.json', dir), 'utf8');
   w.fetch = async (u) => String(u).startsWith('data.json') ? { ok: true, json: async () => JSON.parse(data) } : { ok: false, status: 401, json: async () => ({}) };
-  for (const f of ['engine.js', 'league.js', 'core.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
+  for (const f of ['engine.js', 'league.js', 'core.js', 'report.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
   await new Promise(r => setTimeout(r, 1500));
   const S = w.__S, dp = w.__dp;
   const find = (nm, yr) => { for (const t of S.teams) if (t.season === yr) for (const p of t.players) if (p.name === nm) return p; };

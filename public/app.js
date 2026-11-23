@@ -340,11 +340,36 @@
       <div class="hd">${crest(t.tm, 20)}<span>${t.season} ${esc(t.tm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:24px">${vis ? dp(p) : '??'}</span></div>
       <div class="bd"><div class="who">${avatar(p.name, t.tm, 46, vis ? dp(p) : null, p.pos, t.season)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
         <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
-      </div>${fitBadge(p, taken, fits)}</button>`;
+      </div>${fitBadge(p, taken, fits)}${needTag(p, fits)}</button>`;
   }
   const fitPositions = p => Core.fitPositions(S.D.picks, p);
   const IC_OK = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5 5.5 10.5 11.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const IC_NO = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const IC_WARN = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 15 14H1L8 1.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6.2v4M8 11.7v.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const IC_CHK = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 8.3 7.2 10.4 11 5.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const IC_BAD = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.4 5.4l5.2 5.2M10.6 5.4l-5.2 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  // ---------- team report: does the roster have everything a team needs ----------
+  const poolKey = () => S.from + '-' + S.to;
+  function teamReport(players, title) {
+    if (S.hard && !S.revealed) return `<div class="panel rp"><div class="eyebrow">${title}</div><div class="rp-lock">Hidden in Hard mode until the draft is over. The report would give away the stats.</div></div>`;
+    const a = Report.analyze(players, S.pool, poolKey());
+    if (!a) return `<div class="panel rp"><div class="eyebrow">${title}</div><div class="rp-lock">Draft three players and the report shows what your team has and what it is missing.</div></div>`;
+    const rows = a.list.map(c => `<div class="rp-row ${c.tier}"><span class="rp-n">${c.short}</span><span class="rp-bar"><b style="width:${Math.max(3, c.pct)}%"></b></span><span class="ovr">${c.pct}</span><span class="rp-l">${esc(c.leader)} &middot; ${c.leaderVal.toFixed(1)} ${c.unit}</span></div>`).join('');
+    const ic = { bad: IC_BAD, warn: IC_WARN, good: IC_CHK };
+    const notes = a.notes.map(n => `<li class="${n.kind}">${ic[n.kind]}<span>${esc(n.text)}</span></li>`).join('');
+    return `<div class="panel rp"><div class="eyebrow">${title}</div>
+      <div class="rp-head"><div class="rp-score ${a.tier}"><b class="led num">${a.score}</b><span>BALANCE</span></div>
+        <div><div class="rp-v">${a.verdict}</div><div class="rp-s">${a.partial ? 'Based on ' + players.length + ' of 10 players so far.' : 'Ranked against rosters a smart draft usually builds in this era.'}</div></div></div>
+      <div class="rp-rows">${rows}</div><ul class="rp-notes">${notes}</ul></div>`;
+  }
+  // On a draft card: does this player lift the weakest area of the roster?
+  function needTag(p, fits) {
+    const D = S.D;
+    if (!fits || !D.rep || !statsVisible()) return '';
+    const cat = D.rep.cats[D.rep.need];
+    if (cat.pct >= 45) return '';
+    return Report.lift(D.picks, p, S.pool, poolKey(), D.rep.need) >= 12 ? `<div class="need">Fills your need: ${cat.name}</div>` : '';
+  }
   const IC_TAKEN = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 7h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   function fitBadge(p, taken, fits) {
     if (taken) return `<div class="fit tk">${IC_TAKEN}<span>On your roster</span></div>`;
@@ -408,6 +433,7 @@
   }
   SCREENS.draft = () => {
     const D = S.D;
+    D.rep = Report.analyze(D.picks, S.pool, poolKey());
     const t = D.phase === 'choose' ? D.cur : D.reel;
     const reel = `<div class="reelbox ${D.phase === 'spinning' ? 'spin' : ''}" id="reelbox" style="${t ? clubStyle(t.tm) : ''}"><div id="reelC">${t ? crest(t.tm, 54) : ''}</div><div class="t"><small>Team</small><div class="v" id="reelT">${t ? esc(t.name) : 'Spin to start'}</div></div><div class="y led num" id="reelY">${t ? t.season : '----'}</div></div>`;
     const acts = D.phase === 'choose'
@@ -422,7 +448,7 @@
     return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Draft &middot; pick ${Math.min(D.round + 1, 10)} of 10</h2>
       <div class="row"><span class="pill">${S.hard ? 'Hard' : 'Normal'}</span><span class="pill">${eraLabel()}</span></div></div>
       ${D.err ? `<div class="banner" role="alert">${esc(D.err)}</div>` : ''}
-      <div class="grid2"><div><div class="stage">${reel}${acts}</div>${cards}</div>${rosterPanel()}</div>`;
+      <div class="grid2"><div><div class="stage">${reel}${acts}</div>${cards}</div><div>${rosterPanel()}${teamReport(D.picks, 'Team report')}</div></div>`;
   };
 
   // ---------- coach panel ----------
@@ -461,7 +487,7 @@
   SCREENS.prep = () => `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Roster complete</h2>
       <div class="row"><input type="text" id="tname" value="${esc(S.teamName)}" maxlength="24" aria-label="Team name"><button class="btn pri" data-a="beginSeason">Start season</button></div></div>
       ${S.hard ? '<div class="banner">Hard mode: your players are revealed so you can set the rotation.</div>' : ''}
-      <p class="note">Team average overall <b>${teamAvg()}</b>. Set your starting five, minutes and tactics. You can change all of this during the season, and live in games during quarter breaks and timeouts.</p>${coachPanel()}`;
+      <p class="note">Team average overall <b>${teamAvg()}</b>. Set your starting five, minutes and tactics. You can change all of this during the season, and live in games during quarter breaks and timeouts.</p>${teamReport(S.user.players, 'Team report')}${coachPanel()}`;
   SCREENS.coach = () => `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Tactics</h2><button class="btn pri" data-a="coachBack">Back</button></div>${coachPanel()}`;
 
   // ---------- season hub ----------
@@ -933,6 +959,7 @@
   });
 
   fetch('data.json').then(r => r.json()).then(D => {
+    Report.setCore(Core);
     S.teams = Core.mkTeams(D);
     S.byId = new Map(S.teams.map(t => [t.id, t]));
     setPool(); S.screen = 'menu'; render(); initAccount();

@@ -429,6 +429,36 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .actions{min-width:200px}
 .spot .pl.dim,.spot.lock .pl.dim{background:transparent}
 .bench .spot .nm{font-size:12px;letter-spacing:0}
+/* the jersey itself carries the highlight; the old circular ring must never draw a frame around it */
+.spot .ring,.spot.ok .ring,.spot.pick .ring,.spot.lock .ring,.bench .spot .ring{border:0!important;background:none!important;box-shadow:none!important;border-radius:0!important;width:auto!important;height:auto!important;padding:0!important}
+
+/* team report */
+.rp{margin-top:16px;position:relative;overflow:hidden}
+.rp-head{display:flex;align-items:center;gap:16px;margin:2px 0 14px}
+.rp-score{flex:none;min-width:84px;text-align:center;padding:6px 10px 4px;border-radius:12px;border:2px solid currentColor;background:#080c14;box-shadow:0 0 18px -4px currentColor}
+.rp-score b{display:block;font-size:46px;line-height:.95;font-weight:800}
+.rp-score span{display:block;font-family:var(--display);font-weight:700;font-size:11px;letter-spacing:.2em;margin-top:3px;opacity:.85}
+.rp-score.low{color:#ef5b50}.rp-score.mid{color:#9fb0cc}.rp-score.good{color:#ffb627}.rp-score.elite{color:#ffd24d}
+.rp-v{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:.04em;text-transform:uppercase;line-height:1.05}
+.rp-s{color:var(--mute);font-size:13px;margin-top:3px}
+.rp-rows{display:grid;gap:7px}
+.rp-row{display:grid;grid-template-columns:152px minmax(0,1fr) 44px;gap:10px;align-items:center}
+.rp-n{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#cfd9ec;white-space:nowrap}
+.rp-bar{position:relative;height:14px;-webkit-mask:repeating-linear-gradient(90deg,#000 0 9px,transparent 9px 12px);mask:repeating-linear-gradient(90deg,#000 0 9px,transparent 9px 12px);background:#18233a;border-radius:2px}
+.rp-bar b{position:absolute;left:0;top:0;bottom:0;background:currentColor;transition:width .35s ease}
+.rp-row.low{color:#ef5b50}.rp-row.mid{color:#8493ad}.rp-row.good{color:#ffb627}.rp-row.elite{color:#ffd24d}
+.rp-row .ovr{font-size:15px;min-width:40px;padding:0 4px;color:inherit}
+.rp-row .rp-l{grid-column:2 / 4;margin-top:-4px;font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-notes{list-style:none;margin:14px 0 0;padding:12px 0 0;border-top:1px solid var(--line2);display:grid;gap:8px}
+.rp-notes li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;font-size:14px;line-height:1.35;color:#d7e0f0}
+.rp-notes svg{margin-top:2px}
+.rp-notes .bad svg{color:#ef5b50}.rp-notes .warn svg{color:#ffb627}.rp-notes .good svg{color:#5fd08a}
+.rp-notes .bad{color:#ffd9d5}
+.rp-lock{padding:14px;border:1px dashed var(--line2);border-radius:10px;color:var(--mute);font-size:14px}
+.need{margin:0 12px 12px;padding:5px 9px;border-radius:7px;background:rgba(255,182,39,.14);border:1px solid rgba(255,182,39,.5);color:var(--amber);font-family:var(--display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+@media(max-width:560px){.rp-row{grid-template-columns:124px minmax(0,1fr) 40px}.rp-v{font-size:22px}}
+.pcard{display:flex;flex-direction:column;justify-content:flex-start}
+.pcard .need{margin:8px 12px 12px}
 </style>
 </head>
 <body>
@@ -442,6 +472,7 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 <script src="engine.js"></script>
 <script src="league.js"></script>
 <script src="core.js"></script>
+<script src="report.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
