@@ -51,12 +51,49 @@
   const rnd = n => Math.floor(Math.random() * n);
   const mmss = c => Math.floor(c / 60) + ':' + String(c % 60).padStart(2, '0');
   const eraLabel = () => (S.from === MIN_Y && S.to === MAX_Y) ? 'All-Time' : S.from + '-' + S.to;
-  function hueOf(key) { let h = 0; for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+  // Real club colours [primary, secondary] by franchise code. Colours only: no logos.
+  const CLUB = {
+    ATL: ['#E03A3E', '#C1D32F'], BOS: ['#007A33', '#BA9653'], BRK: ['#4A5568', '#FFFFFF'], NJN: ['#1F4E9E', '#CD1041'], NYN: ['#1F4E9E', '#CD1041'],
+    CHA: ['#1D6FA5', '#F26B21'], CHH: ['#00778B', '#5B2C86'], CHO: ['#00788C', '#5B2C86'], CHI: ['#CE1141', '#111111'],
+    CLE: ['#860038', '#FDBB30'], DAL: ['#00538C', '#B8C4CA'], DEN: ['#1B3A6B', '#FEC524'], DET: ['#C8102E', '#1D42BA'], FTW: ['#C8102E', '#1D42BA'],
+    GSW: ['#1D428A', '#FFC72C'], SFW: ['#1D428A', '#FFC72C'], PHW: ['#1D428A', '#FFC72C'], HOU: ['#CE1141', '#C4CED4'], SDR: ['#CE1141', '#C4CED4'],
+    IND: ['#002D62', '#FDBB30'], LAC: ['#C8102E', '#1D428A'], SDC: ['#C8102E', '#1D428A'], BUF: ['#2B6CB0', '#F58426'],
+    LAL: ['#552583', '#FDB927'], MNL: ['#552583', '#FDB927'], MEM: ['#5D76A9', '#12173F'], VAN: ['#00A0A8', '#8B2332'],
+    MIA: ['#98002E', '#F9A01B'], MIL: ['#00471B', '#EEE1C6'], MLH: ['#C8102E', '#1D428A'], MIN: ['#236192', '#78BE20'],
+    NOH: ['#00A3AD', '#F9A01B'], NOK: ['#00A3AD', '#F9A01B'], NOP: ['#0C2340', '#C8102E'], NOJ: ['#4B2E83', '#F2B100'],
+    NYK: ['#006BB6', '#F58426'], OKC: ['#007AC1', '#EF3B24'], ORL: ['#0077C0', '#C4CED4'], PHI: ['#006BB6', '#ED174C'], SYR: ['#1E5BA8', '#ED174C'],
+    PHO: ['#1D1160', '#E56020'], POR: ['#E03A3E', '#111111'], SAC: ['#5A2D81', '#63727A'], KCK: ['#C8102E', '#1D428A'], KCO: ['#C8102E', '#1D428A'],
+    CIN: ['#1D428A', '#C8102E'], ROC: ['#1D428A', '#C8102E'], SAS: ['#8A8D8F', '#1C1C1C'], SEA: ['#00653A', '#FFC200'], TOR: ['#CE1141', '#B4975A'],
+    UTA: ['#3E2680', '#F9A01B'], WAS: ['#002B5C', '#E31837'], WSB: ['#CE1141', '#002B5C'], BAL: ['#C8102E', '#002B5C'], CAP: ['#C8102E', '#002B5C'],
+    BLB: ['#8E1A2D', '#E5B73B'], CHP: ['#005EB8', '#C8102E'], CHZ: ['#005EB8', '#C8102E'], STL: ['#C8102E', '#1D428A']
+  };
   const hashOf = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
-  function crest(tm, size, hue) {
-    tm = String(tm || '?').slice(0, 4); hue = hue == null ? hueOf(tm) : hue; size = size || 28;
-    const h = hashOf(tm), pat = h % 5, h2 = (hue + 150 + (h >> 4) % 60) % 360;
-    const c1 = `hsl(${hue} 62% 30%)`, c2 = `hsl(${hue} 72% 48%)`, c3 = `hsl(${h2} 78% 62%)`, ed = `hsl(${hue} 80% 70%)`;
+  function hexHsl(hex) {
+    const n = parseInt(hex.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let h = 0, sat = 0;
+    if (d) { sat = d / (1 - Math.abs(2 * l - 1)); h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360; }
+    return [Math.round(h), Math.round(sat * 100), Math.round(l * 100)];
+  }
+  const hslS = (h, s, l) => `hsl(${h} ${s}% ${l}%)`;
+  // Returns { h, a: primary (hsl, never too dark), d: darker primary, b: secondary (hsl), hex: [primary, secondary] }
+  const _cc = {};
+  function clubCols(tm) {
+    tm = String(tm || '?');
+    if (_cc[tm]) return _cc[tm];
+    let pri, sec;
+    if (CLUB[tm]) { pri = hexHsl(CLUB[tm][0]); sec = hexHsl(CLUB[tm][1]); }
+    else { const h = hashOf(tm) % 360; pri = [h, 60, 40]; sec = [(h + 40) % 360, 75, 62]; }
+    const L = Math.max(pri[2], 30), S2 = pri[1] < 10 ? pri[1] : Math.max(pri[1], 38);
+    const o = { h: pri[0], a: hslS(pri[0], S2, L), d: hslS(pri[0], S2, Math.max(16, L - 14)), b: hslS(sec[0], sec[1], Math.max(sec[2], 34)), l: pri[2] };
+    return (_cc[tm] = o);
+  }
+  const hueOf = key => clubCols(key).h;
+  const clubStyle = tm => { const c = clubCols(tm); return `--c1:${c.a};--c2:${c.b};--c0:${c.d}`; };
+  function crest(tm, size) {
+    tm = String(tm || '?').slice(0, 4); size = size || 28;
+    const cc = clubCols(tm), h = hashOf(tm), pat = h % 5;
+    const c1 = cc.d, c2 = cc.a, c3 = cc.b, ed = cc.b;
     const id = 'cr' + h.toString(36) + size;
     const shield = 'M16 1 30 6v12c0 9-7 15-14 17C9 33 2 27 2 18V6z';
     const deco = [
@@ -66,20 +103,54 @@
       `<circle cx="16" cy="19" r="11" fill="${c2}"/><path d="M5 19h22M16 8v22" stroke="${c3}" stroke-width="1.1" fill="none"/>`,
       `<path d="M2 6 16 1l14 5v5H2z" fill="${c3}"/><path d="M8 11l8 5 8-5v4l-8 5-8-5z" fill="${c2}"/>`
     ][pat];
-    return `<svg class="crest" width="${size}" height="${Math.round(size * 1.12)}" viewBox="0 0 32 36" aria-hidden="true"><defs><clipPath id="${id}"><path d="${shield}"/></clipPath></defs><path d="${shield}" fill="${c1}"/><g clip-path="url(#${id})">${deco}</g><path d="${shield}" fill="none" stroke="${ed}" stroke-width="1.6"/><text x="16" y="${pat === 3 ? 23.5 : 26}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${tm.length > 3 ? 8.5 : 11}" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width=".9" paint-order="stroke">${esc(tm)}</text></svg>`;
+    return `<svg class="crest" width="${size}" height="${Math.round(size * 1.12)}" viewBox="0 0 32 36" aria-hidden="true"><defs><clipPath id="${id}"><path d="${shield}"/></clipPath></defs><path d="${shield}" fill="${c1}"/><g clip-path="url(#${id})">${deco}</g><path d="${shield}" fill="none" stroke="${ed}" stroke-width="1.6"/><text x="16" y="${pat === 3 ? 23.5 : 26}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${tm.length > 3 ? 8.5 : 11}" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width=".9" paint-order="stroke">${esc(tm)}</text></svg>`;
+  }
+  // Well-known jersey numbers (a player's most iconic number; [number, {TM: number}] when it changed by team).
+  // Everyone not listed gets a number generated from the name, because the dataset has no jersey numbers.
+  const NUMS_SRC = {
+    'Michael Jordan': 23, 'LeBron James': [23, { MIA: 6 }], 'Kobe Bryant': [24, { _to2006: 8 }], 'Kareem Abdul-Jabbar': 33, 'Magic Johnson': 32, 'Larry Bird': 33, 'Julius Erving': 6,
+    'Wilt Chamberlain': 13, 'Bill Russell': 6, 'Oscar Robertson': [1, { CIN: 14 }], 'Jerry West': 44, 'Elgin Baylor': 22, 'John Havlicek': 17, 'Rick Barry': 24, 'Pete Maravich': [7, { ATL: 44 }],
+    'Walt Frazier': 10, 'Willis Reed': 19, 'Dave Cowens': 18, 'Bob Cousy': 14, 'Bob Pettit': 9, 'Dolph Schayes': 4, 'George Mikan': 99, 'Nate Thurmond': 42, 'Elvin Hayes': 11, 'Wes Unseld': 41,
+    'Moses Malone': 2, 'George Gervin': 44, 'David Thompson': 33, 'Bob McAdoo': 11, 'Bill Walton': 32, 'Artis Gilmore': 53, 'Bernard King': 30, 'Alex English': 2, 'Adrian Dantley': 4,
+    'Isiah Thomas': 11, 'Joe Dumars': 4, 'Dennis Rodman': [10, { CHI: 91, LAL: 73, DAL: 70 }], 'Bill Laimbeer': 40, 'Clyde Drexler': 22, 'Patrick Ewing': 33, 'Hakeem Olajuwon': 34,
+    'David Robinson': 50, 'Karl Malone': 32, 'John Stockton': 12, 'Charles Barkley': [34, { HOU: 4 }], 'Scottie Pippen': 33, "Shaquille O'Neal": [34, { ORL: 32, MIA: 32 }],
+    'Tim Duncan': 21, 'Kevin Garnett': 21, 'Paul Pierce': 34, 'Ray Allen': 20, 'Allen Iverson': 3, 'Steve Nash': 13, 'Dirk Nowitzki': 41, 'Vince Carter': 15, 'Tracy McGrady': 1,
+    'Grant Hill': 33, 'Jason Kidd': 5, 'Gary Payton': 20, 'Reggie Miller': 31, 'Chris Webber': 4, 'Dikembe Mutombo': 55, 'Alonzo Mourning': 33, 'Penny Hardaway': 1, 'Anfernee Hardaway': 1,
+    'Shawn Kemp': 40, 'Dominique Wilkins': 21, 'Kevin McHale': 32, 'Robert Parish': '00', 'Dennis Johnson': 3, 'James Worthy': 42, 'Byron Scott': 4, 'Kevin Johnson': 7, 'Mark Price': 25,
+    'Mitch Richmond': 2, 'Tim Hardaway': 10, 'Chris Mullin': 17, 'Detlef Schrempf': 11, 'Rod Strickland': 1, 'Brad Daugherty': 43, 'Ron Harper': 9, 'Toni Kukoc': 7, 'Horace Grant': 54,
+    'Dwyane Wade': 3, 'Chris Bosh': 1, 'Carmelo Anthony': 7, 'Chris Paul': 3, 'Deron Williams': 8, 'Dwight Howard': 12, 'Kevin Durant': [35, { BRK: 7, PHO: 35, HOU: 7 }],
+    'Russell Westbrook': 0, 'Stephen Curry': 30, 'Klay Thompson': 11, 'Draymond Green': 23, 'James Harden': 13, 'Kawhi Leonard': 2, 'Paul George': 13,
+    'Anthony Davis': [3, { NOP: 23, NOH: 23 }], 'Damian Lillard': 0, 'Kyrie Irving': [11, { CLE: 2 }], 'Giannis Antetokounmpo': 34, 'Nikola Jokic': 15, 'Joel Embiid': 21, 'Luka Doncic': 77,
+    'Jayson Tatum': 0, 'Jimmy Butler': 22, 'Devin Booker': 1, 'Donovan Mitchell': 45, 'Trae Young': 11, 'Ja Morant': 12, 'Zion Williamson': 1, 'Anthony Edwards': 5,
+    'Shai Gilgeous-Alexander': 2, 'Jalen Brunson': [11, { DAL: 13 }], 'Karl-Anthony Towns': 32, 'Bam Adebayo': 13, 'Kevin Love': 0, 'LaMarcus Aldridge': 12, 'Blake Griffin': 32,
+    'DeMar DeRozan': 10, 'Kyle Lowry': 7, 'Rudy Gobert': 27, 'Victor Wembanyama': 1, 'Tyrese Haliburton': 0, 'Domantas Sabonis': 11, "De'Aaron Fox": 5, 'Pascal Siakam': 43,
+    'Ben Simmons': 25, 'Kemba Walker': 15, 'John Wall': 2, 'Derrick Rose': 1, 'Rajon Rondo': 9, 'Manu Ginobili': 20, 'Tony Parker': 9, 'Pau Gasol': 16, 'Marc Gasol': 33, 'Yao Ming': 11,
+    "Amar'e Stoudemire": 1, 'Joe Johnson': 2, 'Gilbert Arenas': 0, 'Baron Davis': 1, 'Ben Wallace': 3, 'Chauncey Billups': 1, 'Rasheed Wallace': 30, 'Richard Hamilton': 32,
+    'Tayshaun Prince': 22, 'Andre Iguodala': 9, 'Andrew Wiggins': 22, 'Vlade Divac': 21, 'Peja Stojakovic': 16, 'Drazen Petrovic': 3, 'Sidney Moncrief': 4, 'Maurice Cheeks': 10,
+    'Larry Nance': 22, 'Terry Cummings': 34, 'Michael Cooper': 21, 'Jack Sikma': 43, 'Tom Chambers': 24, 'Dale Ellis': 3
+  };
+  const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const NUMS = {}; Object.keys(NUMS_SRC).forEach(k => { NUMS[norm(k)] = NUMS_SRC[k]; });
+  function jerseyNum(name, tm, season) {
+    const v = NUMS[norm(name)];
+    if (v == null) return String(hashOf(name) % 100);
+    if (!Array.isArray(v)) return String(v);
+    const o = v[1] || {};
+    if (o._to2006 != null && season && season <= 2006) return String(o._to2006);
+    return String(o[tm] != null ? o[tm] : v[0]);
   }
   // Player card mark: a team-colour jersey with a number and a rarity trim driven by the displayed rating.
-  // The dataset has no jersey numbers, so the number is generated from the name. Geometric art only: no likeness.
-  function avatar(name, hue, size, ovr, pos) {
+  // Geometric art only: no likeness of any real person.
+  function avatar(name, tm, size, ovr, pos, season) {
     size = size || 40;
-    const h = hashOf(name), num = h % 100, id = 'jr' + h.toString(36) + size;
+    const cc = clubCols(tm), h = hashOf(name), num = jerseyNum(name, tm, season), id = 'jr' + h.toString(36) + size + String(tm).slice(0, 3);
     const tier = ovr == null ? 0 : ovr >= 90 ? 4 : ovr >= 80 ? 3 : ovr >= 68 ? 2 : 1;
     const trim = ['#8a96a8', '#c9803a', '#d3dbe6', '#ffb627', '#ffe08a'][tier];
     const body = 'M14 3h5c0 6 10 6 10 0h5c2 6 4 11 4 17v25H10V20c0-6 2-11 4-17z';
-    const stripe = h % 3 === 0 ? `<rect x="10" y="30" width="28" height="3" fill="hsl(${hue} 85% 78%)" opacity=".85"/>` : h % 3 === 1 ? `<rect x="10" y="3" width="4.5" height="42" fill="hsl(${hue} 85% 78%)" opacity=".5"/><rect x="33.5" y="3" width="4.5" height="42" fill="hsl(${hue} 85% 78%)" opacity=".5"/>` : `<path d="M10 16h28M10 19h28" stroke="hsl(${hue} 85% 78%)" stroke-width="1.2" opacity=".7"/>`;
+    const stripe = h % 3 === 0 ? `<rect x="10" y="30" width="28" height="3" fill="${cc.b}" opacity=".95"/>` : h % 3 === 1 ? `<rect x="10" y="3" width="4.5" height="42" fill="${cc.b}" opacity=".8"/><rect x="33.5" y="3" width="4.5" height="42" fill="${cc.b}" opacity=".8"/>` : `<path d="M10 16h28M10 19h28" stroke="${cc.b}" stroke-width="1.4" opacity=".9"/>`;
     const glow = tier === 4 ? `<path d="${body}" fill="none" stroke="#ff8a1f" stroke-width="3.4" opacity=".55"/>` : '';
-    const fs = num > 9 ? 17 : 20;
-    return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="${id}"><path d="${body}"/></clipPath><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue} 60% 44%)"/><stop offset="1" stop-color="hsl(${hue} 64% 26%)"/></linearGradient></defs>${glow}<path d="${body}" fill="url(#${id}g)"/><g clip-path="url(#${id})">${stripe}</g><path d="M19 3c0 6 10 6 10 0" fill="rgba(0,0,0,.35)"/><text x="24" y="${num > 9 ? 34 : 35}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${fs}" fill="#fff" stroke="rgba(0,0,0,.5)" stroke-width=".9" paint-order="stroke">${num}</text><path d="${body}" fill="none" stroke="${trim}" stroke-width="${tier >= 3 ? 2 : 1.5}" stroke-linejoin="round"/></svg>`;
+    const fs = num.length > 1 ? 17 : 20;
+    return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="${id}"><path d="${body}"/></clipPath><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cc.a}"/><stop offset="1" stop-color="${cc.d}"/></linearGradient></defs>${glow}<path d="${body}" fill="url(#${id}g)"/><g clip-path="url(#${id})">${stripe}</g><path d="M19 3c0 6 10 6 10 0" fill="rgba(0,0,0,.35)"/><text x="24" y="${num.length > 1 ? 34 : 35}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${fs}" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="1" paint-order="stroke">${esc(num)}</text><path d="${body}" fill="none" stroke="${trim}" stroke-width="${tier >= 3 ? 2 : 1.5}" stroke-linejoin="round"/></svg>`;
   }
   // ---------- trophies (original vector art) ----------
   function trophy(kind, label, size) {
@@ -252,7 +323,11 @@
   }
   function updateReels() {
     const t = S.D.reel, a = document.getElementById('reelT'), y = document.getElementById('reelY'), c = document.getElementById('reelC');
-    if (a && t) { a.textContent = t.name; y.textContent = t.season; c.innerHTML = crest(t.tm, 54); }
+    if (a && t) {
+      a.textContent = t.name; y.textContent = t.season; c.innerHTML = crest(t.tm, 54);
+      const rb = document.getElementById('reelbox'), cc = clubCols(t.tm);
+      if (rb) { rb.style.setProperty('--c1', cc.a); rb.style.setProperty('--c2', cc.b); rb.style.setProperty('--c0', cc.d); }
+    }
   }
   const statsVisible = () => !S.hard || S.revealed || (S.D && S.D.scoutedId && S.D.cur && S.D.scoutedId === S.D.cur.id);
   function playerCard(p, i) {
@@ -262,9 +337,9 @@
     const dis = taken || !fits;
     const vis = statsVisible();
     const st = (l, v) => `<div>${l}<b>${vis ? v : '&nbsp;'}</b></div>`;
-    return `<button class="pcard ${D.sel === i ? 'sel' : ''} ${dis ? 'dis' : ''}" style="--h:${hue}" data-a="sel" data-i="${i}" ${dis ? 'aria-disabled="true"' : ''}>
+    return `<button class="pcard ${D.sel === i ? 'sel' : ''} ${dis ? 'dis' : ''}" style="--h:${hue};${clubStyle(t.tm)}" data-a="sel" data-i="${i}" ${dis ? 'aria-disabled="true"' : ''}>
       <div class="hd">${crest(t.tm, 20)}<span>${t.season} ${esc(t.tm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:24px">${vis ? dp(p) : '??'}</span></div>
-      <div class="bd"><div class="who">${avatar(p.name, hue, 46, vis ? dp(p) : null, p.pos)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
+      <div class="bd"><div class="who">${avatar(p.name, t.tm, 46, vis ? dp(p) : null, p.pos, t.season)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
         <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
       </div>${fitBadge(p, taken, fits)}</button>`;
   }
@@ -281,39 +356,72 @@
     if (!fits) return `<div class="fit no">${IC_NO}<span>No open slot</span><em>${E.eligible(p).map(x => `<b>${x}</b>`).join('')} full</em></div>`;
     return `<div class="fit ok">${IC_OK}<span>Fits roster</span><em>fills ${fitPositions(p).map(x => `<b>${x}</b>`).join('')}</em></div>`;
   }
+  // Spots on the half court, in percent of the court box (basket at the top).
+  const SPOT = { PG: [50, 78], SG: [83, 61], SF: [17, 61], PF: [73, 34], C: [27, 34] };
+  const shortName = n => { const t = String(n).split(' '); return t.length > 1 ? t.slice(1).join(' ') : n; };
+  function spotHtml(pos, p, st, ghost, bench) {
+    // st: '' | 'ok' (can be placed here) | 'lock' (selected player cannot play here) | 'pick' (chosen target)
+    const vis = !S.hard || S.revealed;
+    const act = st === 'ok' || st === 'pick' ? `data-a="place" data-v="${pos}"` : 'disabled';
+    const tag = bench ? 'onbench' : 'oncourt';
+    if (p) {
+      return `<button class="spot filled ${tag} ${st}" ${bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`} disabled aria-label="${esc(p.name)} at ${pos}">${avatar(p.name, p.fromTm, 56, vis ? dp(p) : null, p.pos, p.fromSeason)}<span class="nm">${esc(shortName(p.name))}</span><span class="pp">${pos}${vis ? ' &middot; ' + dp(p) : ''}</span></button>`;
+    }
+    if (ghost) {
+      return `<button class="spot ghost ${tag} ${st}" ${bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`} ${act} aria-label="Place ${esc(ghost.name)} at ${pos}"><span class="gh">${avatar(ghost.name, S.D.cur.tm, 56, statsVisible() ? dp(ghost) : null, ghost.pos, S.D.cur.season)}</span><span class="nm">${esc(shortName(ghost.name))}</span><span class="pp">${pos}</span></button>`;
+    }
+    return `<button class="spot empty ${tag} ${st}" ${bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`} ${act} aria-label="${pos} ${bench ? 'bench' : 'starter'} spot"><span class="ring">${pos}</span><span class="pp">${bench ? 'Bench' : 'Starter'}</span></button>`;
+  }
+  const COURT_SVG = `<svg class="court-art" viewBox="0 0 500 520" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2a40"/><stop offset="1" stop-color="#121b2b"/></linearGradient></defs>
+    <rect x="6" y="6" width="488" height="508" rx="10" fill="url(#wood)" stroke="#3b4e6e" stroke-width="3"/>
+    <g fill="none" stroke="#6f86ad" stroke-width="2.4" opacity=".8">
+      <rect x="170" y="6" width="160" height="196" fill="rgba(255,182,39,.07)"/>
+      <path d="M190 202a60 60 0 0 0 120 0"/><path d="M190 202a60 60 0 0 1 120 0" stroke-dasharray="6 7"/>
+      <path d="M218 42h64"/><circle cx="250" cy="54" r="9" stroke="#ff8a3d" stroke-width="2.6"/><path d="M250 42v-36"/>
+      <path d="M210 62a40 40 0 0 0 80 0"/>
+      <path d="M44 6v132"/><path d="M456 6v132"/><path d="M44 138A222 222 0 0 0 456 138"/>
+      <path d="M170 74h-14M170 106h-14M170 138h-14M330 74h14M330 106h14M330 138h14"/>
+    </g></svg>`;
   function rosterPanel() {
     const D = S.D, P = D.picks;
     const as = P.length ? E.assign(P) : [];
     const byPos = {}; E.POS.forEach(x => byPos[x] = []);
     P.forEach((p, i) => { byPos[as[i] || E.eligible(p)[0]].push(p); });
     const vis = !S.hard || S.revealed;
-    const slotHtml = p => p ? `<div class="slot full">${crest(p.fromTm, 22)}<div class="who"><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span></div>${vis ? `<div class="ovr ${ovrCls(dp(p))}">${dp(p)}</div>` : ''}</div>` : '<div class="slot empty">open</div>';
-    const grp = E.POS.map(pos => `<div class="sgrp"><div class="lb">${pos}</div>${slotHtml(byPos[pos][0])}${slotHtml(byPos[pos][1])}</div>`).join('');
+    const sp = D.phase === 'choose' && D.sel != null ? D.cur.players[D.sel] : null;
+    const fp = sp ? fitPositions(sp) : [];
+    const stOf = pos => !sp ? '' : (fp.includes(pos) ? (D.selPos === pos ? 'pick' : 'ok') : 'lock');
+    const cell = (pos, k) => {
+      const p = byPos[pos][k], st = stOf(pos);
+      const target = sp && fp.includes(pos) && !p && byPos[pos].length === k;   // next free spot at this position
+      if (p) return spotHtml(pos, p, sp ? (st === 'lock' ? 'lock' : '') : '', null, k === 1);
+      if (target) return spotHtml(pos, null, st, D.selPos === pos ? sp : null, k === 1);
+      return spotHtml(pos, null, sp ? 'lock' : '', null, k === 1);
+    };
     const avg = P.length && vis ? (P.reduce((a, p) => a + dp(p), 0) / P.length).toFixed(1) : '--';
-    return `<div class="panel"><div class="eyebrow">Roster ${P.length}/10</div><div class="slots">${grp}</div>
-      <div class="note" style="margin-top:10px">Two players per position. Versatile players can fill more than one position, so you can't stack five centers.${vis ? ' Team average: <b>' + avg + '</b>' : ' Ratings are hidden until the draft ends.'}</div></div>`;
+    const hint = sp ? `<b>${esc(sp.name)}</b> can play ${fp.length ? fp.map(x => `<b>${x}</b>`).join(', ') : 'nowhere (no open spot)'}. Click a lit spot to choose where he goes.` : 'Draft two players at every position. Versatile players can fill more than one spot, so you cannot stack five centers.';
+    return `<div class="panel courtp"><div class="eyebrow">Your team &middot; ${P.length}/10</div>
+      <div class="court ${sp ? 'picking' : ''}">${COURT_SVG}${E.POS.map(pos => cell(pos, 0)).join('')}</div>
+      <div class="bench-h"><span>Bench</span></div>
+      <div class="bench ${sp ? 'picking' : ''}">${E.POS.map(pos => `<div class="bslot"><div class="bl">${pos}</div>${cell(pos, 1)}</div>`).join('')}</div>
+      <div class="note courthint">${hint}${vis ? ' Team average: <b>' + avg + '</b>' : ' Ratings are hidden until the draft ends.'}</div></div>`;
   }
   SCREENS.draft = () => {
     const D = S.D;
     const t = D.phase === 'choose' ? D.cur : D.reel;
-    const reel = `<div class="reelbox ${D.phase === 'spinning' ? 'spin' : ''}"><div id="reelC">${t ? crest(t.tm, 54) : ''}</div><div class="t"><small>Team</small><div class="v" id="reelT">${t ? esc(t.name) : 'Spin to start'}</div></div><div class="y led num" id="reelY">${t ? t.season : '----'}</div></div>`;
+    const reel = `<div class="reelbox ${D.phase === 'spinning' ? 'spin' : ''}" id="reelbox" style="${t ? clubStyle(t.tm) : ''}"><div id="reelC">${t ? crest(t.tm, 54) : ''}</div><div class="t"><small>Team</small><div class="v" id="reelT">${t ? esc(t.name) : 'Spin to start'}</div></div><div class="y led num" id="reelY">${t ? t.season : '----'}</div></div>`;
     const acts = D.phase === 'choose'
       ? `<div class="actions"><button class="btn pri" data-a="confirm" ${D.sel == null ? 'disabled' : ''}>Draft player</button>
          <button class="btn ghost" data-a="respin" ${D.skips <= 0 ? 'disabled' : ''}>Re-spin &middot; ${D.skips} left</button>
          ${S.hard ? `<button class="btn sm" data-a="scout" ${(D.scouts <= 0 || D.scoutedId === D.cur.id) ? 'disabled' : ''}>Scout this roll &middot; ${D.scouts} left</button>` : ''}</div>`
       : D.phase === 'idle' ? `<div class="actions"><button class="btn pri" data-a="spin">Spin</button><button class="btn ghost" disabled>Re-spin &middot; ${D.skips} left</button></div>`
         : '<div class="actions"><div class="note">Spinning...</div></div>';
-    let placer = '';
-    if (D.phase === 'choose' && D.sel != null) {
-      const sp = D.cur.players[D.sel], fp = fitPositions(sp);
-      placer = `<div class="placer"><div class="pl-h"><b>Place ${esc(sp.name)} at</b><span>Greyed-out positions are full or not playable for him.</span></div><div class="pl-b">${E.POS.map(x => `<button class="posbtn ${D.selPos === x ? 'on' : ''}" data-a="place" data-v="${x}" ${fp.includes(x) ? '' : 'disabled'}>${x}</button>`).join('')}</div></div>`;
-    }
     let cards = '';
     if (D.phase === 'choose') cards = `<div class="eyebrow">${D.cur.season} ${esc(D.cur.name)} &middot; choose one player</div><div class="cards">${D.cur.players.map((p, i) => playerCard(p, i)).join('')}</div>`;
     else if (D.phase === 'idle') cards = '<p class="note">Spin to get a random team and season, then pick one player from that roster.</p>';
     return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Draft &middot; pick ${Math.min(D.round + 1, 10)} of 10</h2>
       <div class="row"><span class="pill">${S.hard ? 'Hard' : 'Normal'}</span><span class="pill">${eraLabel()}</span></div></div>
-      <div class="grid2"><div><div class="stage">${reel}${acts}</div>${placer}${cards}</div>${rosterPanel()}</div>`;
+      <div class="grid2"><div><div class="stage">${reel}${acts}</div>${cards}</div>${rosterPanel()}</div>`;
   };
 
   // ---------- coach panel ----------

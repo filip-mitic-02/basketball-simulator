@@ -23,4 +23,14 @@ test('draft screen shows jersey cards and ratings, and hides ratings in Hard mod
   assert.ok(cards.length >= 5, 'cards rendered: ' + cards.length);
   assert.ok(doc.querySelectorAll('.pcard svg.avatar text').length >= 5, 'jersey numbers');
   assert.ok(doc.querySelector('.pcard .ovr').textContent.trim().match(/^\d+$/), 'rating shown in Normal');
+  // pick a player: only eligible spots on the court / bench are clickable, the rest are locked
+  const card = [...doc.querySelectorAll('.pcard:not(.dis)')][0];
+  card.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  const lit = doc.querySelectorAll('.spot.ok, .spot.pick'), locked = doc.querySelectorAll('.spot.lock');
+  assert.ok(lit.length >= 1, 'eligible spots are lit');
+  assert.ok(locked.length >= 1, 'other spots are locked');
+  locked.forEach(el => assert.ok(el.disabled, 'locked spot is not clickable'));
+  lit.forEach(el => assert.ok(!el.disabled, 'lit spot is clickable'));
+  assert.equal(doc.querySelectorAll('.court .spot').length, 5);
+  assert.equal(doc.querySelectorAll('.bench .spot').length, 5);
 });
