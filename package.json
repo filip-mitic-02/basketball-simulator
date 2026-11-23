@@ -1,0 +1,21 @@
+{
+  "name": "82-0-coach",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Draft 10 players, coach a full NBA season and the playoffs. Google sign-in, Postgres leaderboard.",
+  "scripts": {
+    "dev": "vercel dev",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "jose": "^5.9.6"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.1"
+  }
+}
