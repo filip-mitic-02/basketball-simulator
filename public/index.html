@@ -324,6 +324,32 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .tcn{margin-top:6px;font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.04em;text-transform:uppercase}
 .tcp{font-size:12px;color:var(--mute)}
 .avatar,.crest{flex:0 0 auto}
+/* home redesign */
+.hero h1{font-size:clamp(40px,6vw,76px)}
+.hero p{font-size:16px}
+.board .big{font-size:72px}
+.setup{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:28px 40px;align-items:start;padding:24px}
+@media(max-width:900px){.setup{grid-template-columns:1fr}}
+.setup .eyebrow{margin-bottom:12px}
+.era .yr{margin-bottom:10px}
+.era .range{margin:10px 8px 0}
+.seg.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px;padding:4px}
+.seg.presets button{padding:8px 4px;font-size:15px}
+@media(max-width:520px){.seg.presets{grid-template-columns:repeat(3,1fr)}}
+.modes{grid-template-columns:1fr;gap:10px}
+.mode{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;padding-right:44px}
+.mode .mi{flex:none;width:48px;height:48px;border-radius:10px;background:var(--ink2);border:1px solid var(--line2);display:grid;place-items:center}
+.mode .mi svg{width:30px;height:30px}
+.mode.on .mi{border-color:var(--amber);background:#2a2412}
+.mode .mt{display:block;min-width:0}
+.mode .mh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mode h3{font-size:24px;line-height:1.1;margin:0}
+.mode .tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--mute);border:1px solid var(--line2);border-radius:20px;padding:2px 8px}
+.mode .tag.hot{color:var(--hot);border-color:rgba(255,106,26,.5)}
+.mode p{margin:5px 0 0}
+.mode::after,.mode.on::after{content:"";position:absolute;top:16px;right:16px;width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);background:transparent;font-size:0}
+.mode.on::after{border-color:var(--amber);background:radial-gradient(circle,var(--amber) 0 4px,transparent 5px)}
+.btn.go{width:100%;font-size:22px;padding:14px 18px}
 </style>
 </head>
 <body>

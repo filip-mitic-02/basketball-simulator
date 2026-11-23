@@ -21,15 +21,15 @@
   const pct = v => (v == null || v === 0) ? '--' : (v * 100).toFixed(1);
   const dec = v => v == null ? '--' : v.toFixed(1);
   const od = v => Math.min(99, Math.round(55 + (v - 30) * 0.62));
-  // Displayed player rating: the raw game-score rating, stretched at the top, plus a bonus for big
-  // box-score production (points + rebounds + assists + stocks relative to the season) and for averaging
-  // a triple-double. Display only: the simulation engine keeps using the raw rating.
-  function dispRating(raw, bon) {
-    let t = 55 + (raw - 30) * 0.62 + 0.30 * Math.max(0, raw - 78) + (bon || 0);
+  // Player rating = game-score rating plus a production bonus (points + rebounds + assists + stocks relative to
+  // the season, and averaging a triple-double), applied once at load so the simulation and the number on screen
+  // agree. The display adds a stretch at the top so MVP-level seasons reach the mid and high 90s.
+  function dispRating(raw) {
+    let t = 55 + (raw - 30) * 0.62 + 0.30 * Math.max(0, raw - 78);
     if (t > 92) t = 92 + 8 * (1 - Math.exp(-(t - 92) / 9));
     return Math.max(0, Math.min(99, Math.round(t)));
   }
-  const dp = p => dispRating(p.ovr0 != null ? p.ovr0 : p.ovr, p.bon);
+  const dp = p => dispRating(p.ovr0 != null ? p.ovr0 : p.ovr);
   function addBonus(D) {
     const F = D.fields, ix = {}; F.forEach((f, i) => { ix[f] = i; });
     const pr = r => (r[ix.ppg] || 0) + 1.2 * (r[ix.rpg] || 0) + 1.6 * (r[ix.apg] || 0) + 2.2 * (r[ix.spg] || 0) + 2.0 * (r[ix.bpg] || 0);
@@ -41,10 +41,9 @@
         let b = 0;
         if (r[ix.mpg] >= 20 && r[ix.g] >= 40) b += 2.0 * Math.max(0, (pr(r) - mu) / sd - 2.0);
         if (r[ix.ppg] >= 10 && r[ix.rpg] >= 10 && r[ix.apg] >= 10) b += 3;
-        r.push(Math.round(b * 10) / 10);
+        r[ix.ovr] = Math.round(r[ix.ovr] + b / 0.62);
       });
     });
-    F.push('bon');
   }
   const LEGACY = { 'Šampion': 'Champion', 'Sampion': 'Champion', 'Prvak': 'Champion', 'Nije u plejofu': 'Missed playoffs', 'Propustio plejof': 'Missed playoffs' };
   const trRes = s => { s = String(s == null ? '' : s); if (LEGACY[s]) return LEGACY[s]; return s.replace(/^Eliminisan:\s*/i, 'Eliminated: ').replace('Šampion', 'Champion'); };
@@ -69,24 +68,18 @@
     ][pat];
     return `<svg class="crest" width="${size}" height="${Math.round(size * 1.12)}" viewBox="0 0 32 36" aria-hidden="true"><defs><clipPath id="${id}"><path d="${shield}"/></clipPath></defs><path d="${shield}" fill="${c1}"/><g clip-path="url(#${id})">${deco}</g><path d="${shield}" fill="none" stroke="${ed}" stroke-width="1.6"/><text x="16" y="${pat === 3 ? 23.5 : 26}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${tm.length > 3 ? 8.5 : 11}" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width=".9" paint-order="stroke">${esc(tm)}</text></svg>`;
   }
-  // Player card mark: team-colour jersey, initials and a rarity ring driven by the displayed rating.
-  // Purely typographic and geometric, so it carries no likeness of any real person.
+  // Player card mark: a team-colour jersey with a number and a rarity trim driven by the displayed rating.
+  // The dataset has no jersey numbers, so the number is generated from the name. Geometric art only: no likeness.
   function avatar(name, hue, size, ovr, pos) {
     size = size || 40;
-    const parts = String(name || '?').replace(/[.,]/g, '').split(/\s+/).filter(Boolean);
-    const ini = ((parts[0] || '?')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+    const h = hashOf(name), num = h % 100, id = 'jr' + h.toString(36) + size;
     const tier = ovr == null ? 0 : ovr >= 90 ? 4 : ovr >= 80 ? 3 : ovr >= 68 ? 2 : 1;
-    const ring = ['#6b7686', '#b87333', '#c3ccd8', '#ffb627', '#ffe08a'][tier];
-    const glow = tier === 4 ? `<circle cx="24" cy="24" r="23.4" fill="none" stroke="#ff8a1f" stroke-width="1" opacity=".85"/>` : '';
-    const h = hashOf(name), id = 'av' + h.toString(36) + size;
-    const stripe = h % 3;
-    const deco = [
-      `<path d="M0 30h48v5H0z" fill="hsl(${hue} 85% 72%)" opacity=".9"/>`,
-      `<path d="M-4 40 26 4l6 0L2 44z" fill="hsl(${hue} 85% 72%)" opacity=".28"/><path d="M12 44 42 8l5 0L17 48z" fill="hsl(${hue} 85% 72%)" opacity=".28"/>`,
-      `<path d="M24 4 44 24 24 44 4 24z" fill="hsl(${hue} 85% 72%)" opacity=".22"/>`
-    ][stripe];
-    const fs = ini.length > 1 ? 17 : 20;
-    return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="${id}"><circle cx="24" cy="24" r="22.4"/></clipPath><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue} 58% 40%)"/><stop offset="1" stop-color="hsl(${hue} 62% 22%)"/></linearGradient></defs><g clip-path="url(#${id})"><rect width="48" height="48" fill="url(#${id}g)"/>${deco}<text x="24" y="${ini.length > 1 ? 30 : 31}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${fs}" letter-spacing=".5" fill="#fff" stroke="rgba(0,0,0,.45)" stroke-width=".8" paint-order="stroke">${esc(ini)}</text>${pos ? `<text x="24" y="42" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="700" font-size="7.5" letter-spacing="1" fill="rgba(255,255,255,.8)">${esc(String(pos).split(',')[0])}</text>` : ''}</g>${glow}<circle cx="24" cy="24" r="22.4" fill="none" stroke="${ring}" stroke-width="${tier >= 3 ? 2.4 : 1.8}"/></svg>`;
+    const trim = ['#8a96a8', '#c9803a', '#d3dbe6', '#ffb627', '#ffe08a'][tier];
+    const body = 'M14 3h5c0 6 10 6 10 0h5c2 6 4 11 4 17v25H10V20c0-6 2-11 4-17z';
+    const stripe = h % 3 === 0 ? `<rect x="10" y="30" width="28" height="3" fill="hsl(${hue} 85% 78%)" opacity=".85"/>` : h % 3 === 1 ? `<rect x="10" y="3" width="4.5" height="42" fill="hsl(${hue} 85% 78%)" opacity=".5"/><rect x="33.5" y="3" width="4.5" height="42" fill="hsl(${hue} 85% 78%)" opacity=".5"/>` : `<path d="M10 16h28M10 19h28" stroke="hsl(${hue} 85% 78%)" stroke-width="1.2" opacity=".7"/>`;
+    const glow = tier === 4 ? `<path d="${body}" fill="none" stroke="#ff8a1f" stroke-width="3.4" opacity=".55"/>` : '';
+    const fs = num > 9 ? 17 : 20;
+    return `<svg class="avatar" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="${id}"><path d="${body}"/></clipPath><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue} 60% 44%)"/><stop offset="1" stop-color="hsl(${hue} 64% 26%)"/></linearGradient></defs>${glow}<path d="${body}" fill="url(#${id}g)"/><g clip-path="url(#${id})">${stripe}</g><path d="M19 3c0 6 10 6 10 0" fill="rgba(0,0,0,.35)"/><text x="24" y="${num > 9 ? 34 : 35}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="${fs}" fill="#fff" stroke="rgba(0,0,0,.5)" stroke-width=".9" paint-order="stroke">${num}</text><path d="${body}" fill="none" stroke="${trim}" stroke-width="${tier >= 3 ? 2 : 1.5}" stroke-linejoin="round"/></svg>`;
   }
   // ---------- trophies (original vector art) ----------
   function trophy(kind, label, size) {
@@ -155,8 +148,9 @@
   const SCREENS = {}, AFTER = {};
   SCREENS.loading = () => '<div class="loading">Loading player database…</div>';
 
-  const ICON_OPEN = '<svg viewBox="0 0 54 54" aria-hidden="true"><rect x="3" y="12" width="48" height="30" rx="5" fill="none" stroke="#ffb627" stroke-width="2.4"/><path d="M3 27C11 15 43 15 51 27 43 39 11 39 3 27z" fill="none" stroke="#ffb627" stroke-width="2.4" transform="translate(0 0) scale(1 .6) translate(0 18)"/><circle cx="27" cy="27" r="6" fill="#ffb627"/></svg>';
-  const ICON_BLIND = '<svg viewBox="0 0 54 54" aria-hidden="true"><rect x="3" y="12" width="48" height="30" rx="5" fill="none" stroke="#ffb627" stroke-width="2.4"/><path d="M12 22h30M12 28h30M12 34h30" stroke="#ffb627" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 5"/></svg>';
+  const EYE = 'M2 16C6 9 11 6 16 6s10 3 14 10c-4 7-9 10-14 10S6 23 2 16z';
+  const ICON_OPEN = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="${EYE}" fill="none" stroke="#ffb627" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4.4" fill="#ffb627"/></svg>`;
+  const ICON_BLIND = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="${EYE}" fill="none" stroke="#ffb627" stroke-width="2" stroke-linejoin="round" opacity=".55"/><path d="M6 27 26 5" stroke="#ffb627" stroke-width="2.6" stroke-linecap="round"/></svg>`;
 
   function rangeHtml() {
     const pc = y => ((y - MIN_Y) / (MAX_Y - MIN_Y) * 100);
@@ -187,22 +181,23 @@
       </div>
     </div>
     <div class="panel setup">
-      <div>
+      <section class="era">
         <div class="eyebrow">Era</div>
-        <div class="yr"><span class="led num" id="yrtxt">${S.from === MIN_Y && S.to === MAX_Y ? 'All-Time' : S.from + ' &ndash; ' + S.to}</span><span class="muted">${S.hard ? '' : ''}</span></div>
+        <div class="yr"><span class="led num" id="yrtxt">${S.from === MIN_Y && S.to === MAX_Y ? 'All-Time' : S.from + ' &ndash; ' + S.to}</span></div>
         ${rangeHtml()}
-        <div class="row" style="margin-top:6px"><div class="seg" id="presets">${PRESETS.map(p => `<button class="${S.from === p[1] && S.to === p[2] ? 'on' : ''}" data-a="preset" data-f="${p[1]}" data-t="${p[2]}">${p[0]}</button>`).join('')}</div></div>
-        <div class="note" id="eranote" style="margin-top:10px">${eraInfo()}</div>
-      </div>
-      <div>
+        <div class="seg presets" id="presets">${PRESETS.map(p => `<button class="${S.from === p[1] && S.to === p[2] ? 'on' : ''}" data-a="preset" data-f="${p[1]}" data-t="${p[2]}">${p[0]}</button>`).join('')}</div>
+        <div class="note" id="eranote" style="margin-top:12px">${eraInfo()}</div>
+      </section>
+      <section class="side">
         <div class="eyebrow">Draft mode</div>
         <div class="modes">
-          <button class="mode ${!S.hard ? 'on' : ''}" data-a="hard" data-v="0">${ICON_OPEN}<div><h3>Normal</h3><p>See every player's stats and overall before you pick.</p></div></button>
-          <button class="mode ${S.hard ? 'on' : ''}" data-a="hard" data-v="1">${ICON_BLIND}<div><h3>Hard</h3><p>Stats and overalls are hidden. One Scout per draft reveals a full roll. Score x1.5.</p></div></button>
+          <button class="mode ${!S.hard ? 'on' : ''}" data-a="hard" data-v="0"><span class="mi">${ICON_OPEN}</span><span class="mt"><span class="mh"><h3>Normal</h3><span class="tag">Full information</span></span><p>See every player's stats and overall before you pick.</p></span></button>
+          <button class="mode ${S.hard ? 'on' : ''}" data-a="hard" data-v="1"><span class="mi">${ICON_BLIND}</span><span class="mt"><span class="mh"><h3>Hard</h3><span class="tag hot">Score x1.5</span></span><p>Stats and overalls are hidden. One Scout per draft reveals a full roll.</p></span></button>
         </div>
-        <div class="note" style="margin-top:8px">The season plays exactly the same in both modes. Hard only changes how you draft.</div>
-      </div>
-      <div class="row"><button class="btn pri" data-a="start" id="startbtn" ${S.pool.length < MIN_POOL ? 'disabled' : ''}>Start draft</button><span class="note">Opponents are 29 historical rosters from the same era.</span></div>
+        <div class="note" style="margin:10px 0 18px">The season plays exactly the same in both modes. Hard only changes how you draft.</div>
+        <button class="btn pri go" data-a="start" id="startbtn" ${S.pool.length < MIN_POOL ? 'disabled' : ''}>Start draft</button>
+        <div class="note" style="margin-top:8px">Opponents are 29 historical rosters from the same era.</div>
+      </section>
     </div>
     <div class="two" style="margin-top:18px">
       <div class="panel"><div class="eyebrow">Leaderboard</div>${boardHtml()}</div>
