@@ -625,6 +625,14 @@
     five.forEach(i => { if (before.indexOf(i) < 0) { G.sub[t]++; ev(G, { k: 'sub', t, p: i, o: before.find(b => five.indexOf(b) < 0), forced: false, manual: true }); } });
     return true;
   }
+  // a player who cannot play today (injury): treated like a fouled-out player from the first whistle, replaced in the lineup silently
+  function markOut(G, t, idxs) {
+    G.out = G.out || [[], []];
+    const n = G.log.length, sub = G.sub[t];
+    for (const i of idxs) { G.out[t][i] = 1; G.st[t][i].pf = 6; }
+    for (const i of idxs) if (G.on[t].indexOf(i) >= 0) replace(G, t, i, true);
+    G.log.length = n; G.sub[t] = sub;
+  }
   function feedPlayer(G, t, i, n) { G.feed[t] = i; G.feedLeft[t] = n || 8; ev(G, { k: 'feed', t, p: i }); }
   function doubleTeam(G, t, oppIdx, n) {
     // t = tim koji dvoji; oppIdx = igrač protivnika
@@ -670,6 +678,6 @@
     agg, boost, K, T, TR, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
-    setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview
+    setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview, markOut
   };
 });

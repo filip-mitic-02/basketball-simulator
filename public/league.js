@@ -70,6 +70,7 @@
     const n = teams.length;
     const L = {
       r, teams, n, plans: teams.map(t => aiPlan(t)),
+      injR: E.mulberry32(((opts.seed != null ? opts.seed : 1) ^ 0x5bd1e995) >>> 0), inj: null, injNew: null, injLog: [], trades: [], tradedAway: [],
       userPlan: E.defaultPlan(user),
       sched: buildSchedule(n, 82, r),
       day: 0, rec: teams.map(() => ({ w: 0, l: 0, pf: 0, pa: 0 })),
@@ -119,6 +120,7 @@
     G.aiTeam = [info.home !== 0, info.away !== 0];
     G.userSide = info.userHome ? 0 : 1;
     G.info = info;
+    if (L.inj) E.markOut(G, G.userSide, [L.inj.i]);
     return G;
   }
 
@@ -141,8 +143,25 @@
     const s = G.userSide;
     G.st[s].forEach((x, i) => {
       const a = L.agg[i]; if (x.sec > 0) a.g++;
-      for (const k of ['sec', 'pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'pf']) a[k] += x[k];
+      const out = G.out && G.out[s][i];
+      for (const k of ['sec', 'pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'pf']) a[k] += out ? 0 : x[k];
     });
+    injuryTick(L, G);
+  }
+  // Injuries: short and rare, at most one player at a time, so the ten-man roster never collapses. The rolls come from their own
+  // seeded stream, so they never disturb the game results and the server replay reproduces them exactly.
+  const INJ = { rate: 0.055, ratePo: 0.025, d1: 0.55, d2: 0.95 };
+  function injuryTick(L, G) {
+    const s = G.userSide; L.injNew = null;
+    if (L.inj) { L.inj.g--; if (L.inj.g <= 0) L.inj = null; return; }
+    if (L.injR() >= (G.playoff ? INJ.ratePo : INJ.rate)) return;
+    const secs = G.st[s].map(x => x.sec), tot = secs.reduce((a, b) => a + b, 0);
+    if (tot <= 0) return;
+    let x = L.injR() * tot, i = 0;
+    while (i < secs.length - 1 && x >= secs[i]) { x -= secs[i]; i++; }
+    const d = L.injR(), g = d < INJ.d1 ? 1 : d < INJ.d2 ? 2 : 3, name = L.teams[0].players[i].name;
+    L.inj = { i, g }; L.injNew = { i, g, name };
+    L.injLog.push({ day: L.userGames.length, name, g, po: !!G.playoff });
   }
 
   // završetak utakmice sezone koju je igrao korisnik
@@ -268,6 +287,7 @@
     const info = nextPlayoffGame(L);
     const G = E.newGame([L.teams[info.home], L.teams[info.away]], [L.plans[info.home], L.plans[info.away]], { rng: L.r });
     G.aiTeam = [info.home !== 0, info.away !== 0]; G.userSide = info.userHome ? 0 : 1; G.info = info; G.playoff = true;
+    if (L.inj) E.markOut(G, G.userSide, [L.inj.i]);
     return G;
   }
   function finishPlayoffGame(L, G) {

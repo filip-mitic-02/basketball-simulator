@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-24.6';
+  const VERSION = 'sim-2026-11-24.7';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -84,7 +84,7 @@
     const plan = E.defaultPlan(user);
     const L = LG.create(user, o.pool, { rng: E.mulberry32(o.seed >>> 0), seed: o.seed >>> 0 });
     L.userPlan = plan; L.plans[0] = plan;
-    return { L, user, plan, hard: !!o.hard, log: [], planJ: JSON.stringify(planOf(plan)), cur: null };
+    return { L, user, plan, seed: o.seed >>> 0, pool: o.pool, hard: !!o.hard, log: [], planJ: JSON.stringify(planOf(plan)), cur: null };
   }
   const pushCmd = (SE, kind) => {
     const last = SE.log[SE.log.length - 1];
@@ -136,6 +136,49 @@
     return r;
   }
 
+
+  // ---------- trades ----------
+  // Before the deadline you may swap one player for one of three offers of similar quality. Offers are a pure function of the season seed,
+  // the number of trades already made and the player you give, so the server regenerates the same three and checks the pick.
+  const TRADE = { max: 2, lastGame: 55, win: [4, 6, 9], offers: 3, minMpg: 18 };
+  function tradeState(SE) {
+    const L = SE.L, used = L.trades.length;
+    return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= TRADE.lastGame && used < TRADE.max, left: TRADE.max - used, lastGame: TRADE.lastGame, played: L.userGames.length };
+  }
+  function tradeOffers(SE, give) {
+    const P = SE.user.players;
+    if (!isIdx(give, P.length)) return [];
+    const out = P[give], rest = P.filter((_, i) => i !== give), have = new Set(P.map(p => p.name));
+    let cands = [];
+    for (const w of TRADE.win) {
+      cands = []; const seen = new Set();
+      for (const t of SE.pool) for (const p of t.players) {
+        if (have.has(p.name) || seen.has(p.name) || p.mpg < TRADE.minMpg || Math.abs(p.ovr - out.ovr) > w) continue;
+        const np = Object.assign({}, p, { fromLabel: t.label, fromSeason: t.season, fromTm: t.tm });
+        if (!E.canAdd(rest, np)) continue;
+        seen.add(p.name); cands.push(np);
+      }
+      if (cands.length >= 12) break;
+    }
+    const rng = E.mulberry32((SE.seed ^ Math.imul(SE.L.trades.length + 1, 0x9e3779b1) ^ Math.imul(give + 7, 0x85ebca6b)) >>> 0), res = [];
+    while (res.length < TRADE.offers && cands.length) res.push(cands.splice(Math.floor(rng() * cands.length), 1)[0]);
+    return res;
+  }
+  function doTrade(SE, give, idx) {
+    if (!tradeState(SE).open) return false;
+    const offs = tradeOffers(SE, give), np = offs[idx];
+    if (!np) return false;
+    const U = SE.user, L = SE.L, old = U.players[give];
+    U.players[give] = np;
+    const as = E.assign(U.players);
+    if (!as) { U.players[give] = old; return false; }
+    U.players.forEach((p, i) => { p.slot = as[i]; p.guard = as[i] === 'PG' || as[i] === 'SG'; p.big = as[i] === 'PF' || as[i] === 'C'; });
+    L.tradedAway.push({ name: old.name, agg: L.agg[give] });
+    L.agg[give] = { g: 0, sec: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0 };
+    L.trades.push({ day: L.userGames.length, out: old.name, in: np.name });
+    SE.log.push(['tr', give, idx]);
+    return true;
+  }
 
   // ---------- interactive moments ----------
   // While the user coaches a game live, play pauses at a few moments and offers a choice. Everything here is a pure function of the game
@@ -258,6 +301,7 @@
           }
           break;
         }
+        case 'tr': if (!Number.isInteger(c[1]) || !Number.isInteger(c[2]) || !doTrade(SE, c[1], c[2])) bad('trade'); break;
         case 'sp': if (L.phase !== 'seasonDone') bad('phase'); LG.startPlayoffs(L); break;
         case 'lg': case 'lp': {
           const po = c[0] === 'lp';
@@ -334,7 +378,7 @@
   return {
     VERSION, DRAFT_ROUNDS, MAX_SKIPS, MIN_Y, MAX_Y, MIN_POOL, Invalid,
     prepData, mkTeams, poolOf, validEra, fitPositions, pickable, rollTeam, makePick,
-    createSeason, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
+    createSeason, tradeState, tradeOffers, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
     replay, resultLabel, calcScore, achievements, summarize, poWins, poLosses
   };
 });

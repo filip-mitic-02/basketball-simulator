@@ -485,10 +485,10 @@
     const P = S.user.players, plan = S.plan, tot = plan.mins.reduce((a, b) => a + b, 0);
     const five = plan.starters.map((pi, k) => {
       const p = P[pi];
-      return `<div class="starter"><div class="sl">${esc(p.slot)}</div><div class="sw">${crest(p.fromTm, 30)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}</div><div class="ovr ${ovrCls(dp(p))}" style="margin-left:auto">${dp(p)}</div></div>
-        <select data-a="starter" data-k="${k}" aria-label="Starter ${k + 1}">${P.map((q, i) => `<option value="${i}" ${pi === i ? 'selected' : ''}>${esc(q.name)} (${esc(q.slot)})</option>`).join('')}</select></div>`;
+      return `<div class="starter"><div class="sl">${esc(p.slot)}</div><div class="sw">${crest(p.fromTm, 30)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}${injOf(pi) ? '<span class="inj">Out ' + injOf(pi) + '</span>' : ''}</div><div class="ovr ${ovrCls(dp(p))}" style="margin-left:auto">${dp(p)}</div></div>
+        <select data-a="starter" data-k="${k}" aria-label="Starter ${k + 1}">${P.map((q, i) => `<option value="${i}" ${pi === i ? 'selected' : ''}>${esc(q.name)} (${esc(q.slot)})${injOf(i) ? ' - OUT' : ''}</option>`).join('')}</select></div>`;
     }).join('');
-    const rows = P.map((p, i) => `<tr><td><div class="rn">${crest(p.fromTm, 20)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}</div></div></td>
+    const rows = P.map((p, i) => `<tr><td><div class="rn">${crest(p.fromTm, 20)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}${injOf(i) ? '<span class="inj">Out ' + injOf(i) + '</span>' : ''}</div></div></td>
       <td><span class="pill">${esc(p.slot)}</span></td><td class="r"><span class="ovr ${ovrCls(dp(p))}" style="font-size:20px">${dp(p)}</span></td>
       <td class="r num">${dec(p.ppg)}</td><td class="r num">${dec(p.rpg)}</td><td class="r num">${dec(p.apg)}</td>
       <td><div class="mrow"><input class="mins" type="range" min="0" max="44" step="1" value="${plan.mins[i]}" data-a="mins" data-i="${i}" aria-label="Minutes for ${esc(p.name)}"><span class="num mv" id="m${i}">${plan.mins[i]}</span></div></td></tr>`).join('');
@@ -571,6 +571,38 @@
     const icon = s => /Champions/.test(s) ? ['ball', ''] : /Finals MVP|^MVP/.test(s) ? ['cup', ''] : /Defensive Player/.test(s) ? ['shield', ''] : /Coach/.test(s) ? ['clip', ''] : /Scoring/.test(s) ? ['medal', 'PTS'] : /Rebound/.test(s) ? ['medal', 'REB'] : /Assist/.test(s) ? ['medal', 'AST'] : /Steal/.test(s) ? ['medal', 'STL'] : /Block/.test(s) ? ['medal', 'BLK'] : ['star', ''];
     return `<div class="tcase"><div class="eyebrow">Trophy case</div><div class="tc-row">${mine.map(s => { const i = s.indexOf(': '), ic = icon(s); return `<div class="tc">${trophy(ic[0], ic[1], 76)}<div class="tcn">${esc(i > 0 ? s.slice(0, i) : s)}</div>${i > 0 ? `<div class="tcp">${esc(s.slice(i + 2))}</div>` : ''}</div>`; }).join('')}</div></div>`;
   }
+  const injOf = i => (S.L && S.L.inj && S.L.inj.i === i ? S.L.inj.g : 0);
+  const IC_INJ = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg>';
+  const injBar = () => {
+    const L = S.L; if (!L || !L.inj) return '';
+    const p = S.user.players[L.inj.i], g = L.inj.g;
+    return `<div class="injbar"><i>${IC_INJ}</i><div><b>Injury report: ${esc(p.name)} is out</b><span>Misses the next ${g === 1 ? 'game' : g + ' games'}. The assistant coach plays the rest of your rotation; you can change the lineup in Tactics.</span></div></div>`;
+  };
+  const tradeBtn = () => {
+    const st = Core.tradeState(S.SE);
+    return st.open ? `<button class="btn sm" data-a="gotrade">Trade &middot; ${st.left} left</button>` : '';
+  };
+  function tradeCard(p, i, out) {
+    const vis = !S.hard || S.revealed, hue = hueOf(p.fromTm), st = (l, v) => `<div>${l}<b>${vis ? v : '&nbsp;'}</b></div>`;
+    return `<button class="pcard" style="--h:${hue};${clubStyle(p.fromTm)}" data-a="toffer" data-i="${i}">
+      <div class="hd">${crest(p.fromTm, 20)}<span>${p.fromSeason} ${esc(p.fromTm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:24px">${vis ? dp(p) : '??'}</span></div>
+      <div class="bd"><div class="who">${avatar(p.name, p.fromTm, 46, vis ? dp(p) : null, p.pos, p.fromSeason)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
+        ${vis ? `<div class="trow">${traitBadge(p, true)}</div>` : ''}
+        <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
+      </div><div class="fit tk">Replaces ${esc(out.name)}</div></button>`;
+  }
+  SCREENS.trade = () => {
+    const st = Core.tradeState(S.SE), P = S.user.players, T = S.tr || (S.tr = { give: null }), vis = !S.hard || S.revealed;
+    const rows = P.map((p, i) => `<button class="trrow ${T.give === i ? 'on' : ''}" data-a="tgive" data-i="${i}">${crest(p.fromTm, 24)}<div class="trn"><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)} &middot; ${esc(p.slot)}${injOf(i) ? ' &middot; out ' + injOf(i) : ''}</span>${traitBadge(p)}</div><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:20px">${vis ? dp(p) : '??'}</span></button>`).join('');
+    let offers = '';
+    if (T.give != null) {
+      const out = P[T.give], offs = Core.tradeOffers(S.SE, T.give);
+      offers = offs.length ? `<div class="eyebrow" style="margin-top:20px">Offers for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. Look for what your team is missing.</p><div class="cards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`;
+    }
+    return `<div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="font-size:36px">Trade</h2><button class="btn pri" data-a="tback">Back</button></div>
+      <p class="note" style="margin-bottom:14px">Trades left: <b>${st.left}</b> &middot; deadline: game ${st.lastGame} (you have played ${st.played}). Pick the player to give up, then choose one of three offers. A trade cannot be undone.</p>
+      <div class="panel"><div class="eyebrow">Who goes?</div><div class="trlist">${rows}</div></div>${offers}`;
+  };
   SCREENS.hub = () => {
     const L = S.L, r = L.rec[0];
     if (L.phase === 'seasonDone') {
@@ -582,7 +614,7 @@
         <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Standings</div>${standingsHtml()}</div><div class="panel"><div class="eyebrow">Season stats</div>${statsHtml()}</div></div>`;
     }
     const g = LG.nextUserGame(L), o = oppSummary(g.opp);
-    return `<div class="grid2">
+    return `${injBar()}<div class="grid2">
       <div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-end">
         <div><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">${esc(S.teamName)} &middot; game ${L.day + 1} of 82</div><div class="rec led num">${r.w}&ndash;${r.l}</div></div>
         <div style="text-align:right"><div class="muted">Win streak</div><div class="led num" style="font-size:46px">${L.streak}</div></div></div>${pipsHtml()}
@@ -592,7 +624,7 @@
         <div class="note">${o.top.map(p => esc(p.name) + ' (' + dp(p) + ')').join(' &middot; ')}</div>
         <div class="note">Roster strength <b>${od(o.ovr).toFixed(0)}</b> &middot; yours <b>${od(E.teamOvr(S.user, S.plan)).toFixed(0)}</b></div>
         <div class="ctrl" style="margin-top:4px"><button class="btn pri" data-a="play">Coach this game</button><button class="btn" data-a="quick">Quick sim</button></div>
-        <div class="ctrl" style="margin-top:0"><button class="btn sm" data-a="sim10">Sim 10 games</button><button class="btn sm" data-a="simall">Sim to end of season</button><button class="btn sm" data-a="gocoach">Tactics</button></div></div></div>
+        <div class="ctrl" style="margin-top:0"><button class="btn sm" data-a="sim10">Sim 10 games</button><button class="btn sm" data-a="simall">Sim to end of season</button><button class="btn sm" data-a="gocoach">Tactics</button>${tradeBtn()}</div></div></div>
       <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Recent games</div>${lastGames()}</div><div class="panel"><div class="eyebrow">Conference standings</div>${standingsHtml()}</div></div>
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Season stats</div>${statsHtml()}</div>
       ${teamReport(S.user.players, 'Team report')}`;
@@ -606,7 +638,7 @@
     const tbd = '<div class="ser tbd"><div><span>To be decided</span><span class="num">&ndash;</span></div><div><span>To be decided</span><span class="num">&ndash;</span></div></div>';
     const cols = [8, 4, 2, 1].map((n, ri) => `<div class="bcol"><div class="eyebrow">${LG.roundName(ri)}</div><div class="bcells">${Array.from({ length: n }, (_, i) => { const s = po.rounds[ri] && po.rounds[ri][i]; return `<div class="bcell ${i % 2 ? 'odd' : 'even'}">${s ? ser(s) : tbd}</div>`; }).join('')}</div></div>`).join('');
     const pw = (L.poGames || []).filter(g => g.win).length, pl = (L.poGames || []).filter(g => !g.win).length;
-    return `<div class="grid2"><div class="panel"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Playoffs &middot; ${LG.roundName(po.round)}</div>
+    return `${injBar()}<div class="grid2"><div class="panel"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Playoffs &middot; ${LG.roundName(po.round)}</div>
       <div class="rec led num">${us ? (us.a === 0 ? us.wa : us.wb) + '&ndash;' + (us.a === 0 ? us.wb : us.wa) : ''}</div>
       <div class="note">Playoff record ${pw}-${pl} &middot; regular season ${L.rec[0].w}-${L.rec[0].l}</div></div>
       <div class="panel opp"><div class="vs">${ng ? 'Game ' + (ng.gameNo + 1) + ' &middot; ' + (ng.userHome ? 'home vs' : 'away at') : ''}</div>
@@ -722,10 +754,10 @@
     if (live.tab === 'rot') {
       const order = P.map((_, i) => i).sort((a, b) => (on.includes(b) - on.includes(a)) || (P[b].ovr - P[a].ovr));
       body = `<div class="note" style="margin-bottom:8px">${open ? 'Click a bench player, then a player on the floor to swap them.' : 'Locked until the next break or timeout.'}</div><div class="rot ${open ? '' : 'lock'}">` + order.map(i => {
-        const p = P[i], s = st[i], e = Math.round(en[i]), out = s.pf >= 6;
+        const p = P[i], s = st[i], e = Math.round(en[i]), out = s.pf >= 6, hurt = !!(G.out && G.out[side][i]);
         return `<div class="pl ${on.includes(i) ? 'on' : ''} ${live.sel === i ? 'pick' : ''} ${out ? 'out' : ''}" data-a="pl" data-i="${i}">
-          <div class="a"><span>${esc(p.name)}</span><span class="pill">${esc(p.slot)}</span></div><div class="b">${s.pts} pts</div>
-          <div class="c"><div class="bar ${e < 35 ? 'low' : e < 60 ? 'mid' : ''}"><i style="width:${e}%"></i></div><span>${Math.round(s.sec / 60)}' &middot; ${s.reb}r ${s.ast}a &middot; <span class="${s.pf >= 4 ? 'fl' : ''}">${s.pf}pf</span></span></div></div>`;
+          <div class="a"><span>${esc(p.name)}</span><span class="pill">${esc(p.slot)}</span>${hurt ? '<span class="inj">Injured</span>' : ''}</div><div class="b">${s.pts} pts</div>
+          <div class="c"><div class="bar ${e < 35 ? 'low' : e < 60 ? 'mid' : ''}"><i style="width:${e}%"></i></div><span>${Math.round(s.sec / 60)}' &middot; ${s.reb}r ${s.ast}a &middot; ${hurt ? 'out for this game' : `<span class="${s.pf >= 4 ? 'fl' : ''}">${s.pf}pf</span>`}</span></div></div>`;
       }).join('') + '</div>';
     } else if (live.tab === 'tac') {
       const oppP = G.teams[opp].players, oppOn = G.on[opp];
@@ -844,7 +876,7 @@
   const STATS_ = Core.STATS;
   function callHtml(pd, done) {
     const G = S.G, P = G.teams[G.userSide].players, res = done && done.type === 'call' ? done : null, T = MO_TXT[pd.kind];
-    const opt = (o, i) => `<button class="mo-opt ${res && res.idx === i ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res || o.off ? 'disabled' : ''}><b>${o.label}</b><span>${MO_HELP[o.id][0]}</span><span class="need">${MO_HELP[o.id][1]}</span>${o.who && o.who.length ? `<em>On your floor: ${o.who.map(i => esc(P[i].name.split(' ').slice(-1)[0])).join(', ')}</em>` : o.off ? '<em>No timeouts left</em>' : ''}</button>`;
+    const opt = (o, i) => `<button class="mo-opt ${res && res.idx === i ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res || o.off ? 'disabled' : ''}><b>${o.label}</b><span>${MO_HELP[o.id][0]}</span><span class="mo-need">${MO_HELP[o.id][1]}</span>${o.who && o.who.length ? `<em>On your floor: ${o.who.map(i => esc(P[i].name.split(' ').slice(-1)[0])).join(', ')}</em>` : o.off ? '<em>No timeouts left</em>' : ''}</button>`;
     let verdict = '';
     if (res) {
       const b = res.res.b;
@@ -933,6 +965,8 @@
       <p><b>Season.</b> 82 games against 29 strong historical rosters from the same era. You coach games possession by possession. Play pauses at the end of each quarter and when the opponent goes on a run or your player picks up a fifth foul.</p>
       <p><b>Coaching.</b> Starting five, target minutes, tempo, offense and defense. During a game you can change things at quarter breaks and during timeouts: substitutions, tactics, feeding the ball to a player, doubling a star. Timeouts also restore energy and stop runs. Players tire and foul out.</p>
       <p><b>Moments.</b> When you coach a game step by step, play pauses a few times: a matchup duel in each half, and a coach's call in a close finish, in overtime, after a long scoring drought or when the opponent goes on a big run. The right read is worth about a point a moment, a guess is worth nothing, and skipping costs nothing. Quick sims have no moments.</p>
+      <p><b>Injuries.</b> Now and then one of your players is hurt for one to three games, never more than one at a time. He sits out in quick sims and coached games alike, and the rotation covers for him.</p>
+      <p><b>Trades.</b> Until game 55 you can make up to two trades from the hub: choose a player to give up and pick one of three offers of similar quality from your era. The new player takes the old one's minutes and spot. A trade cannot be undone.</p>
       <p><b>Playoffs.</b> Top eight in each conference, best-of-seven series up to the Finals.</p>
       <p><b>Saving.</b> Results and achievements are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID and your finished seasons, nothing else. <button class="btn sm" data-a="delacct">Delete my account and data</button></p>
       <div class="ctrl"><button class="btn pri" data-a="closemodal">Close</button></div></div></div>`);
@@ -1015,6 +1049,16 @@
       S.SE = SE; S.L = SE.L; S.user = SE.user; S.plan = SE.plan; S.saved = false; S.lastRun = null; S.verdict = null;
       go('hub');
     },
+    gotrade() { S.tr = { give: null }; go('trade'); },
+    tback() { S.tr = null; go('hub'); },
+    tgive(d) { S.tr = { give: +d.i }; render(); },
+    toffer(d) {
+      const out = S.user.players[S.tr.give], np = Core.tradeOffers(S.SE, S.tr.give)[+d.i], vis = !S.hard || S.revealed;
+      if (!np) return;
+      document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box"><h2>Confirm trade</h2><p>You give <b>${esc(out.name)}</b>${vis ? ' (' + dp(out) + ')' : ''} and get <b>${esc(np.name)}</b>${vis ? ' (' + dp(np) + ')' : ''}, ${np.fromSeason} ${esc(np.fromTm)}.</p><p class="note">${esc(np.name)} takes over the minutes and the spot in the rotation of ${esc(out.name)}. This cannot be undone.</p>
+        <div class="ctrl"><button class="btn pri" data-a="tconfirm" data-i="${d.i}">Make the trade</button><button class="btn" data-a="closemodal">Cancel</button></div></div></div>`);
+    },
+    tconfirm(d) { closeModal(); if (Core.doTrade(S.SE, S.tr.give, +d.i)) { S.tr = null; go('hub'); } },
     gocoach() { S.coachBack = S.screen; go('coach'); },
     coachBack() { go(S.coachBack || 'hub'); },
     play() { beginGame(Core.beginLive(S.SE, false)); },

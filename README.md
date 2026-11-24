@@ -73,3 +73,9 @@ About 2% of player-seasons (rated 72+ with one rare, league-leading skill) carry
 ## Interactive moments
 
 Only in games you coach step by step; quick sims and "sim quarter" skip them. Each live game has a Matchup duel in the second and third quarters, plus Coach's Calls when the game calls for one: a close finish, overtime, four minutes without scoring, or an opponent run (10 unanswered points, or a net 10 over five minutes). At most six per game. Each is a pure function of the game state, answers are logged as op `M` and re-applied by the server replay, and an unanswered moment has no effect. The right read is worth about one point per game on average.
+
+## Injuries and trades
+
+Injuries: each of your games has a small chance (5.5% in the regular season, 2.5% in the playoffs) that one player is hurt, picked by minutes played, for 1 game (55%), 2 (40%) or 3 (5%). Only one player can be out at a time. Rolls come from their own seeded stream (`L.injR`), so they never change other results and the server replay reproduces them. An injured player is treated like a fouled-out player from the first whistle (`Engine.markOut`).
+
+Trades: until game 55, at most two per season, from the hub. `Core.tradeOffers` returns three players within a few overall points of the one you give (the window widens if the market is thin), valid for the roster positions, from a pure function of season seed, trade count and player index. The log records `['tr', give, offer]` and the replay regenerates the offers and checks the choice. The new player takes the old one's slot, minutes and starter spot, and the traded player's season stats are kept in `L.tradedAway`.

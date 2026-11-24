@@ -330,8 +330,21 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .mo-row:hover:not(:disabled){border-color:var(--amber);background:#241d0c}
 .mo-row:active:not(:disabled){transform:scale(.99)}
 .mo-row span,.mo-orow span{text-align:left}
+.injbar{display:flex;gap:12px;align-items:center;padding:11px 14px;margin-bottom:14px;border-radius:10px;border:1px solid rgba(255,84,104,.45);background:linear-gradient(90deg,rgba(255,84,104,.14),rgba(255,84,104,.04))}
+.injbar i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(255,84,104,.18);color:var(--bad);flex:none}
+.injbar b{display:block;font-family:var(--display);text-transform:uppercase;letter-spacing:.06em;font-size:18px;color:var(--bad)}
+.injbar span{font-size:13px;color:var(--mute)}
+.inj{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;background:rgba(255,84,104,.16);border:1px solid rgba(255,84,104,.5);color:var(--bad);font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.trlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.trrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;background:var(--panel2);border:1px solid var(--line2);color:var(--text);cursor:pointer;text-align:left}
+.trrow:hover{border-color:var(--mute)}
+.trrow.on{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.trrow .trn{display:grid;flex:1;min-width:0}
+.trrow .trn b{font-family:var(--display);text-transform:uppercase;letter-spacing:.04em;font-size:17px}
+.trrow .trn>span{font-size:12px;color:var(--mute)}
+.trrow .trn .trait{justify-self:start;margin-top:3px}
 .mo-how{font-size:13.5px;color:var(--mute);margin:2px 0 10px}
-.mo-opt .need{color:var(--text);opacity:.85;font-size:12.5px}
+.mo-opt .mo-need{color:var(--text);opacity:.85;font-size:12.5px}
 .mo-row i,.mo-orow i{display:block;font-style:normal;font-family:var(--body,inherit);font-weight:400;letter-spacing:.02em;font-size:11px;color:var(--mute);text-transform:none}
 .mo-row b,.mo-orow b{font-size:24px;color:var(--text)}
 .mo-orow b{color:var(--dim)}

@@ -101,6 +101,8 @@ test('every kind of invalid log is rejected (each on its own draft)', async () =
     'playoffs before the season ends': [['sp']],
     'quick-sim too many games': [['q', 120]],
     'unknown command': [['hack']],
+    'trade with a bad player': [['tr', 99, 0]],
+    'trade with a bad offer': [['tr', 0, 9]],
     'duplicate starters': [['P', { ...plan, starters: [0, 0, 1, 2, 3] }]],
     'minutes out of range': [['P', { ...plan, mins: Array(10).fill(99) }]],
     'bad tempo': [['P', { ...plan, tempo: 'warp' }]],

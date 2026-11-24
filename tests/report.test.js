@@ -101,3 +101,43 @@ test('interactive moments: live games show them, answers are verified by replay,
   assert.equal(R2.L.rec[0].w, b.SE.L.rec[0].w);
   assert.throws(() => C.replay(o, [['lg', [[3, 'M', 0]]]]), /moment/, 'an answer with no moment pending is rejected');
 });
+const finishSeason = SE => { while (SE.L.phase === 'season') C.quick(SE); C.startPlayoffs(SE); while (!['eliminated', 'champion', 'done'].includes(SE.L.phase)) C.quickPo(SE); };
+test('injuries: rare, short, one at a time, the man really sits, and the server replay reproduces them', () => {
+  let total = 0, long = 0;
+  for (let seed = 1; seed <= 6; seed++) {
+    const o = { picks: draft(p => p.ovr), pool, seed, hard: false, name: 'T' }, SE = C.createSeason(o), L = SE.L;
+    let prev = null;
+    while (L.phase === 'season') {
+      const G = C.beginLive(SE, false); G.fast = true; const hurt = L.inj && L.inj.i;
+      while (!G.over) C.step(SE, G);
+      if (hurt != null) assert.equal(G.st[G.userSide][hurt].sec, 0, 'an injured player does not play');
+      C.finishLive(SE, G);
+    }
+    total += L.injLog.length; long += L.injLog.filter(x => x.g > 2).length;
+    L.injLog.forEach(x => assert.ok(x.g >= 1 && x.g <= 3));
+    C.startPlayoffs(SE); while (!['eliminated', 'champion', 'done'].includes(L.phase)) C.quickPo(SE);
+    const R2 = C.replay(o, JSON.parse(JSON.stringify(SE.log)));
+    assert.equal(R2.L.rec[0].w, L.rec[0].w); assert.equal(JSON.stringify(R2.L.injLog), JSON.stringify(L.injLog));
+  }
+  assert.ok(total >= 6 && total <= 60, 'a few injuries per season, got ' + total + ' in 6');
+  assert.ok(long <= total * 0.2, 'three-game injuries are rare');
+});
+test('trades: three comparable offers, deterministic, verified by the replay, limited by count and deadline', () => {
+  const o = { picks: draft(p => p.ovr), pool, seed: 5, hard: false, name: 'T' }, SE = C.createSeason(o);
+  const offs = C.tradeOffers(SE, 4), again = C.tradeOffers(SE, 4);
+  assert.equal(offs.length, 3); assert.deepEqual(offs.map(p => p.name), again.map(p => p.name));
+  const out = SE.user.players[4];
+  offs.forEach(p => { assert.ok(Math.abs(p.ovr - out.ovr) <= 9); assert.ok(!SE.user.players.some(x => x.name === p.name)); });
+  assert.ok(C.doTrade(SE, 4, 1)); assert.equal(SE.user.players[4].name, offs[1].name);
+  assert.ok(C.doTrade(SE, 2, 0));
+  assert.equal(C.tradeState(SE).left, 0); assert.equal(C.doTrade(SE, 1, 0), false, 'only two trades a season');
+  assert.equal(new Set(SE.user.players.map(p => p.slot)).size, 5, 'positions stay valid');
+  finishSeason(SE);
+  const R2 = C.replay(o, JSON.parse(JSON.stringify(SE.log)));
+  assert.equal(R2.L.rec[0].w, SE.L.rec[0].w); assert.equal(R2.user.players.map(p => p.name).join(), SE.user.players.map(p => p.name).join());
+  // deadline
+  const SE2 = C.createSeason(o); for (let g = 0; g < 56; g++) C.quick(SE2);
+  assert.equal(C.tradeState(SE2).open, false); assert.equal(C.doTrade(SE2, 0, 0), false);
+  const bad = JSON.parse(JSON.stringify(SE2.log)); bad.push(['tr', 0, 0]);
+  assert.throws(() => C.replay(o, bad), /trade/);
+});

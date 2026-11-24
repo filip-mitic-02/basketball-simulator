@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import * as require_fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { ApiError, opStart, opSpin, opPick, opState, opSubmit } from '../lib/draftlogic.js';
 import { memStore } from './helpers/memstore.js';
@@ -61,6 +62,16 @@ async function run(signedIn) {
   await until(() => doc.querySelector('[data-a=finish]'), 'game over');
   click('[data-a=finish]');
   await until(() => doc.querySelector('[data-a=play]'), 'hub again');
+  // a trade: give a player, pick one of three offers, confirm
+  click('[data-a=gotrade]');
+  await until(() => doc.querySelector('[data-a=tgive]'), 'trade screen');
+  click('[data-a=tgive][data-i="4"]');
+  await until(() => doc.querySelectorAll('[data-a=toffer]').length === 3, 'three offers');
+  if (process.env.DUMP) require_fs.writeFileSync('/tmp/trade.html', '<!doctype html>' + doc.documentElement.outerHTML);
+  const gone = w.__S.user.players[4].name;
+  click('[data-a=toffer][data-i="1"]'); click('[data-a=tconfirm]');
+  await until(() => doc.querySelector('[data-a=play]'), 'hub after the trade');
+  assert.notEqual(w.__S.user.players[4].name, gone, 'the traded player is replaced');
   // a second game played step by step, answering the interactive moments
   click('[data-a=play]');
   await until(() => doc.querySelector('[data-a=resume]'), 'second game');
