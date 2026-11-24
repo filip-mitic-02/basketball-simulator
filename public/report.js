@@ -1,32 +1,45 @@
-// Team report: does the roster have everything a team needs? Pure presentation logic, it never touches the simulation.
-// Every category is ranked (percentile) against rosters a sensible drafter would build in the chosen era.
+// Team report: where a roster's strength comes from and what it is missing.
+// Every number here comes from the simulation itself. Each component of the player rating (Engine.CRED) acts in the game with a
+// weight that was calibrated and measured, so a category's "points per game" is what that part of the roster is actually worth.
+// Pure presentation logic, it never changes the simulation.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(); else root.Report = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   const N = v => (typeof v === 'number' && isFinite(v) ? v : 0);
-  // key, label, unit, per-player value, how the team value is built from the rotation
+  let CORE = null, ENG = null;
+
+  // Measured on the final simulation: points per game won by one rating point for the whole rotation, and wins per point per game.
+  const PPG_PER_RATING = 1.1, WINS_PER_PPG = 1.45;
+  // Measured cost of the team-level synergies in the game engine (points per game, worst case).
+  const SYN = { handler: 2.6, cramped: 0.5, usage: 0.7 };
+  // Projected wins from the minute-weighted rating of the roster (quadratic fit on ~670 simulated seasons with rating 58+,
+  // residual sd about 5.5 wins; the opposition, injuries of form and coaching make up the rest).
+  const projWins = r => -151.8 + 4.886 * r - 0.027 * r * r;
+  const TG = [34, 33, 32, 30, 29, 24, 20, 16, 12, 10];
+
+  // Each category: the part of the rating it stands for (ovr points, relative to an average player).
   const CATS = [
-    { k: 'sc', name: 'Scoring', unit: 'pts', val: p => N(p.ppg) },
-    { k: 'pm', name: 'Playmaking', unit: 'ast', val: p => N(p.apg) },
-    { k: 'rb', name: 'Rebounding', unit: 'reb', val: p => N(p.rpg) },
-    { k: 'rp', name: 'Rim protection', unit: 'blk', val: p => N(p.bpg) },
-    { k: 'pd', name: 'Perimeter defense', short: 'Perimeter D', unit: 'stl', val: p => N(p.spg) },
-    { k: 'sp', name: 'Floor spacing', unit: '3P', val: p => N(p.r3) * N(p.tp) * N(p.mpg) / 36 }
+    { k: 'sc', name: 'Scoring', short: 'Scoring', unit: 'pts', stat: p => N(p.ppg), val: (p, C) => C.score(p) },
+    { k: 'pm', name: 'Playmaking', short: 'Playmaking', unit: 'ast', stat: p => N(p.apg), val: (p, C) => C.cr('ast', p) },
+    { k: 'rb', name: 'Rebounding', short: 'Rebounding', unit: 'reb', stat: p => N(p.rpg), val: (p, C) => C.cr('orb', p) + C.cr('drb', p) },
+    { k: 'rp', name: 'Rim protection', short: 'Rim protection', unit: 'blk', stat: p => N(p.bpg), val: (p, C) => C.cr('blk', p) },
+    { k: 'pd', name: 'Perimeter defense', short: 'Perimeter D', unit: 'stl', stat: p => N(p.spg), val: (p, C) => C.cr('stl', p) },
+    { k: 'di', name: 'Discipline', short: 'Discipline', unit: '', stat: null, val: (p, C) => C.cr('tov', p) + C.cr('pf', p) }
   ];
-  const ROT = 8;
-  const byMin = ps => ps.slice().sort((a, b) => N(b.mpg) - N(a.mpg) || N(b.ovr) - N(a.ovr));
-  // Team value: the rotation (best eight by minutes). Playmaking leans on the two best passers, because one facilitator
-  // is worth more than five average passers; rim protection leans on the best shot blocker for the same reason.
-  function teamVal(cat, ps) {
-    const rot = byMin(ps).slice(0, ROT), v = rot.map(cat.val).sort((a, b) => b - a), sum = v.reduce((a, b) => a + b, 0);
-    if (cat.k === 'pm') return 0.5 * sum + 1.5 * ((v[0] || 0) + 0.5 * (v[1] || 0));
-    if (cat.k === 'rp') return 0.6 * sum + 1.2 * (v[0] || 0);
-    return sum;
+  const helpers = () => {
+    const CR = ENG.CRED, cr = (f, p) => (p[f] == null ? 0 : CR[f][0] * (p[f] - CR[f][1]));
+    // scoring = the rating minus what the other components already pay for
+    const score = p => p.ovr - ['ast', 'orb', 'drb', 'stl', 'blk', 'tov', 'pf'].reduce((a, f) => a + cr(f, p), 0);
+    return { cr, score };
+  };
+  const byRating = ps => ps.slice().sort((a, b) => N(b.ovr) - N(a.ovr));
+  // minute-weighted average of a per-player value, using the standard rotation for as many players as the roster has
+  function teamVal(fn, ps) {
+    const top = byRating(ps).slice(0, TG.length); let s = 0, w = 0;
+    top.forEach((p, i) => { s += fn(p) * TG[i]; w += TG[i]; });
+    return w ? s / w : 0;
   }
-  let CORE = null;
   const refCache = new Map();
-  // The yardstick is a set of rosters drafted by a sensible player (best rating at every spin) in the same era, so 50 means
-  // "a typical good draft" and a low number means a real gap compared to what is usually possible, not compared to history.
   function simRosters(pool) {
     const out = []; let s = 12345;
     const rnd = n => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return Math.floor(((t ^ (t >>> 14)) >>> 0) / 4294967296 * n); };
@@ -43,69 +56,83 @@
     }
     return out;
   }
+  // refs[n][k] = sorted team values over rosters a sensible drafter builds in this era, limited to their n best players
   function refFor(pool, key, n) {
     let R = refCache.get(key);
-    if (!R) { R = { rosters: simRosters(pool) }; refCache.set(key, R); if (refCache.size > 8) refCache.delete(refCache.keys().next().value); }
+    if (!R) { R = { rosters: simRosters(pool), H: helpers() }; refCache.set(key, R); if (refCache.size > 8) refCache.delete(refCache.keys().next().value); }
     if (R[n]) return R[n];
     const out = {};
-    CATS.forEach(c => { out[c.k] = R.rosters.map(ps => teamVal(c, byMin(ps).slice(0, n))).sort((a, b) => a - b); });
+    CATS.forEach(c => { out[c.k] = R.rosters.map(ps => teamVal(p => c.val(p, R.H), byRating(ps).slice(0, n))).sort((a, b) => a - b); });
     return (R[n] = out);
   }
   const pctOf = (arr, v) => { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; } return Math.max(0, Math.min(99, Math.round(lo / arr.length * 100))); };
+  const median = arr => arr[arr.length >> 1];
   const tier = v => v >= 80 ? 'elite' : v >= 55 ? 'good' : v >= 20 ? 'mid' : 'low';
-  const lead = (cat, ps) => ps.slice().sort((a, b) => cat.val(b) - cat.val(a))[0];
+  const scoreTier = w => w >= 66 ? 'elite' : w >= 56 ? 'good' : w >= 40 ? 'mid' : 'low';
   const f1 = v => N(v).toFixed(1);
 
-  function analyze(players, pool, key) {
-    const n = Math.min(ROT, players.length);
-    if (n < 3) return null;
-    const ref = refFor(pool, key, n), cats = {};
-    CATS.forEach(c => {
-      const v = teamVal(c, players), p = pctOf(ref[c.k], v), L = lead(c, players);
-      cats[c.k] = { k: c.k, name: c.name, short: c.short || c.name, unit: c.unit, pct: p, tier: tier(p), leader: L ? L.name : '', leaderVal: L ? c.val(L) : 0 };
-    });
-    const list = CATS.map(c => cats[c.k]);
-    const avg = list.reduce((a, c) => a + c.pct, 0) / list.length;
-    const holes = list.filter(c => c.pct < 20).sort((a, b) => a.pct - b.pct);
-    const gaps = list.reduce((a, c) => a + Math.max(0, 35 - c.pct), 0);
-    const score = Math.max(3, Math.min(99, Math.round(22 + 0.78 * avg - gaps * 0.3)));
-    const notes = insights(players, cats, list, holes);
-    const verdict = holes.length === 0 ? (score >= 62 ? 'Complete roster' : 'Solid, no real holes')
-      : holes.length === 1 ? 'One big hole' : 'Unbalanced roster';
-    const need = holes[0] || list.slice().sort((a, b) => a.pct - b.pct)[0];
-    return { n, cats, list, score, tier: tier(score), verdict, holes, need: need.k, notes, partial: players.length < 10 };
+  // Team-level synergies the engine models, from the starting five.
+  function synergy(ps) {
+    const five = ENG.bestFive(ps).map(i => ps[i]), out = [];
+    const guards = five.filter(p => p.guard), hq = guards.reduce((m, p) => Math.max(m, N(p.ast)), 0);
+    const hl = Math.max(0, Math.min(1, (0.95 - hq) / 0.35));
+    if (ps.length >= 5 && hl > 0.05) out.push({ k: 'handler', pts: -SYN.handler * hl, hl });
+    const spc = five.reduce((a, p) => a + Math.max(0, Math.min(1, (N(p.r3) - 0.14) / 0.18)) * Math.max(0.3, Math.min(1.2, 0.5 + (N(p.p3) + 0.03) * 12)), 0);
+    if (ps.length >= 5 && spc < 1.6) out.push({ k: 'cramped', pts: -SYN.cramped, spc });
+    const usg = five.reduce((a, p) => a + N(p.usg), 0) / Math.max(1, five.length);
+    if (ps.length >= 5 && usg > 1.12) out.push({ k: 'usage', pts: -SYN.usage * Math.min(1.4, (usg - 1.08) / 0.27), usg });
+    return out;
   }
 
-  // Short, specific sentences. Problems first, then what is working.
-  function insights(ps, cats, list, holes) {
-    const out = [], top = byMin(ps).slice(0, ROT), P = k => cats[k].pct;
-    const scorers = top.filter(p => N(p.ppg) >= 18);
-    const best = k => { const c = CATS.find(x => x.k === k), L = lead(c, ps); return L ? `${L.name} (${f1(c.val(L))} ${c.unit})` : ''; };
-    const sayHole = {
-      pm: () => scorers.length >= 3 && P('sc') >= 55
-        ? `Plenty of scorers and nobody to get them the ball. Your best passer is ${best('pm')}.`
-        : `Nobody to run the offense. Your best passer is ${best('pm')}, so shots will come off isolation.`,
-      rb: () => cats.rb.leaderVal >= 9 ? `${best('rb')} has almost no help on the glass. Opponents will get second chances.` : `Thin on the glass. Opponents will get second chances. Best rebounder: ${best('rb')}.`,
-      rp: () => cats.rp.leaderVal >= 1.8 ? `${best('rp')} is the only rim protector. Drivers will finish easily whenever he rests.` : `No one protects the rim. Drivers will finish easily. Best shot blocker: ${best('rp')}.`,
-      pd: () => `Nobody to pressure the ball on the perimeter. Best thief: ${best('pd')}.`,
-      sp: () => `No floor spacing. The paint will be crowded and defenders can sag off your shooters.`,
-      sc: () => `Short on scoring. When the offense stalls nobody can create a bucket. Top scorer: ${best('sc')}.`
+  function analyze(players, pool, key) {
+    if (!CORE || !ENG || players.length < 3) return null;
+    const n = Math.min(TG.length, players.length), H = helpers(), ref = refFor(pool, key, n), complete = players.length >= 10;
+    const list = CATS.map(c => {
+      const v = teamVal(p => c.val(p, H), players), arr = ref[c.k], pct = pctOf(arr, v), pts = PPG_PER_RATING * (v - median(arr));
+      const L = c.stat ? players.slice().sort((a, b) => c.stat(b) - c.stat(a))[0] : players.slice().sort((a, b) => c.val(b, H) - c.val(a, H))[0];
+      return { k: c.k, name: c.name, short: c.short, unit: c.unit, pct, pts, tier: tier(pct), leader: L ? L.name : '', leaderVal: L && c.stat ? c.stat(L) : null };
+    });
+    const syn = synergy(players), synPts = syn.reduce((a, s) => a + s.pts, 0);
+    const cats = Object.fromEntries(list.map(c => [c.k, c]));
+    const rating = teamVal(p => N(p.ovr), players);
+    const wins = complete ? Math.max(8, Math.min(78, Math.round(projWins(rating) + WINS_PER_PPG * synPts))) : null;
+    const holes = list.filter(c => c.pts <= -0.9 && c.pct < 25).sort((a, b) => a.pts - b.pts);
+    const cost = holes.reduce((a, c) => a + c.pts, 0) + synPts;
+    const verdict = (cost > -0.9 ? 'No real weakness' : holes.length + syn.filter(s => s.pts <= -0.8).length >= 2 ? 'Unbalanced roster' : 'One big hole');
+    const need = list.slice().sort((a, b) => a.pts - b.pts)[0];
+    return { n, cats, list, syn, wins, score: wins, tier: wins == null ? 'mid' : scoreTier(wins), verdict, holes, need: need.k, notes: insights(players, cats, list, holes, syn), partial: !complete, count: players.length };
+  }
+
+  const pts1 = v => Math.abs(v).toFixed(1);
+  function insights(ps, cats, list, holes, syn) {
+    const out = [], nm = (k, extra) => { const c = cats[k]; return c.leader ? `${c.leader}${c.leaderVal != null ? ` (${f1(c.leaderVal)} ${c.unit})` : ''}` : ''; };
+    const say = {
+      sc: c => `Short on scoring, about ${pts1(c.pts)} points per game behind a typical draft. Top scorer: ${nm('sc')}.`,
+      pm: c => `Few playmakers. It costs about ${pts1(c.pts)} points per game. Best passer: ${nm('pm')}.`,
+      rb: c => `Thin on the glass, about ${pts1(c.pts)} points per game. Best rebounder: ${nm('rb')}.`,
+      rp: c => `Weak rim protection, about ${pts1(c.pts)} points per game. Best shot blocker: ${nm('rp')}.`,
+      pd: c => `Nobody to disrupt ball handlers, about ${pts1(c.pts)} points per game. Best thief: ${nm('pd')}.`,
+      di: c => `Sloppy with the ball and the whistle: turnovers and fouls cost about ${pts1(c.pts)} points per game.`
     };
-    holes.forEach(h => out.push({ kind: 'bad', text: sayHole[h.k]() }));
-    list.filter(c => c.pct >= 20 && c.pct < 36 && out.length < 3).forEach(c => out.push({ kind: 'warn', text: `${c.name} is a soft spot. It ranks ${c.pct} against typical drafts.` }));
-    if (scorers.length >= 4 && P('pm') < 60) out.push({ kind: 'warn', text: `${scorers.length} players want 18+ points but there is one ball. Expect shots to be shared thin.` });
-    const bigs = top.filter(p => p.big || p.slot === 'C' || p.slot === 'PF');
-    if (bigs.length && Math.max(...bigs.map(p => N(p.rpg))) < 6.5 && P('rb') >= 20) out.push({ kind: 'warn', text: 'No true big man on the floor. You may get pushed around inside.' });
-    list.filter(c => c.pct >= 80).sort((a, b) => b.pct - a.pct).slice(0, 2).forEach(c => out.push({ kind: 'good', text: `${c.name} is elite, led by ${c.leader} (${f1(c.leaderVal)} ${c.unit}).` }));
-    if (!out.length) out.push({ kind: 'good', text: 'Everything a contender needs: scoring, passing, size, defense and shooting.' });
+    syn.filter(s => s.pts <= -0.8).forEach(s => {
+      if (s.k === 'handler') out.push({ kind: 'bad', text: `No real ball handler in the starting five. Turnovers go up and shots get worse, about ${pts1(s.pts)} points per game.` });
+      if (s.k === 'usage') out.push({ kind: 'bad', text: `Too many high-usage starters sharing one ball, about ${pts1(s.pts)} points per game.` });
+    });
+    holes.forEach(h => out.push({ kind: 'bad', text: say[h.k](h) }));
+    syn.filter(s => s.pts > -0.8).forEach(s => {
+      if (s.k === 'handler') out.push({ kind: 'warn', text: `The starting five is light on ball handling, about ${pts1(s.pts)} points per game.` });
+    });
+    list.filter(c => !holes.includes(c) && c.pts <= -0.5 && c.pts > -0.9 && out.length < 3).forEach(c => out.push({ kind: 'warn', text: `${c.name} is a soft spot, ${pts1(c.pts)} points per game below a typical draft.` }));
+    list.filter(c => c.pts >= 1.2).sort((a, b) => b.pts - a.pts).slice(0, 2).forEach(c => out.push({ kind: 'good', text: `${c.name} is a strength: +${f1(c.pts)} points per game over a typical draft${c.leader ? ', led by ' + c.leader : ''}.` }));
+    if (!out.length) out.push({ kind: 'good', text: 'No weak spot. The roster covers scoring, passing, size, defense and shooting.' });
     return out.slice(0, 5);
   }
 
-  // How much would adding `p` lift the team's weakest category? Used to tag draft cards.
+  // How much would adding `p` lift the team's weakest category, in points per game?
   function lift(players, p, pool, key, catKey) {
-    if (players.length < 2) return 0;
-    const c = CATS.find(x => x.k === catKey), ref = refFor(pool, key, Math.min(ROT, players.length + 1));
-    return pctOf(ref[catKey], teamVal(c, players.concat([p]))) - pctOf(refFor(pool, key, Math.min(ROT, players.length))[catKey], teamVal(c, players));
+    if (!CORE || !ENG || players.length < 2) return 0;
+    const c = CATS.find(x => x.k === catKey), H = helpers();
+    return PPG_PER_RATING * (teamVal(q => c.val(q, H), players.concat([p])) - teamVal(q => c.val(q, H), players));
   }
-  return { CATS, analyze, lift, tier, setCore: c => { CORE = c; } };
+  return { CATS, analyze, lift, tier, setCore: (c, e) => { CORE = c; ENG = e; } };
 });

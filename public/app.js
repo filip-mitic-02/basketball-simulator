@@ -354,12 +354,13 @@
     if (S.hard && !S.revealed) return `<div class="panel rp"><div class="eyebrow">${title}</div><div class="rp-lock">Hidden in Hard mode until the draft is over. The report would give away the stats.</div></div>`;
     const a = Report.analyze(players, S.pool, poolKey());
     if (!a) return `<div class="panel rp"><div class="eyebrow">${title}</div><div class="rp-lock">Draft three players and the report shows what your team has and what it is missing.</div></div>`;
-    const rows = a.list.map(c => `<div class="rp-row ${c.tier}"><span class="rp-n">${c.short}</span><span class="rp-bar"><b style="width:${Math.max(3, c.pct)}%"></b></span><span class="ovr">${c.pct}</span><span class="rp-l">${esc(c.leader)} &middot; ${c.leaderVal.toFixed(1)} ${c.unit}</span></div>`).join('');
+    const sgn = v => (v > 0.05 ? '+' : v < -0.05 ? '\u2212' : '') + Math.abs(v).toFixed(1);
+    const rows = a.list.map(c => `<div class="rp-row ${c.tier}"><span class="rp-n">${c.short}</span><span class="rp-bar"><b style="width:${Math.max(3, c.pct)}%"></b></span><span class="ovr">${sgn(c.pts)}</span><span class="rp-l">${c.leader ? esc(c.leader) + (c.leaderVal != null ? ' &middot; ' + c.leaderVal.toFixed(1) + ' ' + c.unit : '') : ''}</span></div>`).join('');
     const ic = { bad: IC_BAD, warn: IC_WARN, good: IC_CHK };
     const notes = a.notes.map(n => `<li class="${n.kind}">${ic[n.kind]}<span>${esc(n.text)}</span></li>`).join('');
     return `<div class="panel rp"><div class="eyebrow">${title}</div>
-      <div class="rp-head"><div class="rp-score ${a.tier}"><b class="led num">${a.score}</b><span>BALANCE</span></div>
-        <div><div class="rp-v">${a.verdict}</div><div class="rp-s">${a.partial ? 'Based on ' + players.length + ' of 10 players so far.' : 'Ranked against rosters a smart draft usually builds in this era.'}</div></div></div>
+      <div class="rp-head"><div class="rp-score ${a.tier}"><b class="led num">${a.partial ? a.count + '/10' : a.wins}</b><span>${a.partial ? 'DRAFTED' : 'PROJ. WINS'}</span></div>
+        <div><div class="rp-v">${a.verdict}</div><div class="rp-s">${a.partial ? 'The projection unlocks when the roster is complete. Bars compare each area with a typical draft.' : 'Projected from rating, role fit and synergy. Bars show points per game against a typical draft in this era.'}</div></div></div>
       <div class="rp-rows">${rows}</div><ul class="rp-notes">${notes}</ul></div>`;
   }
   // On a draft card: does this player lift the weakest area of the roster?
@@ -367,8 +368,8 @@
     const D = S.D;
     if (!fits || !D.rep || !statsVisible()) return '';
     const cat = D.rep.cats[D.rep.need];
-    if (cat.pct >= 45) return '';
-    return Report.lift(D.picks, p, S.pool, poolKey(), D.rep.need) >= 12 ? `<div class="need">Fills your need: ${cat.name}</div>` : '';
+    if (cat.pts > -0.8) return '';
+    return Report.lift(D.picks, p, S.pool, poolKey(), D.rep.need) >= 0.6 ? `<div class="need">Fills your need: ${cat.name}</div>` : '';
   }
   const IC_TAKEN = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 7h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   function fitBadge(p, taken, fits) {
@@ -565,7 +566,8 @@
         <div class="ctrl" style="margin-top:4px"><button class="btn pri" data-a="play">Coach this game</button><button class="btn" data-a="quick">Quick sim</button></div>
         <div class="ctrl" style="margin-top:0"><button class="btn sm" data-a="sim10">Sim 10 games</button><button class="btn sm" data-a="simall">Sim to end of season</button><button class="btn sm" data-a="gocoach">Tactics</button></div></div></div>
       <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Recent games</div>${lastGames()}</div><div class="panel"><div class="eyebrow">Conference standings</div>${standingsHtml()}</div></div>
-      <div class="panel" style="margin-top:16px"><div class="eyebrow">Season stats</div>${statsHtml()}</div>`;
+      <div class="panel" style="margin-top:16px"><div class="eyebrow">Season stats</div>${statsHtml()}</div>
+      ${teamReport(S.user.players, 'Team report')}`;
   };
 
   // ---------- playoffs ----------
@@ -959,7 +961,7 @@
   });
 
   fetch('data.json').then(r => r.json()).then(D => {
-    Report.setCore(Core);
+    Report.setCore(Core, E);
     S.teams = Core.mkTeams(D);
     S.byId = new Map(S.teams.map(t => [t.id, t]));
     setPool(); S.screen = 'menu'; render(); initAccount();

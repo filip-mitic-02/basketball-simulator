@@ -46,3 +46,18 @@ Team crests and player avatars are generated SVGs, not real logos or photos.
 Signed-in drafts and seasons are verified on the server (see SECURITY.md). Run this SQL once in Neon (it is in `schema.sql`):
 the `drafts` table and the new `runs` columns `draft_id`, `verified`, `sim_version`, `log`. After changing `public/engine.js`,
 `league.js`, `core.js` or `data.json`, bump `VERSION` in `public/core.js` and run `node scripts/update-sim-lock.mjs`.
+
+
+## Rating model and balance
+
+The rating on a card is paid for by measurable components (`CRED` in `public/engine.js`: shooting, passing, rebounds, steals, blocks,
+turnovers, fouls). The game models each component explicitly, so shot quality uses `coreOf(player)`, the part of the rating the
+components do not explain. Each component is calibrated so that a team-wide gain in it is worth what the rating credits it for
+(`node scripts/measure-impact.mjs 12000` prints the measured effect next to the target). `node scripts/balance-check.mjs 160` plays
+greedy drafts through full seasons and prints wins, titles and the league spread (best opponent about 61 wins, worst about 18).
+Any change to the engine, league or data needs a new `VERSION` in `public/core.js` and `node scripts/update-sim-lock.mjs`.
+
+When the version changes, clear old results (their logs belong to the old simulation):
+
+    delete from runs;
+    delete from drafts;

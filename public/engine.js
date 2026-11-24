@@ -18,13 +18,25 @@
 
   // ---------- Konstante modela ----------
   const BASE2 = 0.543, BASE3 = 0.362;
-  const K = { ovrO: 0.0070, ovrD: 0.0078, delta: 1.8, cmp: 7, cmpT: 0, clump: 0.05, tform: 0.03, sat: 0.05, satT: 0.04, es: 0.6, formSd: 0.025 };       // moderna liga kao referenca (sve je era-normalizovano)
+  const K = { ovrO: 0.00546, ovrD: 0.00608, delta: 1.8, cmp: 7, cmpT: 0, clump: 0.05, tform: 0.03, sat: 0.09, satT: 0.06, es: 0.6, formSd: 0.025,
+    // how strongly each component acts on the court; tuned so a +1 sd team-wide gain is worth what the rating credits it for
+    kOrb: 0.30, kDrb: 0.68, kStl: 0.38, kBlk: 0.16, kAst: 9.5, kTov: 0.56, kFtr: 1.16, kPf: 2.0, d2: 0.72, d3: 2.67, spcUp: 0.004, spcDn: -0.006, gain: 1.85, g3: 0.75, hndP: -0.006, hndT: 1.09 };       // moderna liga kao referenca (sve je era-normalizovano)
   const TEMPO = {                              // sekundi po posedu (prosek), umor, TOV, kvalitet šuta
     slow: { dur: 15.6, fat: 0.96, tov: -0.004, sq: +0.003 },
     normal: { dur: 13.2, fat: 1.00, tov: 0.0, sq: 0.0 },
     fast: { dur: 11.6, fat: 1.04, tov: +0.004, sq: -0.002 },
     push: { dur: 10.4, fat: 1.10, tov: +0.009, sq: -0.004 }
   };
+  // The rating on a card pays for these components (fitted on the whole player pool: ovr ~ sum of coef * (stat - mean)).
+  // The simulation models each component explicitly, so shot quality uses `core`, the part of the rating they do not explain.
+  // Without this a big man's rebounds and blocks counted twice: once inside his rating and again in the rebound and block
+  // formulas, while a passer's assists were credited in his rating but barely did anything in the game.
+  const CRED = { p2: [91.3, 0], p3: [56.2, 0], r3: [3.14, 0.162], ast: [7.43, 1], orb: [2.25, 1], drb: [6.09, 1], stl: [4.45, 1], blk: [1.79, 1], ftr: [4.3, 1], tov: [-9.68, 1], pf: [-8.19, 1] };
+  function coreOf(p) {
+    let c = p.ovr;
+    for (const f in CRED) { const v = p[f]; if (v != null) c -= CRED[f][0] * (v - CRED[f][1]); }
+    return c;
+  }
   const OFFENSE = ['balanced', 'inside', 'threes', 'ballmove', 'iso'];
   const DEFENSE = ['man', 'zone', 'press'];
 
@@ -171,12 +183,14 @@
   // agregati odbrane/napada za trenutnu petorku
   function agg(G, t) {
     const P = G.teams[t].players, on = G.on[t], en = G.en[t];
-    let stl = 0, blk = 0, drb = 0, orb = 0, ast = 0, ovr = 0, usg = 0, spc = 0, hnd = 0, bigs = 0;
+    let stl = 0, blk = 0, drb = 0, orb = 0, ast = 0, ovr = 0, usg = 0, spc = 0, hnd = 0, bigs = 0, pf = 0, hq = 0;
     for (let k = 0; k < 5; k++) {
       const p = P[on[k]], f = Math.pow(fatF(en[on[k]]), 0.7);
-      stl += p.stl * f; blk += p.blk * f; drb += p.drb * f; orb += p.orb * f; ast += p.ast * f; ovr += cmp(p.ovr - 54) * (0.85 + 0.15 * en[on[k]] / 100); usg += p.usg; spc += clamp((p.r3 - 0.14) / 0.18, 0, 1) * clamp(0.5 + (p.p3 + 0.03) * 12, 0.3, 1.2); if (p.guard && p.ast > 0.85) hnd++; if (p.big) bigs++;
+      stl += p.stl * f; blk += p.blk * f; drb += p.drb * f; orb += p.orb * f; ast += p.ast * f; ovr += cmp(coreOf(p) - 54) * (0.85 + 0.15 * en[on[k]] / 100); pf += p.pf; usg += p.usg; spc += clamp((p.r3 - 0.14) / 0.18, 0, 1) * clamp(0.5 + (p.p3 + 0.03) * 12, 0.3, 1.2); if (p.guard) { hnd++; if (p.ast * f > hq) hq = p.ast * f; } if (p.big) bigs++;
     }
-    return { stl: stl / 5, blk: blk / 5, drb: drb / 5, orb: orb / 5, ast: ast / 5, ovr: ovr / 5, usg: usg / 5, spc, hnd, bigs, sum: { drb, orb } };
+    const sc = (v, k) => 1 + k * (v / 5 - 1);      // scaled effect of a component (raw values stay for who-does-what picks)
+    return { stl: stl / 5, blk: blk / 5, drb: drb / 5, orb: orb / 5, ast: ast / 5, ovr: ovr / 5, usg: usg / 5, spc, hnd, bigs, pf: pf / 5, hl: clamp((0.95 - hq) / 0.35, 0, 1), sum: { drb, orb },
+      e: { stl: sc(stl, K.kStl), blk: sc(blk, K.kBlk), drb: sc(drb, K.kDrb), orb: sc(orb, K.kOrb), ast: clamp(sc(ast, K.kAst), 0.2, 3) } };
   }
 
   // ---------- Jedan posed ----------
@@ -232,7 +246,7 @@
 
     // ---- gubitak lopte ----
     const defPress = pd.def === 'press' ? 0.030 : 0;
-    let pT = 0.128 * S.tov * (A.hnd === 0 ? 1.18 : 1) * (1 + 0.45 * (D.stl - 1)) + defPress + tp.tov + (isFB ? -0.02 : 0)
+    let pT = 0.128 * (1 + K.kTov * (S.tov - 1)) * (1 + (K.hndT - 1) * A.hl) * (1 + 0.45 * (D.e.stl - 1)) + defPress + tp.tov + (isFB ? -0.02 : 0)
       + (G.dbl[d] === pi ? 0.045 : 0);
     pT = clamp(pT, 0.03, 0.32);
     if (G.r() < pT) {
@@ -252,27 +266,27 @@
     const r3 = clamp(S.r3 * (po.off === 'threes' ? 1.32 : po.off === 'inside' ? 0.62 : 1) * (pd.def === 'zone' ? 1.10 : 1), 0, 0.85);
     const is3 = G.r() < r3;
 
-    let pFoul = 0.082 * S.ftr * (po.off === 'inside' ? 1.22 : po.off === 'threes' ? 0.85 : 1)
+    let pFoul = 0.082 * (1 + K.kFtr * (S.ftr - 1)) * (1 + K.kPf * (D.pf - 1)) * (po.off === 'inside' ? 1.22 : po.off === 'threes' ? 0.85 : 1)
       * (pd.def === 'press' ? 1.18 : pd.def === 'zone' ? 0.86 : 1) * (is3 ? 0.30 : 1) * (isFB ? 1.1 : 1);
     pFoul = clamp(pFoul, 0, 0.30);
     const sq = tp.sq;
     // verovatnoća pogotka
-    let p = (is3 ? BASE3 + K.delta * S.p3 : BASE2 + K.delta * S.p2);
-    p += K.ovrO * cmp(S.ovr - 54) - K.ovrD * D.ovr;
+    let p = (is3 ? BASE3 + K.d3 * S.p3 : BASE2 + K.d2 * S.p2);
+    p += K.ovrO * cmp(coreOf(S) - 54) - K.ovrD * D.ovr;
     p -= K.clump * Math.max(0, A.usg - 1.08);
-    if (!is3) p += (A.spc >= 3.2 ? 0.010 : A.spc < 1.6 ? -0.014 : 0);
-    if (A.hnd === 0) p -= 0.012;
+    if (!is3) p += (A.spc >= 3.2 ? K.spcUp : A.spc < 1.6 ? K.spcDn : 0);
+    p += K.hndP * A.hl;
     p += G.tform[o];
-    p += 0.012 * (A.ast - 1);
-    const defScore = (0.45 * (D.blk - 1) + 0.35 * (D.stl - 1) + 0.20 * (D.drb - 1)) * (is3 ? 0.55 : 1);
+    p += 0.012 * (A.e.ast - 1);
+    const defScore = (0.45 * (D.e.blk - 1) + 0.35 * (D.e.stl - 1) + 0.20 * (D.e.drb - 1)) * (is3 ? 0.55 : 1);
     p -= 0.09 * defScore;
     if (po.off === 'inside' && !is3) p += A.bigs >= 2 ? 0.015 : -0.008;
     if (po.off === 'threes' && is3) p += A.spc >= 2.8 ? 0.012 : -0.010;
-    if (po.off === 'ballmove') p += clamp(0.035 * (A.ast - 1), -0.012, 0.016);
+    if (po.off === 'ballmove') p += clamp(0.035 * (A.e.ast - 1), -0.012, 0.016);
     if (po.off === 'iso') p += S.ovr >= 80 ? -0.006 : -0.018;
     if (pd.def === 'press') p += 0.007;
     if (pd.def === 'zone') p += is3 ? 0.017 : -0.009;
-    { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o], ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + (K.sat - T) * Math.tanh((ax - T) / (K.sat - T)); p = base + (x < 0 ? -y : y); } }
+    { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o] * K.gain * (is3 ? K.g3 : 1), ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + (K.sat - T) * Math.tanh((ax - T) / (K.sat - T)); p = base + (x < 0 ? -y : y); } }
     p += sq;
     p -= 0.08 * Math.pow(1 - eo[pi] / 100, 1.4);
     p += G.form[o][pi] + 0.006 * G.heat[o][pi] + 0.005 * G.mom[o] + (o === 0 ? 0.005 : -0.005);
@@ -300,7 +314,7 @@
 
     // blokada
     if (!is3) {
-      const pB = 0.056 * Math.pow(D.blk, 1.15) * (S.big ? 1.15 : 1) * (po.off === 'inside' ? 1.1 : 1);
+      const pB = 0.056 * Math.pow(D.e.blk, 1.15) * (S.big ? 1.15 : 1) * (po.off === 'inside' ? 1.1 : 1);
       if (G.r() < clamp(pB, 0, 0.2)) {
         st.fga++;
         const bj = wpick(G, dn.map(j => Math.pow(Q[j].blk, 1.6) * fatF(ed[j])));
@@ -385,7 +399,7 @@
   function rebound(G, o, d, A, D, mult) {
     const P = G.teams[o].players, Q = G.teams[d].players;
     const pd = G.plans[d];
-    let rO = A.orb, rD = D.drb * (pd.def === 'zone' ? 1.0 : pd.def === 'press' ? 0.95 : 1);
+    let rO = A.e.orb, rD = D.e.drb * (pd.def === 'zone' ? 1.0 : pd.def === 'press' ? 0.95 : 1);
     const pOR = clamp(0.262 * rO / (0.262 * rO + 0.738 * rD), 0.1, 0.5) * mult;
     if (G.r() < pOR) {
       const on = G.on[o];
@@ -602,7 +616,7 @@
   }
 
   return {
-    K, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
+    K, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
     setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview
