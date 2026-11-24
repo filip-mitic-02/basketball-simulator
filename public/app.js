@@ -316,7 +316,10 @@
     const tick = () => {
       n++; D.reel = S.pool[rnd(S.pool.length)]; updateReels();
       if (n < 16) setTimeout(tick, 60 + n * 8);
-      else { D.cur = final; D.reel = final; D.phase = 'choose'; render(); }
+      else {
+        D.cur = final; D.reel = final; D.phase = 'choose'; D.landed = true; render();
+        setTimeout(() => { D.landed = false; const el = document.getElementById('reelbox'); if (el) el.classList.remove('land'); }, 900);
+      }
     };
     tick();
   }
@@ -329,11 +332,21 @@
     }
   }
   const statsVisible = () => !S.hard || S.revealed || (S.D && S.D.scoutedId && S.D.cur && S.D.scoutedId === S.D.cur.id);
-  const IC_TRAIT = '<svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6 9l-3.2 1.7.6-3.6L.8 4.6l3.6-.5z" fill="currentColor"/></svg>';
+  const svg = d => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const TRAIT_IC = {
+    magnet: svg('<path d="M5 3v9a7 7 0 0 0 14 0V3"/><path d="M5 7h4M15 7h4"/>'),                                  // horseshoe magnet
+    sniper: svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/><circle cx="12" cy="12" r="1" fill="currentColor"/>'),   // crosshair
+    eraser: svg('<path d="M4 15l9-9a2.5 2.5 0 0 1 3.5 0l3 3a2.5 2.5 0 0 1 0 3.5L12 20H7z"/><path d="M9 11l5 5M4 20h16"/>'),   // eraser
+    lockdown: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/>'),   // padlock
+    maestro: svg('<circle cx="5" cy="17" r="2.2"/><circle cx="19" cy="17" r="2.2"/><circle cx="12" cy="5" r="2.2"/><path d="M7 15.5l3.5-8M17 15.5l-3.5-8M8 18h8"/>'),   // passing triangle
+    glass: svg('<path d="M6 4h12l-1.5 15a2 2 0 0 1-2 1.8h-5a2 2 0 0 1-2-1.8z"/><path d="M8 9h8M10 3.5l-.5-1.5"/>'),   // glass
+    scorer: svg('<path d="M12 3c.6 3 4.8 5 4.8 9.6A4.8 4.8 0 0 1 12 17.4a4.8 4.8 0 0 1-4.8-4.8c0-2 1.2-3.2 2.2-4.2 0 1.8.9 2.8 2 2.8C11.6 8 10.8 6 12 3z"/><path d="M9 21h6"/>')   // flame
+  };
+  const TRAIT_SIDE = { magnet: 'off', sniper: 'off', maestro: 'off', scorer: 'off', eraser: 'def', lockdown: 'def', glass: 'def' };
   function traitBadge(p, long) {
     const t = E.traitOf(p); if (!t) return '';
     const T = E.TRAITS[t.k];
-    return `<span class="trait" title="${esc(T.desc)}">${IC_TRAIT}${T.name}</span>${long ? `<span class="tdesc">${esc(T.desc)}</span>` : ''}`;
+    return `<span class="trait ${TRAIT_SIDE[t.k]}" title="${esc(T.desc)}"><i class="ti">${TRAIT_IC[t.k]}</i>${T.name}</span>${long ? `<span class="tdesc">${esc(T.desc)}</span>` : ''}`;
   }
   function playerCard(p, i) {
     const D = S.D, t = D.cur, hue = hueOf(t.tm);
@@ -443,13 +456,13 @@
     const D = S.D;
     D.rep = Report.analyze(D.picks, S.pool, poolKey());
     const t = D.phase === 'choose' ? D.cur : D.reel;
-    const reel = `<div class="reelbox ${D.phase === 'spinning' ? 'spin' : ''}" id="reelbox" style="${t ? clubStyle(t.tm) : ''}"><div id="reelC">${t ? crest(t.tm, 54) : ''}</div><div class="t"><small>Team</small><div class="v" id="reelT">${t ? esc(t.name) : 'Spin to start'}</div></div><div class="y led num" id="reelY">${t ? t.season : '----'}</div></div>`;
+    const reel = `<div class="reelbox ${D.phase === 'spinning' ? 'spin' : ''} ${D.landed ? 'land' : ''}" id="reelbox" style="${t ? clubStyle(t.tm) : ''}"><div id="reelC">${t ? crest(t.tm, 54) : ''}</div><div class="t"><small>Team</small><div class="v" id="reelT">${t ? esc(t.name) : 'Spin to start'}</div></div><div class="y led num" id="reelY">${t ? t.season : '----'}</div></div>`;
     const acts = D.phase === 'choose'
       ? `<div class="actions"><button class="btn pri" data-a="confirm" ${D.sel == null ? 'disabled' : ''}>Draft player</button>
          <button class="btn ghost" data-a="respin" ${D.skips <= 0 ? 'disabled' : ''}>Re-spin &middot; ${D.skips} left</button>
          ${S.hard ? `<button class="btn sm" data-a="scout" ${(D.scouts <= 0 || D.scoutedId === D.cur.id) ? 'disabled' : ''}>Scout this roll &middot; ${D.scouts} left</button>` : ''}</div>`
       : D.phase === 'idle' ? `<div class="actions"><button class="btn pri" data-a="spin">Spin</button><button class="btn ghost" disabled>Re-spin &middot; ${D.skips} left</button></div>`
-        : '<div class="actions"><div class="note">Spinning...</div></div>';
+        : '<div class="actions"><div class="spinlbl">Spinning<span>.</span><span>.</span><span>.</span></div></div>';
     let cards = '';
     if (D.phase === 'choose') cards = `<div class="eyebrow">${D.cur.season} ${esc(D.cur.name)} &middot; choose one player</div><div class="cards">${D.cur.players.map((p, i) => playerCard(p, i)).join('')}</div>`;
     else if (D.phase === 'idle') cards = '<p class="note">Spin to get a random team and season, then pick one player from that roster.</p>';
@@ -770,6 +783,7 @@
     stepOnce(); live.alert = '';
     if (G.over) { live.playing = false; updateGame(); gameOverModal(); return; }
     if (G.q !== q) { live.playing = false; openWindow('end of ' + (q <= 4 ? 'Q' + q : 'overtime')); updateGame(); return; }
+    if (G.mo && G.mo.pending) { live.playing = false; updateGame(); showMoment(); return; }
     if (checkAlerts()) { live.playing = false; updateGame(); return; }
     updateGame();
     live.timer = setTimeout(loop, delay());
@@ -782,6 +796,70 @@
     if (!G.over && G.q !== q) openWindow('end of ' + (q <= 4 ? 'Q' + q : 'overtime'));
     updateGame();
     if (G.over) gameOverModal();
+  }
+  // ---------- interactive moments ----------
+  const MO_ICON = {
+    duel: '<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect x="3" y="6" width="11" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="18" y="10" width="11" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2" transform="rotate(8 23 18)"/><path d="M8 11h2M8 15h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    call: '<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M5 24c4-10 9-14 20-15M20 5l6 4-5 5M7 9l4 4M11 9l-4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+  const MO_TXT = {
+    late: ['Crunch time', 'Under two minutes in a close game. Call the next few plays.'],
+    ot: ['Overtime', 'Five more minutes. How do you want to start?'],
+    dry: ['Cold spell', 'Your team has not scored in four minutes. Change something.'],
+    run: ['Opponent run', 'They are on a run. Stop the bleeding.']
+  };
+  const MO_HELP = {
+    iso: 'Best scorer on the floor takes over.', pnr: 'Handler and big run the two-man game.', three: 'Spread the floor and let it fly.', foul: 'Attack the rim and get to the line.',
+    timeout: 'Costs a timeout. Rest and reset.', press: 'Pressure the ball. Needs active hands.', zone: 'Protect the rim. Needs shot blockers.', double: 'Send two at their best scorer.'
+  };
+  function momentSb() {
+    const G = S.G, u = G.userSide;
+    return `<div class="mo-sb"><span>${G.q > 4 ? 'OT' : 'Q' + G.q} ${mmss(Math.max(0, Math.round(G.clock)))}</span><b class="num">${esc(S.teamName)} ${G.score[u]}</b><span>-</span><b class="num">${G.score[1 - u]} ${esc(G.teams[1 - u].label)}</b></div>`;
+  }
+  const statCell = (p, st) => { const v = st[3](p); return v == null || isNaN(v) ? '-' : (Math.round(v * 10) / 10).toFixed(1); };
+  function duelHtml(pd, done) {
+    const G = S.G, u = G.userSide, a = G.teams[u].players[pd.mine], b = G.teams[1 - u].players[pd.theirs];
+    const att = pd.mode === 'attack', res = done && done.type === 'duel' ? done : null;
+    const row = (st, i) => {
+      const chosen = res && res.idx === i;
+      return `<button class="mo-row ${chosen ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res ? 'disabled' : ''}><span>${st[1]}<i>${st[2]}</i></span><b class="num">${statCell(a, st)}</b></button>`;
+    };
+    const orow = (st, i) => `<div class="mo-orow ${res && res.idx === i ? 'chosen' : ''}"><span>${st[1]}<i>${st[2]}</i></span><b class="num">${res ? statCell(b, st) : '??'}</b></div>`;
+    const verdict = res ? (res.res.win > 0 ? `<div class="mo-verdict win">You win the matchup</div><p class="note">${att ? 'Easier looks' : 'Tougher shots for them'} for the next few possessions.</p>` : res.res.win < 0 ? `<div class="mo-verdict lose">They win the matchup</div><p class="note">${att ? 'Harder looks' : 'Easier shots for them'} for the next few possessions.</p>` : `<div class="mo-verdict">Dead even</div><p class="note">No change.</p>`) : '';
+    return `<div class="mo-head"><span class="mo-ic">${MO_ICON.duel}</span><div><h2>Matchup: ${att ? 'attack' : 'defend'}</h2><p class="note">${att ? 'Pick the category where your player beats the man guarding him.' : 'Pick the category where your defender beats the scorer he is guarding.'}</p></div></div>${momentSb()}
+      <div class="mo-duel"><div class="mo-card me"><div class="mo-tag">${att ? 'Your attacker' : 'Your defender'}</div><h3>${esc(a.name)}</h3><div class="note">${esc(a.pos)} &middot; ${esc(a.fromSeason + ' ' + a.fromTm)}</div><div class="mo-rows">${STATS_.map(row).join('')}</div></div>
+      <div class="mo-vs">VS</div>
+      <div class="mo-card op"><div class="mo-tag">${att ? 'His defender' : 'The scorer'}</div><h3>${esc(b.name)}</h3><div class="note">${esc(b.pos || '')} &middot; ${esc(G.teams[1 - u].label)}</div><div class="mo-rows">${STATS_.map(orow).join('')}</div></div></div>${verdict}
+      <div class="ctrl">${res ? '<button class="btn pri" data-a="mocont">Continue</button>' : '<button class="btn" data-a="moauto">Skip: let the staff decide</button>'}</div>`;
+  }
+  const STATS_ = Core.STATS;
+  function callHtml(pd, done) {
+    const G = S.G, P = G.teams[G.userSide].players, res = done && done.type === 'call' ? done : null, T = MO_TXT[pd.kind];
+    const opt = (o, i) => `<button class="mo-opt ${res && res.idx === i ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res || o.off ? 'disabled' : ''}><b>${o.label}</b><span>${MO_HELP[o.id]}</span>${o.who && o.who.length ? `<em>${o.who.map(i => esc(P[i].name)).join(' &middot; ')}</em>` : o.off ? '<em>No timeouts left</em>' : ''}</button>`;
+    let verdict = '';
+    if (res) {
+      const b = res.res.b;
+      verdict = pd.kind === 'run' ? '<div class="mo-verdict">Play called</div>' : b > 0.03 ? '<div class="mo-verdict win">Good read: this lineup suits it</div>' : b < -0.03 ? '<div class="mo-verdict lose">Poor fit for this lineup</div>' : '<div class="mo-verdict">Play called</div>';
+      verdict += '<p class="note">The next few possessions will show how it works out.</p>';
+    }
+    return `<div class="mo-head"><span class="mo-ic">${MO_ICON.call}</span><div><h2>${T[0]}</h2><p class="note">${T[1]}</p></div></div>${momentSb()}
+      <div class="mo-opts">${pd.opts.map(opt).join('')}</div>${verdict}
+      <div class="ctrl">${res ? '<button class="btn pri" data-a="mocont">Continue</button>' : '<button class="btn" data-a="moauto">Skip: let the staff decide</button>'}</div>`;
+  }
+  function showMoment(done) {
+    const m = S.G.mo, pd = m && m.pending;
+    closeModal();
+    if (!pd && !done) return;
+    const src = pd || S.live.moShown;
+    S.live.moShown = src;
+    document.body.insertAdjacentHTML('beforeend', `<div class="modal moment"><div class="box">${src.type === 'duel' ? duelHtml(src, done) : callHtml(src, done)}</div></div>`);
+  }
+  function momentDone() {
+    const live = S.live, G = S.G; closeModal(); live.moShown = null;
+    updateGame();
+    if (G.over) return;
+    if (G.coachOpen && G.mo.res && G.mo.res.kind === 'run' && G.mo.res.idx === 0) { openWindow('timeout'); updateGame(); return; }
+    live.playing = true; live.window = false; live.timer = setTimeout(loop, 300);
   }
   function gameOverModal() {
     const G = S.G, side = mySide(), us = G.score[side], them = G.score[1 - side], win = us > them;
@@ -797,12 +875,39 @@
     const ph = S.L.phase;
     if (['eliminated', 'champion', 'done'].includes(ph)) { S.saved = false; go('end'); } else if (ph === 'playoffs') go('po'); else go('hub');
   }
+  const FACTS = [
+    'Wilt Chamberlain scored 100 points in a single game on March 2, 1962.',
+    'The 1995-96 Bulls won 72 games. The 2015-16 Warriors broke that with 73.',
+    'Bill Russell won 11 championships in 13 seasons with the Celtics.',
+    'Boston won eight straight titles from 1959 to 1966.',
+    'Oscar Robertson averaged a triple-double for the whole 1961-62 season.',
+    'The NBA added the three-point line in the 1979-80 season.',
+    'The 24-second shot clock arrived in 1954 and saved the league from stalling.',
+    'John Stockton leads all time in assists and steals, and it is not close.',
+    'Dennis Rodman won seven straight rebounding titles from 1992 to 1998.',
+    'Stephen Curry hit 402 threes in 2015-16, a record that stood far above the old one.',
+    'Hakeem Olajuwon is the all-time leader in blocked shots.',
+    'Kareem Abdul-Jabbar held the career scoring record for almost 39 years.',
+    'Wilt Chamberlain grabbed 55 rebounds in a single game in 1960.',
+    'Chamberlain averaged 50.4 points per game in 1961-62.'
+  ];
+  function simPanel(L) {
+    const g = L.userGames, n = g.length, r = L.rec[0], last = g.slice(-12), lg = g[n - 1];
+    const pips = last.map(x => `<i class="pip ${x.win ? 'w' : 'l'}">${x.win ? 'W' : 'L'}</i>`).join('');
+    const fact = FACTS[Math.floor(n / 9) % FACTS.length], opp = lg && L.teams[lg.opp];
+    return `<div class="simp"><div class="simp-top"><span class="eyebrow">Simulating the season</span><span class="simp-n num">Game ${n} of 82</span></div>
+      <div class="simp-rec led num">${r.w}<small>&ndash;</small>${r.l}</div>
+      <div class="simp-bar"><div style="width:${Math.round(n / 82 * 100)}%"></div></div>
+      <div class="simp-pips">${pips}</div>
+      ${lg ? `<div class="simp-last ${lg.win ? 'w' : 'l'}"><b>${lg.win ? 'W' : 'L'}</b><span>${lg.home ? 'vs' : '@'} ${esc(opp ? opp.label : '')}</span><b class="num">${lg.us}-${lg.them}${lg.ot ? ' OT' : ''}</b></div>` : ''}
+      <div class="simp-fact"><small>Did you know</small>${esc(fact)}</div></div>`;
+  }
   function chunkSim(days) {
     const L = S.L; let n = 0;
     const step = () => {
       const t0 = performance.now();
       while (n < days && L.phase === 'season' && performance.now() - t0 < 40) { Core.quick(S.SE); n++; }
-      if (n < days && L.phase === 'season') { app.innerHTML = '<div class="loading">Simulating season... ' + L.userGames.length + ' / 82</div>'; setTimeout(step, 0); } else go('hub');
+      if (n < days && L.phase === 'season') { app.innerHTML = simPanel(L); setTimeout(step, 0); } else go('hub');
     };
     step();
   }
@@ -816,6 +921,7 @@
       <p><b>Draft.</b> Ten times, spin a random team and season from your chosen era and take one player from that roster. Every position (PG, SG, SF, PF, C) needs exactly two players. Versatile players can fill more than one position. You get 2 re-spins. Hard mode hides stats and overalls, with one Scout to reveal a full roll.</p>
       <p><b>Season.</b> 82 games against 29 strong historical rosters from the same era. You coach games possession by possession. Play pauses at the end of each quarter and when the opponent goes on a run or your player picks up a fifth foul.</p>
       <p><b>Coaching.</b> Starting five, target minutes, tempo, offense and defense. During a game you can change things at quarter breaks and during timeouts: substitutions, tactics, feeding the ball to a player, doubling a star. Timeouts also restore energy and stop runs. Players tire and foul out.</p>
+      <p><b>Moments.</b> When you coach a game step by step, play pauses a few times: a matchup duel in each half, and a coach's call in a close finish, in overtime, after a long scoring drought or when the opponent goes on a big run. The right read is worth about a point a moment, a guess is worth nothing, and skipping costs nothing. Quick sims have no moments.</p>
       <p><b>Playoffs.</b> Top eight in each conference, best-of-seven series up to the Finals.</p>
       <p><b>Saving.</b> Results and achievements are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID and your finished seasons, nothing else. <button class="btn sm" data-a="delacct">Delete my account and data</button></p>
       <div class="ctrl"><button class="btn pri" data-a="closemodal">Close</button></div></div></div>`);
@@ -908,7 +1014,10 @@
     playpo() { beginGame(Core.beginLive(S.SE, true)); },
     quickpo() { Core.quickPo(S.SE); routeByPhase(); },
     simseries() { const s = LG.seriesOfUser(S.L); let n = 0; while (s && !s.done && S.L.phase === 'playoffs' && n++ < 8) Core.quickPo(S.SE); routeByPhase(); },
-    resume() { const live = S.live; if (S.G.over || live.playing) return; live.playing = true; live.window = false; live.alert = ''; live.sel = null; live.timer = setTimeout(loop, 50); updateGame(); },
+    mochoice(d) { const i = +d.i, ok = Core.answerMoment(S.SE, S.G, i); if (!ok) return; showMoment(Object.assign({ idx: i }, S.G.mo.res)); },
+    mocont() { momentDone(); },
+    moauto() { Core.skipMoment(S.G); momentDone(); },
+    resume() { const live = S.live; if (S.G.over || live.playing) return; if (S.G.mo && S.G.mo.pending) { showMoment(); return; } live.playing = true; live.window = false; live.alert = ''; live.sel = null; live.timer = setTimeout(loop, 50); updateGame(); },
     pause() { S.live.playing = false; stopLive(); updateGame(); },
     speed(d) { S.live.speed = +d.v; updateGame(); },
     skipq() { const q = S.G.q; S.live.playing = false; stopLive(); simUntil(() => S.G.q !== q); },

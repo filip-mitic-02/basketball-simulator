@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-24.4';
+  const VERSION = 'sim-2026-11-24.5';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -100,7 +100,7 @@
   function beginLive(SE, playoff) {
     syncPlan(SE);
     const G = playoff ? LG.startPlayoffGame(SE.L) : LG.startUserGame(SE.L);
-    G.np = 0; G.coachOpen = true;
+    G.np = 0; G.coachOpen = true; moInit(G);
     SE.cur = { playoff: !!playoff, ops: [] };
     return G;
   }
@@ -110,9 +110,11 @@
   }
   function step(SE, G) {
     midPlan(SE, G);
+    skipMoment(G);
     const q = G.q;
     E.step(G);
     G.coachOpen = !G.over && G.q !== q;
+    afterStep(G);
   }
   function lineup(SE, G, five) {
     if (!G.coachOpen || G.over) return false;
@@ -133,6 +135,97 @@
     SE.log.push([G.playoff ? 'lp' : 'lg', SE.cur.ops]); SE.cur = null;
     return r;
   }
+
+
+  // ---------- interactive moments ----------
+  // While the user coaches a game live, play pauses at a few moments and offers a choice. Everything here is a pure function of the game
+  // state (no random numbers), so the server reaches the same moment and checks the same answer. An unanswered moment resolves as "auto",
+  // which changes nothing. The best answer is worth about half a point per moment; a guess is worth nothing on average.
+  const MO = { max: 6, gap: 8, halfAt: 360, crunchAt: 120, crunchMargin: 6, runWin: 300, runLead: 10, dry: 240, boostN: 10, duel: 0.06, call: 0.09, callMax: 0.14, safe: 0.025 };
+  const STATS = [['ppg', 'Scoring', 'PPG', p => p.ppg], ['apg', 'Playmaking', 'APG', p => p.apg], ['rpg', 'Rebounding', 'RPG', p => p.rpg], ['stk', 'Defense', 'STL + BLK', p => (p.spg || 0) + (p.bpg || 0)]];
+  const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function moInit(G) { G.mo = { pending: null, n: 0, h1: false, h2: false, crunch: false, ot: {}, last: -99, hist: [], lastScore: 0, lastRun: -99, lastDry: -99, log: [] }; }
+  const oncourt = (G, t) => G.on[t].map(i => [i, G.teams[t].players[i]]);
+  const best = (list, f) => list.reduce((b, x) => (b == null || f(x[1]) > f(b[1]) ? x : b), null);
+  function afterStep(G) {
+    const m = G.mo || (moInit(G), G.mo), u = G.userSide, o = 1 - u, el = G.elapsed;
+    m.hist.push([el, G.score[u], G.score[o]]);
+    while (m.hist.length > 2 && m.hist[0][0] < el - MO.runWin - 60) m.hist.shift();
+    if (G.score[u] !== (m.prevScore == null ? 0 : m.prevScore)) m.lastScore = el;
+    m.prevScore = G.score[u];
+    if (m.pending || G.over || m.n >= MO.max || G.np - m.last < MO.gap) return;
+    if (G.q >= 3) m.h1 = true;
+    const diff = G.score[u] - G.score[o];
+    let type = null;
+    if (G.q > 4 && !m.ot[G.q]) { m.ot[G.q] = 1; type = ['call', 'ot']; }
+    else if (G.q === 4 && !m.crunch && G.clock <= MO.crunchAt && Math.abs(diff) <= MO.crunchMargin) { m.crunch = true; type = ['call', 'late']; }
+    else {
+      const w = m.hist.find(h => h[0] >= el - MO.runWin);
+      if (w && G.np - m.lastRun > 20 && (G.score[o] - w[2]) >= MO.runLead && (G.score[o] - w[2]) - (G.score[u] - w[1]) >= MO.runLead) { m.lastRun = G.np; type = ['call', 'run']; }
+      else if (el > MO.dry && el - m.lastScore >= MO.dry && G.np - m.lastDry > 20) { m.lastDry = G.np; type = ['call', 'dry']; }
+      else if (!m.h1 && G.q === 2 && G.clock <= MO.halfAt) { m.h1 = true; type = ['duel', 'attack']; }
+      else if (!m.h2 && G.q === 3 && G.clock <= MO.halfAt) { m.h2 = true; type = ['duel', 'defend']; }
+    }
+    if (!type) return;
+    m.n++; m.last = G.np;
+    m.pending = type[0] === 'duel' ? buildDuel(G, type[1]) : buildCall(G, type[1]);
+    m.pending.at = G.np;
+  }
+  const defScoreOf = p => p.stl + p.blk + p.drb;
+  function buildDuel(G, mode) {
+    const u = G.userSide, o = 1 - u, mine = oncourt(G, u), theirs = oncourt(G, o);
+    const a = mode === 'attack' ? best(mine, p => p.usg * p.ovr) : best(mine, p => defScoreOf(p) * p.ovr);
+    const b = mode === 'attack' ? best(theirs, p => defScoreOf(p) * p.ovr) : best(theirs, p => p.usg * p.ovr);
+    return { type: 'duel', mode, mine: a[0], theirs: b[0], opts: STATS.map(x => ({ id: x[0], label: x[1], unit: x[2] })) };
+  }
+  // fit of the five on the floor for each way to play the moment (z-like scores around a typical strong lineup)
+  function offenseFit(G) {
+    const u = G.userSide, A = E.agg(G, u), L = oncourt(G, u).map(x => x[1]);
+    const star = Math.max(...L.map(p => p.ovr)), ftr = mean(L.map(p => p.ftr));
+    return { iso: (star - 90) / 6, pnr: (A.ast - 1.45) / 0.25, three: (A.spc - 1.6) / 0.8, foul: (ftr - 1.4) / 0.3 };
+  }
+  function buildCall(G, kind) {
+    const u = G.userSide, L = oncourt(G, u);
+    const top = (f, n) => L.slice().sort((a, b) => f(b[1]) - f(a[1])).slice(0, n).map(x => x[0]);
+    if (kind === 'run') {
+      return { type: 'call', kind, opts: [{ id: 'timeout', label: 'Timeout and reset', off: G.to[u] <= 0 }, { id: 'press', label: 'Full-court press', who: top(p => p.stl, 2) },
+        { id: 'zone', label: 'Pack the paint (zone)', who: top(p => p.blk, 2) }, { id: 'double', label: 'Double their star', who: [] }] };
+    }
+    return { type: 'call', kind, opts: [{ id: 'iso', label: 'Feed the star', who: top(p => p.ovr, 1) }, { id: 'pnr', label: 'Pick and roll', who: top(p => p.ast, 2) },
+      { id: 'three', label: 'Spot-up threes', who: top(p => p.p3 + 0.3 * p.r3, 2) }, { id: 'foul', label: 'Attack and draw fouls', who: top(p => p.ftr, 2) }] };
+  }
+  function applyMoment(G, idx) {
+    const m = G.mo, pd = m && m.pending, u = G.userSide, o = 1 - u;
+    if (!pd || !Number.isInteger(idx) || idx < 0 || idx >= pd.opts.length) return false;
+    const opt = pd.opts[idx];
+    if (opt.off) return false;
+    let res = null;
+    if (pd.type === 'duel') {
+      const st = STATS[idx], a = G.teams[u].players[pd.mine], b = G.teams[o].players[pd.theirs];
+      const x = st[3](a) || 0, y = st[3](b) || 0, sgn = x > y ? 1 : x < y ? -1 : 0;
+      if (sgn) { if (pd.mode === 'attack') E.boost(G, u, sgn * MO.duel, 0, MO.boostN); else E.boost(G, u, 0, sgn * MO.duel, MO.boostN); }
+      res = { win: sgn, mine: x, theirs: y };
+    } else if (pd.kind === 'run') {
+      const A = E.agg(G, u);
+      if (opt.id === 'timeout') { E.callTimeout(G, u); G.coachOpen = true; E.boost(G, u, 0, MO.safe, MO.boostN); }
+      else if (opt.id === 'double') { const t = best(oncourt(G, o), p => p.usg * p.ovr); E.doubleTeam(G, u, t[0], 8); }
+      else { const z = opt.id === 'press' ? (A.stl - 1.13) / 0.25 : (A.blk - 1.33) / 0.5; E.boost(G, u, 0, clampN(MO.call * z, -MO.callMax, MO.callMax), MO.boostN); }
+      res = {};
+    } else {
+      const f = offenseFit(G), ks = Object.keys(f), mu = mean(ks.map(k => f[k]));
+      const b = clampN(MO.call * (f[opt.id] - mu), -MO.callMax, MO.callMax);
+      E.boost(G, u, b, 0, MO.boostN); res = { b };
+    }
+    m.log.push([pd.at, idx]); m.res = { type: pd.type, idx, res, mode: pd.mode, kind: pd.kind };
+    m.pending = null;
+    return true;
+  }
+  const answerMoment = (SE, G, idx) => {
+    if (!applyMoment(G, idx)) return false;
+    SE.cur.ops.push([G.np | 0, 'M', idx]); return true;
+  };
+  const skipMoment = G => { if (G.mo) G.mo.pending = null; };
 
   // ---------- replay (server) ----------
   class Invalid extends Error { }
@@ -166,7 +259,7 @@
           if (L.phase !== (po ? 'playoffs' : 'season')) bad('phase');
           const list = c[1]; if (!Array.isArray(list) || list.length > 400) bad('ops');
           const G = po ? LG.startPlayoffGame(L) : LG.startUserGame(L);
-          G.fast = true; G.np = 0; G.coachOpen = true;
+          G.fast = true; G.np = 0; G.coachOpen = true; moInit(G);
           let k = 0;
           const side = G.userSide, opp = G.teams[1 - side].players.length;
           for (;;) {
@@ -180,10 +273,13 @@
               } else if (kind === 'T') { if (!E.callTimeout(G, side)) bad('timeout'); G.coachOpen = true; }
               else if (kind === 'F') { if (!G.coachOpen || !isIdx(a, nUser)) bad('feed'); E.feedPlayer(G, side, a, 8); }
               else if (kind === 'D') { if (!G.coachOpen || !isIdx(a, opp)) bad('double'); E.doubleTeam(G, side, a, 8); }
+              else if (kind === 'M') { if (!applyMoment(G, a)) bad('moment'); }
               else bad('op');
             }
             if (G.over) break;
+            skipMoment(G);
             const q = G.q; E.step(G); G.coachOpen = !G.over && G.q !== q;
+            afterStep(G);
             if (G.np > 2500) bad('runaway');
           }
           if (k !== list.length) bad('unused ops');
@@ -233,7 +329,7 @@
   return {
     VERSION, DRAFT_ROUNDS, MAX_SKIPS, MIN_Y, MAX_Y, MIN_POOL, Invalid,
     prepData, mkTeams, poolOf, validEra, fitPositions, pickable, rollTeam, makePick,
-    createSeason, validPlan, planOf, syncPlan, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
+    createSeason, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
     replay, resultLabel, calcScore, achievements, summarize, poWins, poLosses
   };
 });

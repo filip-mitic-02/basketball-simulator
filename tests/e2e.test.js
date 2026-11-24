@@ -60,7 +60,20 @@ async function run(signedIn) {
   click('[data-a=skipg]');
   await until(() => doc.querySelector('[data-a=finish]'), 'game over');
   click('[data-a=finish]');
-  await until(() => doc.querySelector('[data-a=simall]'), 'hub again');
+  await until(() => doc.querySelector('[data-a=play]'), 'hub again');
+  // a second game played step by step, answering the interactive moments
+  click('[data-a=play]');
+  await until(() => doc.querySelector('[data-a=resume]'), 'second game');
+  click('[data-a=speed][data-v="8"]');
+  let moments = 0;
+  for (let n = 0; n < 1500 && !doc.querySelector('[data-a=finish]'); n++) {
+    if (doc.querySelector('.modal.moment [data-a=mochoice]:not([disabled])')) { moments++; click('.modal.moment [data-a=mochoice]:not([disabled])'); await tick(5); assert.ok(doc.querySelector('.modal.moment .mo-verdict'), 'the moment shows its outcome'); click('[data-a=mocont]'); }
+    else if (!doc.querySelector('.modal.moment') && doc.querySelector('[data-a=resume]')) click('[data-a=resume]');
+    await tick(5);
+  }
+  assert.ok(moments >= 2, 'at least two interactive moments in a coached game, got ' + moments);
+  click('[data-a=finish]');
+  await until(() => doc.querySelector('[data-a=simall]'), 'hub after moments');
   click('[data-a=simall]');
   await until(() => doc.querySelector('[data-a=startpo]') || /Playoffs|Season over/.test(doc.getElementById('app').innerHTML), 'season done');
   if (doc.querySelector('[data-a=startpo]')) click('[data-a=startpo]');

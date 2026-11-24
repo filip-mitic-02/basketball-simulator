@@ -79,3 +79,25 @@ test('play-by-play names a trait when it shows up, and only then', () => {
   const G2 = { teams: [{ players: [plain], user: true }, { players: [plain], label: 'X' }] };
   assert.doesNotMatch(E.describe(G2, { k: 'block', t: 0, p: 0, b: 0 }), /Eraser/);
 });
+test('interactive moments: live games show them, answers are verified by replay, skipping changes nothing', () => {
+  const o = { picks: draft(p => p.ovr), pool, seed: 99, hard: false, name: 'T' };
+  const play = answer => {
+    const SE = C.createSeason(o); let seen = 0;
+    for (let g = 0; g < 5; g++) {
+      const G = C.beginLive(SE, false); G.fast = true;
+      while (!G.over) { C.step(SE, G); const pd = G.mo.pending; if (pd) { seen++; if (answer) C.answerMoment(SE, G, (seen * 7) % pd.opts.filter(x => !x.off).length); } }
+      C.finishLive(SE, G);
+    }
+    while (SE.L.phase === 'season') C.quick(SE);
+    C.startPlayoffs(SE); while (!['eliminated', 'champion', 'done'].includes(SE.L.phase)) C.quickPo(SE);
+    return { SE, seen };
+  };
+  const a = play(true), b = play(false);
+  assert.ok(a.seen >= 10, 'about two moments per game at least, got ' + a.seen);
+  assert.ok(a.SE.log.some(c => c[0] === 'lg' && c[1].some(op => op[1] === 'M')), 'answers are logged');
+  const R = C.replay(o, JSON.parse(JSON.stringify(a.SE.log)));
+  assert.equal(R.L.rec[0].w, a.SE.L.rec[0].w); assert.equal(R.L.phase, a.SE.L.phase);
+  const R2 = C.replay(o, JSON.parse(JSON.stringify(b.SE.log)));
+  assert.equal(R2.L.rec[0].w, b.SE.L.rec[0].w);
+  assert.throws(() => C.replay(o, [['lg', [[3, 'M', 0]]]]), /moment/, 'an answer with no moment pending is rejected');
+});

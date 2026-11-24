@@ -177,7 +177,7 @@
       q: 1, clock: 720, score: [0, 0], qs: [[], []], qStart: [0, 0],
       poss: r() < 0.5 ? 0 : 1, firstPoss: null, over: false, ot: 0,
       mom: [0, 0], to: [7, 7], tf: [0, 0], feed: [null, null], feedLeft: [0, 0], dbl: [null, null],
-      fb: false, putback: false, elapsed: 0, sinceSub: [0, 0], runPts: [0, 0],
+      fb: false, putback: false, elapsed: 0, sinceSub: [0, 0], runPts: [0, 0], bo: [{ n: 0, p: 0, dp: 0 }, { n: 0, p: 0, dp: 0 }],
       log: [], st: [], en: [], form: [], tform: [0, 0], es: [1, 1], heat: [], on: [], sub: [0, 0]
     };
     G.firstPoss = G.poss;
@@ -320,6 +320,7 @@
     if (pd.def === 'zone') p += is3 ? T.zn3 + T.zn3S * (A.spc - 1.6) : T.zn2 - T.zn2S * (D.blk - 1.33);
     { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o] * K.gain * (is3 ? K.g3 : 1), ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + (K.sat - T) * Math.tanh((ax - T) / (K.sat - T)); p = base + (x < 0 ? -y : y); } }
     p += sq;
+    { const bo = G.bo; if (bo[o].n > 0) p += bo[o].p; if (bo[d].n > 0) p -= bo[d].dp; }   // a coach's call from an interactive moment
     if (traitCfg.on) {
       const mA = Math.min(A.tr.maestro || 0, 1.4), sn = Math.min(A.tr.sniper || 0, 1.4), er = Math.min(D.tr.eraser || 0, 1.4), lk = Math.min(D.tr.lockdown || 0, 1.4);
       p += TR.maestroP * mA;
@@ -483,6 +484,7 @@
     }
     // momentum se smiruje, hot-hand traje
     G.mom[0] *= 0.97; G.mom[1] *= 0.97;
+    for (let t = 0; t < 2; t++) if (G.bo[t].n > 0) G.bo[t].n--;
     for (let t = 0; t < 2; t++) if (G.feedLeft[t] > 0) { G.feedLeft[t]--; if (!G.feedLeft[t]) G.feed[t] = null; }
     for (let t = 0; t < 2; t++) if (G.dbl[t] != null && G.dblLeft && G.dblLeft[t] != null) { G.dblLeft[t]--; if (G.dblLeft[t] <= 0) { G.dbl[t] = null; G.dblLeft[t] = null; } }
     if (G.clock <= 0.01) endQuarter(G);
@@ -661,8 +663,11 @@
     }
   }
 
+  // temporary shot-quality boost for a side: p on its own shots, dp off the opponent's, for n possessions of the game
+  function boost(G, t, p, dp, n) { G.bo[t] = { n, p, dp }; }
+
   return {
-    K, T, TR, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
+    agg, boost, K, T, TR, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
     setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview
