@@ -16,12 +16,13 @@ const draft = want => {
   return picks;
 };
 test('report needs three players, projects wins only for a full roster, and never touches the roster', () => {
-  const picks = draft(p => p.ovr), before = JSON.stringify(picks);
+  const snap = x => JSON.stringify(x, (k, v) => (k[0] === '_' ? undefined : v));  // caches such as _el and _tr may be filled, nothing else may change
+  const picks = draft(p => p.ovr), before = snap(picks);
   assert.equal(R.analyze(picks.slice(0, 2), pool, 'k'), null);
   const part = R.analyze(picks.slice(0, 6), pool, 'k');
   assert.equal(part.wins, null); assert.equal(part.partial, true);
   const a = R.analyze(picks, pool, 'k');
-  assert.equal(JSON.stringify(picks), before);
+  assert.equal(snap(picks), before);
   assert.equal(a.list.length, 6);
   assert.ok(a.wins >= 8 && a.wins <= 78 && a.notes.length >= 1);
 });
@@ -69,4 +70,12 @@ test('traits: only top players get one, it comes from their stats, and it change
   const by = n => P.filter(p => p.name === n && E.traitOf(p)).map(p => E.traitOf(p).k);
   assert.ok(by('Nikola Jokić').includes('maestro') && by('Stephen Curry').includes('sniper') && by('Joel Embiid').includes('magnet'));
   assert.ok(P.filter(p => p.name === 'Kareem Abdul-Jabbar').some(p => E.traitOf(p) && E.traitOf(p).k === 'eraser'));
+});
+test('play-by-play names a trait when it shows up, and only then', () => {
+  const find = k => sim.teams.flatMap(t => t.players).find(p => E.traitOf(p) && E.traitOf(p).k === k && p.big);
+  const star = find('eraser'), plain = sim.teams.flatMap(t => t.players).find(p => !E.traitOf(p));
+  const G = { teams: [{ players: [plain], user: true }, { players: [star], label: 'X' }] };
+  assert.match(E.describe(G, { k: 'block', t: 0, p: 0, b: 0 }), /Shot Eraser/);
+  const G2 = { teams: [{ players: [plain], user: true }, { players: [plain], label: 'X' }] };
+  assert.doesNotMatch(E.describe(G2, { k: 'block', t: 0, p: 0, b: 0 }), /Eraser/);
 });

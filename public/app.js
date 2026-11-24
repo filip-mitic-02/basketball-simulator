@@ -244,7 +244,7 @@
         <div class="eyebrow">Era</div>
         <div class="yr"><span class="led num" id="yrtxt">${S.from === MIN_Y && S.to === MAX_Y ? 'All-Time' : S.from + ' &ndash; ' + S.to}</span></div>
         ${rangeHtml()}
-        <div class="seg presets" id="presets">${PRESETS.map(p => `<button class="${S.from === p[1] && S.to === p[2] ? 'on' : ''}" data-a="preset" data-f="${p[1]}" data-t="${p[2]}">${p[0]}</button>`).join('')}</div>
+        <div class="presets" id="presets">${PRESETS.map(p => `<button class="pre ${S.from === p[1] && S.to === p[2] ? 'on' : ''} ${p[0] === 'All-Time' ? 'all' : ''}" data-a="preset" data-f="${p[1]}" data-t="${p[2]}"><b>${p[0]}</b><span>${p[1]} &ndash; ${p[2]}</span></button>`).join('')}</div>
         <div class="note" id="eranote" style="margin-top:12px">${eraInfo()}</div>
       </section>
       <section class="side">

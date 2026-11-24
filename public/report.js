@@ -125,6 +125,8 @@
     list.filter(c => !holes.includes(c) && c.pts <= -0.5 && c.pts > -0.9 && out.length < 3).forEach(c => out.push({ kind: 'warn', text: `${c.name} is a soft spot, ${pts1(c.pts)} points per game below a typical draft.` }));
     list.filter(c => c.pts >= 1.2).sort((a, b) => b.pts - a.pts).slice(0, 2).forEach(c => out.push({ kind: 'good', text: `${c.name} is a strength: +${f1(c.pts)} points per game over a typical draft${c.leader ? ', led by ' + c.leader : ''}.` }));
     if (!out.length) out.push({ kind: 'good', text: 'No weak spot. The roster covers scoring, passing, size, defense and shooting.' });
+    const tp = ENG && ENG.traitOf ? ps.filter(p => ENG.traitOf(p)) : [];
+    if (tp.length) out.push({ kind: 'good', text: 'Trait stars: ' + tp.map(p => `${p.name} (${ENG.TRAITS[ENG.traitOf(p).k].name})`).join(', ') + '. They change games beyond what their ratings show.' });
     return out.slice(0, 5);
   }
 

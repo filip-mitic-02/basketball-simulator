@@ -639,14 +639,16 @@
   function describe(G, e) {
     const T = G.teams, nm = (t, i) => (i != null && i >= 0 && T[t].players[i]) ? T[t].players[i].name : '?';
     const tn = t => T[t].user ? 'Your team' : T[t].label;
+    // a trait that just showed up in this play is named at the end of the line (text only, the simulation is untouched)
+    const tag = (t, i, k) => { const p = i != null && i >= 0 ? T[t].players[i] : null, x = p && traitOf(p); return x && x.k === k ? ' \u00b7 ' + TRAITS[k].name : ''; };
     switch (e.k) {
-      case 'make': return nm(e.t, e.p) + (e.is3 ? ' hits a three' : ' scores') + (e.a >= 0 ? ' (assist: ' + nm(e.t, e.a) + ')' : '') + (e.and1 ? ' and draws the foul' : '');
+      case 'make': return nm(e.t, e.p) + (e.is3 ? ' hits a three' : ' scores') + (e.a >= 0 ? ' (assist: ' + nm(e.t, e.a) + ')' : '') + (e.and1 ? ' and draws the foul' : '') + (e.is3 ? tag(e.t, e.p, 'sniper') : '') + tag(e.t, e.a, 'maestro') + (e.and1 ? tag(e.t, e.p, 'magnet') : '') + (e.q >= 4 && e.c < 300 ? tag(e.t, e.p, 'scorer') : '');
       case 'miss': return nm(e.t, e.p) + ' misses ' + (e.is3 ? 'a three' : 'the shot');
-      case 'block': return nm(1 - e.t, e.b) + ' blocks ' + nm(e.t, e.p);
-      case 'reb': return nm(e.t, e.p) + (e.off ? ' grabs the offensive board' : ' grabs the rebound');
-      case 'tov': return nm(e.t, e.p) + ' turns it over' + (e.s >= 0 ? ' (stolen by ' + nm(1 - e.t, e.s) + ')' : '');
+      case 'block': return nm(1 - e.t, e.b) + ' blocks ' + nm(e.t, e.p) + tag(1 - e.t, e.b, 'eraser');
+      case 'reb': return nm(e.t, e.p) + (e.off ? ' grabs the offensive board' : ' grabs the rebound') + tag(e.t, e.p, 'glass');
+      case 'tov': return nm(e.t, e.p) + ' turns it over' + (e.s >= 0 ? ' (stolen by ' + nm(1 - e.t, e.s) + ')' + tag(1 - e.t, e.s, 'lockdown') : '');
       case 'foul': return 'Foul on ' + nm(e.t, e.p) + ' (' + e.n + ')';
-      case 'sfoul': return nm(e.t, e.p) + ' goes to the line (' + e.n + ' shots)';
+      case 'sfoul': return nm(e.t, e.p) + ' goes to the line (' + e.n + ' shots)' + tag(e.t, e.p, 'magnet');
       case 'bonus': return nm(e.t, e.p) + ' goes to the line (bonus)';
       case 'ft': return nm(e.t, e.p) + ' ' + e.m + '/' + e.n + ' from the line';
       case 'sub': return 'Sub (' + tn(e.t) + '): ' + nm(e.t, e.p) + ' in for ' + nm(e.t, e.o) + (e.forced ? ' (forced)' : '');
