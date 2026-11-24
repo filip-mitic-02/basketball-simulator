@@ -476,7 +476,7 @@
   const fitOf = () => (S.hard && !S.revealed) || !S.user ? null : Report.tacticFit(S.user.players, S.plan);
   function tiles(obj, cur, act, F) {
     return `<div class="tiles">${Object.keys(obj).map(k => {
-      const f = F && F.fit[k], cls = f ? (f.rec ? ' rec' : f.weak ? ' weak' : '') : '';
+      const f = F && F.fit[k], cls = f ? (f.rec ? ' best' : f.weak ? ' weak' : '') : '';
       return `<button class="tile ${cur === k ? 'on' : ''}${cls}" data-a="${act}" data-v="${k}"><b>${obj[k][0]}</b><span>${obj[k][1]}</span>${f && (f.rec || f.weak) ? `<em class="fit ${f.rec ? 'yes' : 'no'}">${f.rec ? 'Best fit' : 'Poor fit'}</em><span class="why">${esc(f.why)}</span>` : ''}</button>`;
     }).join('')}</div>`;
   }
@@ -602,7 +602,9 @@
   SCREENS.po = () => {
     const L = S.L, po = L.po, us = LG.seriesOfUser(L), ng = LG.nextPlayoffGame(L);
     const nm = i => i === 0 ? esc(S.teamName) : esc(L.teams[i].label);
-    const cols = po.rounds.map((R, ri) => `<div><div class="eyebrow">${LG.roundName(ri)}</div>${R.map(s => `<div class="ser ${s.a === 0 || s.b === 0 ? 'me' : ''}"><div><span>${nm(s.a)}</span><span class="${s.done && s.winner === s.a ? 'w' : ''} num">${s.wa}</span></div><div><span>${nm(s.b)}</span><span class="${s.done && s.winner === s.b ? 'w' : ''} num">${s.wb}</span></div></div>`).join('')}</div>`).join('');
+    const ser = s => `<div class="ser ${s.a === 0 || s.b === 0 ? 'me' : ''}"><div><span>${nm(s.a)}</span><span class="${s.done && s.winner === s.a ? 'w' : ''} num">${s.wa}</span></div><div><span>${nm(s.b)}</span><span class="${s.done && s.winner === s.b ? 'w' : ''} num">${s.wb}</span></div></div>`;
+    const tbd = '<div class="ser tbd"><div><span>To be decided</span><span class="num">&ndash;</span></div><div><span>To be decided</span><span class="num">&ndash;</span></div></div>';
+    const cols = [8, 4, 2, 1].map((n, ri) => `<div class="bcol"><div class="eyebrow">${LG.roundName(ri)}</div><div class="bcells">${Array.from({ length: n }, (_, i) => { const s = po.rounds[ri] && po.rounds[ri][i]; return `<div class="bcell ${i % 2 ? 'odd' : 'even'}">${s ? ser(s) : tbd}</div>`; }).join('')}</div></div>`).join('');
     const pw = (L.poGames || []).filter(g => g.win).length, pl = (L.poGames || []).filter(g => !g.win).length;
     return `<div class="grid2"><div class="panel"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Playoffs &middot; ${LG.roundName(po.round)}</div>
       <div class="rec led num">${us ? (us.a === 0 ? us.wa : us.wb) + '&ndash;' + (us.a === 0 ? us.wb : us.wa) : ''}</div>
@@ -728,7 +730,7 @@
     } else if (live.tab === 'tac') {
       const oppP = G.teams[opp].players, oppOn = G.on[opp];
       const F = fitOf();
-      const sec = (title, tbl, cur, act) => `<div class="tsec"><div class="th">${title}</div><div class="chips">${Object.keys(tbl).map(k => { const f = F && F.fit[k]; return `<button class="chip ${cur === k ? 'on' : ''}${f && f.rec ? ' rec' : ''}" data-a="${act}" data-v="${k}" ${f && f.rec ? 'title="Best fit for your roster"' : ''}>${Array.isArray(tbl[k]) ? tbl[k][0] : tbl[k]}</button>`; }).join('')}</div><div class="td">${Array.isArray(tbl[cur]) ? esc(tbl[cur][1]) : esc(AUTO_D[cur])}${F && F.fit[cur] && (F.fit[cur].rec || F.fit[cur].weak) ? ` <b class="fitnote ${F.fit[cur].rec ? 'yes' : 'no'}">${F.fit[cur].rec ? 'Best fit.' : 'Poor fit.'}</b> ${esc(F.fit[cur].why)}` : ''}</div></div>`;
+      const sec = (title, tbl, cur, act) => `<div class="tsec"><div class="th">${title}</div><div class="chips">${Object.keys(tbl).map(k => { const f = F && F.fit[k]; return `<button class="chip ${cur === k ? 'on' : ''}${f && f.rec ? ' best' : ''}" data-a="${act}" data-v="${k}" ${f && f.rec ? 'title="Best fit for your roster"' : ''}>${Array.isArray(tbl[k]) ? tbl[k][0] : tbl[k]}</button>`; }).join('')}</div><div class="td">${Array.isArray(tbl[cur]) ? esc(tbl[cur][1]) : esc(AUTO_D[cur])}${F && F.fit[cur] && (F.fit[cur].rec || F.fit[cur].weak) ? ` <b class="fitnote ${F.fit[cur].rec ? 'yes' : 'no'}">${F.fit[cur].rec ? 'Best fit.' : 'Poor fit.'}</b> ${esc(F.fit[cur].why)}` : ''}</div></div>`;
       body = `<div class="opt ${open ? '' : 'lock'}">
         ${sec('Tempo', TEMPO_I, plan.tempo, 'tempo')}
         ${sec('Offense', OFF_I, plan.off, 'off')}
@@ -770,7 +772,7 @@
   }
   function checkAlerts() {
     const G = S.G, live = S.live, side = mySide();
-    if (live.run.t === 1 - side && live.run.pts >= 10 && !live.runAlerted && G.to[side] > 0) { live.runAlerted = true; live.alert = 'The opponent is on a ' + live.run.pts + '-0 run. Call a timeout to stop it and make changes.'; return true; }
+    if (live.run.t === 1 - side && live.run.pts >= 10 && !live.runAlerted && G.to[side] > 0 && !(G.mo && G.mo.n < Core.MO.max)) { live.runAlerted = true; live.alert = 'The opponent is on a ' + live.run.pts + '-0 run. Call a timeout to stop it and make changes.'; return true; }
     for (const i of G.on[side]) { if (G.st[side][i].pf === 5 && !live.foulAlerted[i]) { live.foulAlerted[i] = 1; live.alert = G.teams[side].players[i].name + ' has 5 fouls. Call a timeout to sub him out, or leave it to the auto-subs.'; return true; } }
     return false;
   }
@@ -803,14 +805,21 @@
     call: '<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M5 24c4-10 9-14 20-15M20 5l6 4-5 5M7 9l4 4M11 9l-4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
   const MO_TXT = {
-    late: ['Crunch time', 'Under two minutes in a close game. Call the next few plays.'],
+    late: ['Crunch time', 'Under two minutes left in a close game.'],
     ot: ['Overtime', 'Five more minutes. How do you want to start?'],
-    dry: ['Cold spell', 'Your team has not scored in four minutes. Change something.'],
-    run: ['Opponent run', 'They are on a run. Stop the bleeding.']
+    dry: ['Cold spell', 'You have not scored in four minutes.'],
+    run: ['Opponent run', 'They are on a big run and you have to answer.']
   };
+  // [what it does, what it needs]
   const MO_HELP = {
-    iso: 'Best scorer on the floor takes over.', pnr: 'Handler and big run the two-man game.', three: 'Spread the floor and let it fly.', foul: 'Attack the rim and get to the line.',
-    timeout: 'Costs a timeout. Rest and reset.', press: 'Pressure the ball. Needs active hands.', zone: 'Protect the rim. Needs shot blockers.', double: 'Send two at their best scorer.'
+    iso: ['Your best scorer gets the ball and goes one-on-one.', 'Works best with a clear superstar on the floor.'],
+    pnr: ['The ball handler and a big man run a two-man game.', 'Works best with good passers and a lob or roll threat.'],
+    three: ['Space the floor and take open threes.', 'Works best with several real three-point shooters.'],
+    foul: ['Drive at the rim and try to get to the free-throw line.', 'Works best with players who draw fouls.'],
+    timeout: ['Stop play, rest your players, and reset.', 'Costs one timeout. Always a safe choice.'],
+    press: ['Pressure the ball the full length of the court.', 'Works best with quick hands and steals.'],
+    zone: ['Pack the paint and make them shoot from outside.', 'Works best with shot blockers and rebounders.'],
+    double: ['Send two defenders at their best scorer.', 'Stops him, but opens a shot for someone else.']
   };
   function momentSb() {
     const G = S.G, u = G.userSide;
@@ -835,7 +844,7 @@
   const STATS_ = Core.STATS;
   function callHtml(pd, done) {
     const G = S.G, P = G.teams[G.userSide].players, res = done && done.type === 'call' ? done : null, T = MO_TXT[pd.kind];
-    const opt = (o, i) => `<button class="mo-opt ${res && res.idx === i ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res || o.off ? 'disabled' : ''}><b>${o.label}</b><span>${MO_HELP[o.id]}</span>${o.who && o.who.length ? `<em>${o.who.map(i => esc(P[i].name)).join(' &middot; ')}</em>` : o.off ? '<em>No timeouts left</em>' : ''}</button>`;
+    const opt = (o, i) => `<button class="mo-opt ${res && res.idx === i ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res || o.off ? 'disabled' : ''}><b>${o.label}</b><span>${MO_HELP[o.id][0]}</span><span class="need">${MO_HELP[o.id][1]}</span>${o.who && o.who.length ? `<em>On your floor: ${o.who.map(i => esc(P[i].name.split(' ').slice(-1)[0])).join(', ')}</em>` : o.off ? '<em>No timeouts left</em>' : ''}</button>`;
     let verdict = '';
     if (res) {
       const b = res.res.b;
@@ -843,7 +852,7 @@
       verdict += '<p class="note">The next few possessions will show how it works out.</p>';
     }
     return `<div class="mo-head"><span class="mo-ic">${MO_ICON.call}</span><div><h2>${T[0]}</h2><p class="note">${T[1]}</p></div></div>${momentSb()}
-      <div class="mo-opts">${pd.opts.map(opt).join('')}</div>${verdict}
+      ${res ? '' : '<p class="mo-how">Pick one play. It affects the next ten possessions, and the best choice depends on who is on your floor right now.</p>'}<div class="mo-opts">${pd.opts.map(opt).join('')}</div>${verdict}
       <div class="ctrl">${res ? '<button class="btn pri" data-a="mocont">Continue</button>' : '<button class="btn" data-a="moauto">Skip: let the staff decide</button>'}</div>`;
   }
   function showMoment(done) {
@@ -891,10 +900,11 @@
     'Wilt Chamberlain grabbed 55 rebounds in a single game in 1960.',
     'Chamberlain averaged 50.4 points per game in 1961-62.'
   ];
+  const simFact = { base: 0, t0: 0 };
   function simPanel(L) {
     const g = L.userGames, n = g.length, r = L.rec[0], last = g.slice(-12), lg = g[n - 1];
     const pips = last.map(x => `<i class="pip ${x.win ? 'w' : 'l'}">${x.win ? 'W' : 'L'}</i>`).join('');
-    const fact = FACTS[Math.floor(n / 9) % FACTS.length], opp = lg && L.teams[lg.opp];
+    const fact = FACTS[(simFact.base + Math.floor((performance.now() - simFact.t0) / 6500)) % FACTS.length], opp = lg && L.teams[lg.opp];
     return `<div class="simp"><div class="simp-top"><span class="eyebrow">Simulating the season</span><span class="simp-n num">Game ${n} of 82</span></div>
       <div class="simp-rec led num">${r.w}<small>&ndash;</small>${r.l}</div>
       <div class="simp-bar"><div style="width:${Math.round(n / 82 * 100)}%"></div></div>
@@ -904,12 +914,13 @@
   }
   function chunkSim(days) {
     const L = S.L; let n = 0;
+    simFact.base = Math.floor(Math.random() * FACTS.length); simFact.t0 = performance.now();
     const step = () => {
-      const t0 = performance.now();
-      while (n < days && L.phase === 'season' && performance.now() - t0 < 40) { Core.quick(S.SE); n++; }
-      if (n < days && L.phase === 'season') { app.innerHTML = simPanel(L); setTimeout(step, 0); } else go('hub');
+      if (S.screen !== 'sim') return;
+      if (n < days && L.phase === 'season') { Core.quick(S.SE); n++; }
+      if (n < days && L.phase === 'season') { app.innerHTML = simPanel(L); setTimeout(step, 85); } else go('hub');
     };
-    step();
+    S.screen = 'sim'; app.innerHTML = simPanel(L); setTimeout(step, 85);
   }
   function locked() { const el = document.getElementById('alerts'); if (el) { el.insertAdjacentHTML('beforeend', '<div class="banner">Locked. You can make changes at quarter breaks or by calling a timeout.</div>'); } }
 

@@ -69,3 +69,7 @@ Offense and defense options are balanced so that none is better for every roster
 ## Signature traits
 
 About 2% of player-seasons (rated 72+ with one rare, league-leading skill) carry a trait: Foul Magnet, Playmaker, Shot Eraser, Lockdown, Sniper, Glass Cleaner or Go-To Scorer. `Engine.traitOf` derives it from the player's own stats, so it never needs hand-curation, and it is cached from the original stats before the league opponents are stretched. A trait acts on the court beyond what the rating pays for (constants in `Engine.TR`); each is calibrated to about +2 pts/g for the team that has the star (`ablation: tests removed the star's trait`). Both user and AI teams use them. Changing `TR` needs a new `Core.VERSION` and `node scripts/update-sim-lock.mjs`.
+
+## Interactive moments
+
+Only in games you coach step by step; quick sims and "sim quarter" skip them. Each live game has a Matchup duel in the second and third quarters, plus Coach's Calls when the game calls for one: a close finish, overtime, four minutes without scoring, or an opponent run (10 unanswered points, or a net 10 over five minutes). At most six per game. Each is a pure function of the game state, answers are logged as op `M` and re-applied by the server replay, and an unanswered moment has no effect. The right read is worth about one point per game on average.

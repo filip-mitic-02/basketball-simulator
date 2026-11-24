@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-24.5';
+  const VERSION = 'sim-2026-11-24.6';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -152,17 +152,22 @@
     const m = G.mo || (moInit(G), G.mo), u = G.userSide, o = 1 - u, el = G.elapsed;
     m.hist.push([el, G.score[u], G.score[o]]);
     while (m.hist.length > 2 && m.hist[0][0] < el - MO.runWin - 60) m.hist.shift();
-    if (G.score[u] !== (m.prevScore == null ? 0 : m.prevScore)) m.lastScore = el;
-    m.prevScore = G.score[u];
-    if (m.pending || G.over || m.n >= MO.max || G.np - m.last < MO.gap) return;
+    const pu = m.prevScore == null ? 0 : m.prevScore, po = m.prevO == null ? 0 : m.prevO;
+    if (G.score[u] !== pu) { m.lastScore = el; m.opRun = 0; }
+    m.opRun = (m.opRun || 0) + (G.score[o] - po);
+    m.prevScore = G.score[u]; m.prevO = G.score[o];
+    if (m.pending || G.over || m.n >= MO.max) return;
+    const gp = G.np - m.last;
     if (G.q >= 3) m.h1 = true;
     const diff = G.score[u] - G.score[o];
     let type = null;
     if (G.q > 4 && !m.ot[G.q]) { m.ot[G.q] = 1; type = ['call', 'ot']; }
+    else if (gp < 4) return;
     else if (G.q === 4 && !m.crunch && G.clock <= MO.crunchAt && Math.abs(diff) <= MO.crunchMargin) { m.crunch = true; type = ['call', 'late']; }
     else {
       const w = m.hist.find(h => h[0] >= el - MO.runWin);
-      if (w && G.np - m.lastRun > 20 && (G.score[o] - w[2]) >= MO.runLead && (G.score[o] - w[2]) - (G.score[u] - w[1]) >= MO.runLead) { m.lastRun = G.np; type = ['call', 'run']; }
+      if (G.np - m.lastRun > 20 && (m.opRun >= MO.runLead || (w && (G.score[o] - w[2]) >= MO.runLead && (G.score[o] - w[2]) - (G.score[u] - w[1]) >= MO.runLead))) { m.lastRun = G.np; m.opRun = 0; type = ['call', 'run']; }
+      else if (gp < MO.gap) return;
       else if (el > MO.dry && el - m.lastScore >= MO.dry && G.np - m.lastDry > 20) { m.lastDry = G.np; type = ['call', 'dry']; }
       else if (!m.h1 && G.q === 2 && G.clock <= MO.halfAt) { m.h1 = true; type = ['duel', 'attack']; }
       else if (!m.h2 && G.q === 3 && G.clock <= MO.halfAt) { m.h2 = true; type = ['duel', 'defend']; }
