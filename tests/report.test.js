@@ -49,3 +49,16 @@ test('every component of the rating is paid for in the engine, so a stat cannot 
   const p = sim.teams[0].players[0], q = Object.assign({}, p, { blk: p.blk + 1 });
   assert.ok(Math.abs(E.coreOf(q) - (E.coreOf(p) - E.CRED.blk[0])) < 1e-9, 'core falls by the credit when a component rises');
 });
+test('tactic fit: only for a full roster, at most one recommendation per group, and it follows the roster', () => {
+  const full = C.createSeason({ picks: draft(p => p.ovr), pool, seed: 5, hard: false, name: 'T' });
+  assert.equal(R.tacticFit(full.user.players.slice(0, 6), full.plan), null);
+  const f = R.tacticFit(full.user.players, full.plan);
+  const off = ['inside', 'threes', 'ballmove'].filter(k => f.fit[k].rec), def = ['zone', 'press'].filter(k => f.fit[k].rec);
+  assert.ok(off.length <= 1 && def.length <= 1);
+  assert.ok(!('iso' in f.fit) && !('slow' in f.fit), 'no verdict for tempo and isolation');
+  // a shooting roster should lean to threes over inside, a rim-protecting roster the other way
+  const sh = C.createSeason({ picks: draft(p => p.ovr + 60 * ((p.r3 || 0) - 0.25) + 60 * (p.p3 || 0) - 8 * (p.big ? 1 : 0)), pool, seed: 5, hard: false, name: 'T' });
+  const bg = C.createSeason({ picks: draft(p => p.ovr + 12 * (p.blk || 0) + 8 * (p.orb || 0) - 40 * (p.r3 || 0)), pool, seed: 5, hard: false, name: 'T' });
+  const a = R.tacticFit(sh.user.players, sh.plan).fit, b = R.tacticFit(bg.user.players, bg.plan).fit;
+  assert.ok(a.threes.gain - a.inside.gain > b.threes.gain - b.inside.gain, 'threes vs inside moves with the roster');
+});

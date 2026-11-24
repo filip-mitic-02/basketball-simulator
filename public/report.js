@@ -134,5 +134,49 @@
     const c = CATS.find(x => x.k === catKey), H = helpers();
     return PPG_PER_RATING * (teamVal(q => c.val(q, H), players.concat([p])) - teamVal(q => c.val(q, H), players));
   }
-  return { CATS, analyze, lift, tier, setCore: (c, e) => { CORE = c; ENG = e; } };
+  // ---- Tactic fit ----
+  // Which tactics suit this roster. Fitted on ~140 simulated rosters x every tactic (500 games each, points per game against
+  // league opponents, minute-weighted roster features); the cross-validated policy "use the best predicted tactic when it
+  // is worth at least 0.8 pts/g" gained about +0.8 pts/g on offense and +0.5 on defense. Tempo and Isolation show no stable
+  // roster dependence, so they get no verdict.
+  const FIT = {
+    inside:   { g: 'off', b: -4.56, c: { rim: 4.81, spc: -0.63, usg: -0.14 } },
+    threes:   { g: 'off', b: -0.51, c: { spc: 0.67, p3: 49.78, ast: -0.30 } },
+    ballmove: { g: 'off', b: -4.69, c: { ast: 4.21, usg: -0.18 } },
+    zone:     { g: 'def', b: -3.63, c: { blk: 2.18, spc: -0.05, rim: 0.94 } },
+    press:    { g: 'def', b: -9.75, c: { stl: 8.25, endur: -0.93, drb: 1.23 } }
+  };
+  const FIT_WHY = {
+    inside:   ['Strong rebounders and shot blockers anchor the paint.', 'Too little rim presence to play through the post.'],
+    threes:   ['Real three-point shooters on the floor.', 'Too few true shooters for a volume of threes.'],
+    ballmove: ['Good passers: the ball finds the open man.', 'Not enough passers to move the ball.'],
+    zone:     ['Shot blockers make the paint hard to score in.', 'Too few shot blockers to hold a zone.'],
+    press:    ['Active hands: your defenders force steals.', 'Few ball hawks, so the press just tires you out.']
+  };
+  const FIT_MIN = 0.8, FIT_BAD = -1.0;
+  function rosterFeatures(players, plan) {
+    const mins = plan && plan.mins && plan.mins.length === players.length ? plan.mins : players.map(() => 24);
+    const tw = mins.reduce((a, b) => a + b, 0) || 1;
+    const avg = f => players.reduce((a, p, i) => a + N(f(p)) * mins[i], 0) / tw;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const orb = avg(p => p.orb), blk = avg(p => p.blk);
+    return {
+      rim: (orb + blk) / 2, blk, ast: avg(p => p.ast), usg: avg(p => p.usg), stl: avg(p => p.stl), drb: avg(p => p.drb), endur: avg(p => p.endur),
+      p3: avg(p => p.p3), spc: avg(p => clamp((N(p.r3) - 0.14) / 0.18, 0, 1) * clamp(0.5 + (N(p.p3) + 0.03) * 12, 0.3, 1.2)) * 5
+    };
+  }
+  // Returns { fit: {tactic: {gain, rec, weak, why}}, best: {off, def} }; null until the roster is complete.
+  function tacticFit(players, plan) {
+    if (!players || players.length < 10) return null;
+    const f = rosterFeatures(players, plan), fit = {}, best = { off: null, def: null }, top = { off: FIT_MIN, def: FIT_MIN };
+    for (const k in FIT) {
+      const m = FIT[k]; let g = m.b; for (const x in m.c) g += m.c[x] * f[x];
+      fit[k] = { gain: g, rec: false, weak: g <= FIT_BAD, why: FIT_WHY[k][g <= FIT_BAD ? 1 : 0] };
+      if (g >= top[m.g]) { top[m.g] = g; best[m.g] = k; }
+    }
+    for (const g of ['off', 'def']) if (best[g]) fit[best[g]].rec = true;
+    return { fit, best };
+  }
+
+  return { CATS, analyze, lift, tier, tacticFit, setCore: (c, e) => { CORE = c; ENG = e; } };
 });

@@ -61,3 +61,7 @@ When the version changes, clear old results (their logs belong to the old simula
 
     delete from runs;
     delete from drafts;
+
+## Tactic fit
+
+Offense and defense options are balanced so that none is better for every roster (measured: each averages about 0 pts/g across rosters, and swings by about +-2 pts/g depending on fit). `Report.tacticFit` (public/report.js) predicts the fit of Inside, Threes, Ball movement, Zone and Press from minute-weighted roster features and frames the best one per group as "Best fit". Tempo and Isolation get no verdict. After changing tactic constants, bump `Core.VERSION`, run `node scripts/update-sim-lock.mjs`, and refit the `FIT` coefficients.

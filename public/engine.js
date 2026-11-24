@@ -21,6 +21,9 @@
   const K = { ovrO: 0.00546, ovrD: 0.00608, delta: 1.8, cmp: 7, cmpT: 0, clump: 0.05, tform: 0.03, sat: 0.09, satT: 0.06, es: 0.6, formSd: 0.025,
     // how strongly each component acts on the court; tuned so a +1 sd team-wide gain is worth what the rating credits it for
     kOrb: 0.30, kDrb: 0.68, kStl: 0.38, kBlk: 0.16, kAst: 9.5, kTov: 0.56, kFtr: 1.16, kPf: 2.0, d2: 0.72, d3: 2.67, spcUp: 0.004, spcDn: -0.006, gain: 1.85, g3: 0.75, hndP: -0.006, hndT: 1.09 };       // moderna liga kao referenca (sve je era-normalizovano)
+  // tactic effects: each is a team-fit term (centred on a typical drafted roster) so no option wins for everybody
+  const T = { bmC: 0.007, bmS: 0.05, isoS: 0.0020, isoC: 80, inC: 0.006, inS: 0.08, inFoul: 1.12, thFoul: 0.92, thC: 0.0, thS: 0.012,
+    zn3: 0.012, zn3S: 0.004, zn2: -0.006, zn2S: 0.025, znFoul: 0.95, prFoul: 1.18, prTov: 0.030, prS: 0.06, prP: 0.010 };
   const TEMPO = {                              // sekundi po posedu (prosek), umor, TOV, kvalitet šuta
     slow: { dur: 15.6, fat: 0.96, tov: -0.004, sq: +0.003 },
     normal: { dur: 13.2, fat: 1.00, tov: 0.0, sq: 0.0 },
@@ -245,7 +248,7 @@
     }
 
     // ---- gubitak lopte ----
-    const defPress = pd.def === 'press' ? 0.030 : 0;
+    const defPress = pd.def === 'press' ? T.prTov + T.prS * (D.stl - 1.13) : 0;
     let pT = 0.128 * (1 + K.kTov * (S.tov - 1)) * (1 + (K.hndT - 1) * A.hl) * (1 + 0.45 * (D.e.stl - 1)) + defPress + tp.tov + (isFB ? -0.02 : 0)
       + (G.dbl[d] === pi ? 0.045 : 0);
     pT = clamp(pT, 0.03, 0.32);
@@ -266,8 +269,8 @@
     const r3 = clamp(S.r3 * (po.off === 'threes' ? 1.32 : po.off === 'inside' ? 0.62 : 1) * (pd.def === 'zone' ? 1.10 : 1), 0, 0.85);
     const is3 = G.r() < r3;
 
-    let pFoul = 0.082 * (1 + K.kFtr * (S.ftr - 1)) * (1 + K.kPf * (D.pf - 1)) * (po.off === 'inside' ? 1.22 : po.off === 'threes' ? 0.85 : 1)
-      * (pd.def === 'press' ? 1.18 : pd.def === 'zone' ? 0.86 : 1) * (is3 ? 0.30 : 1) * (isFB ? 1.1 : 1);
+    let pFoul = 0.082 * (1 + K.kFtr * (S.ftr - 1)) * (1 + K.kPf * (D.pf - 1)) * (po.off === 'inside' ? T.inFoul : po.off === 'threes' ? T.thFoul : 1)
+      * (pd.def === 'press' ? T.prFoul : pd.def === 'zone' ? T.znFoul : 1) * (is3 ? 0.30 : 1) * (isFB ? 1.1 : 1);
     pFoul = clamp(pFoul, 0, 0.30);
     const sq = tp.sq;
     // verovatnoća pogotka
@@ -280,12 +283,12 @@
     p += 0.012 * (A.e.ast - 1);
     const defScore = (0.45 * (D.e.blk - 1) + 0.35 * (D.e.stl - 1) + 0.20 * (D.e.drb - 1)) * (is3 ? 0.55 : 1);
     p -= 0.09 * defScore;
-    if (po.off === 'inside' && !is3) p += A.bigs >= 2 ? 0.015 : -0.008;
-    if (po.off === 'threes' && is3) p += A.spc >= 2.8 ? 0.012 : -0.010;
-    if (po.off === 'ballmove') p += clamp(0.035 * (A.e.ast - 1), -0.012, 0.016);
-    if (po.off === 'iso') p += S.ovr >= 80 ? -0.006 : -0.018;
-    if (pd.def === 'press') p += 0.007;
-    if (pd.def === 'zone') p += is3 ? 0.017 : -0.009;
+    if (po.off === 'inside' && !is3) p += clamp(T.inC + T.inS * ((A.orb + A.blk) / 2 - 1.18), -0.014, 0.022);
+    if (po.off === 'threes' && is3) p += clamp(T.thC + T.thS * (A.spc - 1.7), -0.014, 0.016);
+    if (po.off === 'ballmove') p += clamp(T.bmC + T.bmS * (A.ast - 1.47), -0.010, 0.016);
+    if (po.off === 'iso') p += clamp(T.isoS * (S.ovr - T.isoC), -0.020, 0.016);
+    if (pd.def === 'press') p += T.prP;
+    if (pd.def === 'zone') p += is3 ? T.zn3 + T.zn3S * (A.spc - 1.6) : T.zn2 - T.zn2S * (D.blk - 1.33);
     { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o] * K.gain * (is3 ? K.g3 : 1), ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + (K.sat - T) * Math.tanh((ax - T) / (K.sat - T)); p = base + (x < 0 ? -y : y); } }
     p += sq;
     p -= 0.08 * Math.pow(1 - eo[pi] / 100, 1.4);
@@ -616,7 +619,7 @@
   }
 
   return {
-    K, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
+    K, T, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
     setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview

@@ -7,8 +7,8 @@
   const MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PRESETS = [['All-Time', 1950, 2026], ['1950s', 1950, 1959], ['1960s', 1960, 1969], ['1970s', 1970, 1979], ['1980s', 1980, 1989], ['1990s', 1990, 1999], ['2000s', 2000, 2009], ['2010s', 2010, 2019], ['2020s', 2020, 2026]];
   const TEMPO_I = { slow: ['Slow', 'Fewer possessions and less fatigue. More variance, which helps the underdog.'], normal: ['Normal', 'Balanced pace and fatigue.'], fast: ['Fast', 'More possessions, which favors the better team. Costs stamina and turnovers.'], push: ['Push', 'Maximum pace. Wears players down and risks turnovers. Use it when chasing a lead.'] };
-  const OFF_I = { balanced: ['Balanced', 'No bonus and no penalty.'], inside: ['Inside', 'Feeds the bigs. Pays off only with 2+ bigs on the floor.'], threes: ['Threes', 'More three-point attempts. Works only with real shooters on the floor.'], ballmove: ['Ball movement', 'Spreads shots and adds assists. Best with strong passers.'], iso: ['Isolation', 'Your star takes over. Pays off only with a 80+ overall player.'] };
-  const DEF_I = { man: ['Man', 'Standard defense.'], zone: ['Zone', 'Protects the paint and cuts fouls, but gives up threes.'], press: ['Press', 'More steals and turnovers. Tires your players and gives easier shots when beaten.'] };
+  const OFF_I = { balanced: ['Balanced', 'No bonus and no penalty.'], inside: ['Inside', 'Feeds the post and cuts your threes. Pays off with strong rebounders and shot blockers.'], threes: ['Threes', 'More three-point attempts. Works only with real shooters on the floor.'], ballmove: ['Ball movement', 'Spreads shots and adds assists. Best with strong passers.'], iso: ['Isolation', 'Your star takes over. Only worth it with a truly dominant scorer; otherwise it costs you.'] };
+  const DEF_I = { man: ['Man', 'Standard defense.'], zone: ['Zone', 'Protects the paint and cuts fouls, but gives up threes. Best with shot blockers.'], press: ['Press', 'More steals and turnovers. Pays off with active hands; tires your players and gives easier shots when beaten.'] };
   const AUTO_D = { auto: 'The coach manages rotations and fatigue for you, including foul trouble and garbage time.', forced: 'Players are only replaced when they foul out or are exhausted. You control everything else.', manual: 'No automatic substitutions at all. Fouled-out players are still removed.' };
   const AUTO_I = { auto: 'Automatic', forced: 'Forced only', manual: 'Manual' };
 
@@ -453,9 +453,14 @@
   };
 
   // ---------- coach panel ----------
-  function tiles(obj, cur, act) {
-    return `<div class="tiles">${Object.keys(obj).map(k => `<button class="tile ${cur === k ? 'on' : ''}" data-a="${act}" data-v="${k}"><b>${obj[k][0]}</b><span>${obj[k][1]}</span></button>`).join('')}</div>`;
+  const fitOf = () => (S.hard && !S.revealed) || !S.user ? null : Report.tacticFit(S.user.players, S.plan);
+  function tiles(obj, cur, act, F) {
+    return `<div class="tiles">${Object.keys(obj).map(k => {
+      const f = F && F.fit[k], cls = f ? (f.rec ? ' rec' : f.weak ? ' weak' : '') : '';
+      return `<button class="tile ${cur === k ? 'on' : ''}${cls}" data-a="${act}" data-v="${k}"><b>${obj[k][0]}</b><span>${obj[k][1]}</span>${f && (f.rec || f.weak) ? `<em class="fit ${f.rec ? 'yes' : 'no'}">${f.rec ? 'Best fit' : 'Poor fit'}</em><span class="why">${esc(f.why)}</span>` : ''}</button>`;
+    }).join('')}</div>`;
   }
+  const recMissing = F => F && ['tempo', 'off', 'def'].some(g => F.best[g] && S.plan[g] !== F.best[g]);
   function coachPanel() {
     const P = S.user.players, plan = S.plan, tot = plan.mins.reduce((a, b) => a + b, 0);
     const five = plan.starters.map((pi, k) => {
@@ -467,6 +472,8 @@
       <td><span class="pill">${esc(p.slot)}</span></td><td class="r"><span class="ovr ${ovrCls(dp(p))}" style="font-size:20px">${dp(p)}</span></td>
       <td class="r num">${dec(p.ppg)}</td><td class="r num">${dec(p.rpg)}</td><td class="r num">${dec(p.apg)}</td>
       <td><div class="mrow"><input class="mins" type="range" min="0" max="44" step="1" value="${plan.mins[i]}" data-a="mins" data-i="${i}" aria-label="Minutes for ${esc(p.name)}"><span class="num mv" id="m${i}">${plan.mins[i]}</span></div></td></tr>`).join('');
+    const F = fitOf();
+    const recBar = F ? `<div class="recbar"><div><b>Tactics that fit your roster</b><span>${F.best.off || F.best.def ? 'The green-framed options are the ones this roster is built for. They update when you change minutes or starters.' : 'No tactic stands out for this roster right now. Balanced and Man are a safe choice. This updates when you change minutes or starters.'}</span></div>${F.best.off || F.best.def ? `<button class="btn sm pri" data-a="applyrec" ${recMissing(F) ? '' : 'disabled'}>${recMissing(F) ? 'Apply recommended' : 'Applied'}</button>` : ''}</div>` : '';
     return `<div class="coach-grid">
       <div class="cl">
         <div class="panel"><div class="eyebrow">Starting five</div><div class="five">${five}</div></div>
@@ -477,9 +484,10 @@
           <div style="margin-top:10px"><button class="btn sm" data-a="resetplan">Reset rotation to recommended</button></div></div>
       </div>
       <div class="cr">
-        <div class="panel"><div class="eyebrow">Tempo</div>${tiles(TEMPO_I, plan.tempo, 'tempo')}</div>
-        <div class="panel" style="margin-top:16px"><div class="eyebrow">Offense</div>${tiles(OFF_I, plan.off, 'off')}</div>
-        <div class="panel" style="margin-top:16px"><div class="eyebrow">Defense</div>${tiles(DEF_I, plan.def, 'def')}</div>
+        ${recBar}
+        <div class="panel"><div class="eyebrow">Tempo</div>${tiles(TEMPO_I, plan.tempo, 'tempo')}<div class="note" style="margin-top:8px">Tempo is a small lever: it trades fatigue and turnovers for possessions, with no clear roster fit.</div></div>
+        <div class="panel" style="margin-top:16px"><div class="eyebrow">Offense</div>${tiles(OFF_I, plan.off, 'off', F)}</div>
+        <div class="panel" style="margin-top:16px"><div class="eyebrow">Defense</div>${tiles(DEF_I, plan.def, 'def', F)}</div>
         <div class="panel" style="margin-top:16px"><div class="eyebrow">Substitutions in games</div>
           <div class="tiles">${Object.keys(AUTO_I).map(k => `<button class="tile ${plan.auto === k ? 'on' : ''}" data-a="auto" data-v="${k}"><b>${AUTO_I[k]}</b><span>${k === 'auto' ? 'The assistant coach rotates by your minute targets, fatigue and fouls.' : k === 'forced' ? 'Only fouled-out players are replaced. You do the rest.' : 'No automatic changes. Quick sims still rotate automatically.'}</span></button>`).join('')}</div></div>
       </div></div>`;
@@ -699,7 +707,8 @@
       }).join('') + '</div>';
     } else if (live.tab === 'tac') {
       const oppP = G.teams[opp].players, oppOn = G.on[opp];
-      const sec = (title, tbl, cur, act) => `<div class="tsec"><div class="th">${title}</div><div class="chips">${Object.keys(tbl).map(k => `<button class="chip ${cur === k ? 'on' : ''}" data-a="${act}" data-v="${k}">${Array.isArray(tbl[k]) ? tbl[k][0] : tbl[k]}</button>`).join('')}</div><div class="td">${Array.isArray(tbl[cur]) ? esc(tbl[cur][1]) : esc(AUTO_D[cur])}</div></div>`;
+      const F = fitOf();
+      const sec = (title, tbl, cur, act) => `<div class="tsec"><div class="th">${title}</div><div class="chips">${Object.keys(tbl).map(k => { const f = F && F.fit[k]; return `<button class="chip ${cur === k ? 'on' : ''}${f && f.rec ? ' rec' : ''}" data-a="${act}" data-v="${k}" ${f && f.rec ? 'title="Best fit for your roster"' : ''}>${Array.isArray(tbl[k]) ? tbl[k][0] : tbl[k]}</button>`; }).join('')}</div><div class="td">${Array.isArray(tbl[cur]) ? esc(tbl[cur][1]) : esc(AUTO_D[cur])}${F && F.fit[cur] && (F.fit[cur].rec || F.fit[cur].weak) ? ` <b class="fitnote ${F.fit[cur].rec ? 'yes' : 'no'}">${F.fit[cur].rec ? 'Best fit.' : 'Poor fit.'}</b> ${esc(F.fit[cur].why)}` : ''}</div></div>`;
       body = `<div class="opt ${open ? '' : 'lock'}">
         ${sec('Tempo', TEMPO_I, plan.tempo, 'tempo')}
         ${sec('Offense', OFF_I, plan.off, 'off')}
@@ -866,6 +875,13 @@
     off(d) { if (S.screen === 'game' && !canCoach()) return locked(); S.plan.off = d.v; refreshCoach(); },
     def(d) { if (S.screen === 'game' && !canCoach()) return locked(); S.plan.def = d.v; refreshCoach(); },
     auto(d) { if (S.screen === 'game' && !canCoach()) return locked(); S.plan.auto = d.v; refreshCoach(); },
+    applyrec() {
+      if (S.screen === 'game' && !canCoach()) return locked();
+      const F = fitOf(); if (!F) return;
+      if (F.best.off) S.plan.off = F.best.off;
+      if (F.best.def) S.plan.def = F.best.def;
+      refreshCoach();
+    },
     resetplan() { const k = { t: S.plan.tempo, o: S.plan.off, d: S.plan.def, a: S.plan.auto }; const np = E.defaultPlan(S.user); np.tempo = k.t; np.off = k.o; np.def = k.d; np.auto = k.a; Object.assign(S.plan, np); refreshCoach(); },
     beginSeason() {
       const nm = document.getElementById('tname'); if (nm && nm.value.trim()) S.teamName = nm.value.trim();

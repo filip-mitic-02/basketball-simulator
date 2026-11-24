@@ -48,6 +48,8 @@ async function run(signedIn) {
     if (k < 9) await until(() => /pick (\d+) of 10/.exec(doc.getElementById('app').innerHTML) && +/pick (\d+) of 10/.exec(doc.getElementById('app').innerHTML)[1] === k + 2, 'next pick ' + k);
   }
   await until(() => doc.querySelector('[data-a=beginSeason]'), 'prep screen');
+  assert.ok(doc.querySelector('.recbar'), 'tactic recommendations are shown on the prep screen');
+  if (doc.querySelector('[data-a=applyrec]:not([disabled])')) { click('[data-a=applyrec]'); assert.ok(doc.querySelector('.tile.rec.on'), 'applying selects the framed tactics'); }
   click('[data-a=beginSeason]');
   await until(() => doc.querySelector('[data-a=play]'), 'hub');
   // one coached game with a timeout, a substitution window and a feed, then the rest of the season
