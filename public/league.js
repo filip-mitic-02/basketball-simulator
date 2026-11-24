@@ -42,7 +42,7 @@
 
   // pool: lista timova (Engine.mkTeam) iz izabranog perioda; user: tim korisnika
   // How much stronger or weaker than their real selves the opposing teams are. The widening is what gives the league a top and a bottom.
-  const cfg = { stretch: 1.72 };
+  const cfg = { stretch: 1.55 };
   function create(user, pool, opts) {
     opts = opts || {};
     const r = opts.rng || Math.random;
@@ -64,7 +64,7 @@
     for (const t of shuffle(ranked.slice(), r)) { if (opp.length >= nOpp) break; if (!seen.has(t.id) && !seenTm.has(t.tm)) take(t); }
     for (const t of shuffle(ranked.slice(), r)) { if (opp.length >= nOpp) break; if (!seen.has(t.id)) take(t); }
     const SF = opts.stretch != null ? opts.stretch : cfg.stretch;
-    const stretched = opp.map(t => Object.assign({}, t, { players: t.players.map(p => { const q = Object.assign({}, p, { ovr: 54 + (p.ovr - 54) * SF, ovr0: p.ovr }); ['p2', 'p3'].forEach(k => { q[k] = p[k] * SF; }); ['ast', 'orb', 'drb', 'stl', 'blk', 'tov', 'ftr', 'pf'].forEach(k => { q[k] = Math.max(0.2, 1 + (p[k] - 1) * SF); }); return q; }) }));
+    const stretched = opp.map(t => Object.assign({}, t, { players: t.players.map(p => { E.traitOf(p); const q = Object.assign({}, p, { ovr: 54 + (p.ovr - 54) * SF, ovr0: p.ovr }); ['p2', 'p3'].forEach(k => { q[k] = p[k] * SF; }); ['ast', 'orb', 'drb', 'stl', 'blk', 'tov', 'ftr', 'pf'].forEach(k => { q[k] = Math.max(0.2, 1 + (p[k] - 1) * SF); }); return q; }) }));
     opp.length = 0; stretched.forEach(t => opp.push(t));
     const teams = [user].concat(opp);
     const n = teams.length;

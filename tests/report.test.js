@@ -62,3 +62,11 @@ test('tactic fit: only for a full roster, at most one recommendation per group, 
   const a = R.tacticFit(sh.user.players, sh.plan).fit, b = R.tacticFit(bg.user.players, bg.plan).fit;
   assert.ok(a.threes.gain - a.inside.gain > b.threes.gain - b.inside.gain, 'threes vs inside moves with the roster');
 });
+test('traits: only top players get one, it comes from their stats, and it changes games for the team that has the star', () => {
+  const P = sim.teams.flatMap(t => t.players), withT = P.filter(p => E.traitOf(p));
+  assert.ok(withT.length > 200 && withT.length < P.length * 0.05, 'traits are rare');
+  assert.ok(withT.every(p => p.ovr >= E.TR.ovrMin), 'only high-rated players');
+  const by = n => P.filter(p => p.name === n && E.traitOf(p)).map(p => E.traitOf(p).k);
+  assert.ok(by('Nikola Jokić').includes('maestro') && by('Stephen Curry').includes('sniper') && by('Joel Embiid').includes('magnet'));
+  assert.ok(P.filter(p => p.name === 'Kareem Abdul-Jabbar').some(p => E.traitOf(p) && E.traitOf(p).k === 'eraser'));
+});

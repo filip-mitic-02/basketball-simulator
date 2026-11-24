@@ -24,6 +24,32 @@
   // tactic effects: each is a team-fit term (centred on a typical drafted roster) so no option wins for everybody
   const T = { bmC: 0.007, bmS: 0.05, isoS: 0.0020, isoC: 80, inC: 0.006, inS: 0.08, inFoul: 1.12, thFoul: 0.92, thC: 0.0, thS: 0.012,
     zn3: 0.012, zn3S: 0.004, zn2: -0.006, zn2S: 0.025, znFoul: 0.95, prFoul: 1.18, prTov: 0.030, prS: 0.06, prP: 0.010 };
+  // ---------- Signature traits ----------
+  // The few stars whose game is built on one rare skill get a trait, derived from their stats relative to the league (so it is
+  // tied to what the player really did). A trait acts on the court beyond what the rating already pays for, which is why a
+  // trait star changes games more than a role player with bigger raw numbers. Both teams use them, so league strength is shared.
+  const TRAITS = {
+    magnet:   { name: 'Foul Magnet',  desc: 'Draws fouls on a big share of his shots and puts the defenders who guard him in foul trouble.' },
+    maestro:  { name: 'Playmaker',    desc: 'Makes everyone around him better: easier shots for teammates and fewer turnovers. Counts as a ball handler.' },
+    eraser:   { name: 'Shot Eraser',  desc: 'Opponents struggle to score and shoot worse at the rim while he is on the floor.' },
+    lockdown: { name: 'Lockdown',     desc: 'Hounds ball handlers: more turnovers and tougher shots for the opposition.' },
+    sniper:   { name: 'Sniper',       desc: 'Pulls defenders out: better three-point shooting for the team and a weaker zone against it.' },
+    glass:    { name: 'Glass Cleaner', desc: 'Dominates the boards at both ends while he is on the floor.' },
+    scorer:   { name: 'Go-To Scorer', desc: 'Takes over late in games and shrugs off double teams.' }
+  };
+  const TR = { ovrMin: 72, magnet: 3.6, maestroP: 0.012, maestroT: 0.10, eraserP: 0.016, eraserB: 0.35, lockT: 0.016, lockP: 0.005, sniper3: 0.04, sniper2: 0.008, zoneCut: 0.4, glass: 0.22, scorerP: 0.055, scorerLate: 0.06, scorerU: 0.5, scorerDbl: 0.030 };
+  const traitCfg = { on: true };
+  function traitOf(p) {
+    if (p._tr !== undefined) return p._tr;
+    let best = null, bv = 0;
+    if (p.ovr >= TR.ovrMin) {
+      const c = [['magnet', p.ftr / 1.7], ['maestro', p.big ? p.ast / 1.3 : p.ast / 2.4], ['eraser', p.blk / 2.6], ['lockdown', p.stl / 1.8],
+        ['sniper', p.p3 >= 0.02 && p.r3 >= 0.4 ? p.r3 / 0.4 : 0], ['glass', (p.orb + p.drb) / 2 / 1.8], ['scorer', p.ovr >= 85 ? 0.9 * p.usg / 1.5 : 0]];
+      for (const [k, v] of c) if (v >= 1 && v > bv) { bv = v; best = k; }
+    }
+    p._tr = best ? { k: best, s: clamp((p.ovr - 66) / 26, 0.6, 1.4) } : null;
+    return p._tr;
+  }
   const TEMPO = {                              // sekundi po posedu (prosek), umor, TOV, kvalitet šuta
     slow: { dur: 15.6, fat: 0.96, tov: -0.004, sq: +0.003 },
     normal: { dur: 13.2, fat: 1.00, tov: 0.0, sq: 0.0 },
@@ -186,13 +212,13 @@
   // agregati odbrane/napada za trenutnu petorku
   function agg(G, t) {
     const P = G.teams[t].players, on = G.on[t], en = G.en[t];
-    let stl = 0, blk = 0, drb = 0, orb = 0, ast = 0, ovr = 0, usg = 0, spc = 0, hnd = 0, bigs = 0, pf = 0, hq = 0;
+    let stl = 0, blk = 0, drb = 0, orb = 0, ast = 0, ovr = 0, usg = 0, spc = 0, hnd = 0, bigs = 0, pf = 0, hq = 0; const tr = {};
     for (let k = 0; k < 5; k++) {
       const p = P[on[k]], f = Math.pow(fatF(en[on[k]]), 0.7);
-      stl += p.stl * f; blk += p.blk * f; drb += p.drb * f; orb += p.orb * f; ast += p.ast * f; ovr += cmp(coreOf(p) - 54) * (0.85 + 0.15 * en[on[k]] / 100); pf += p.pf; usg += p.usg; spc += clamp((p.r3 - 0.14) / 0.18, 0, 1) * clamp(0.5 + (p.p3 + 0.03) * 12, 0.3, 1.2); if (p.guard) { hnd++; if (p.ast * f > hq) hq = p.ast * f; } if (p.big) bigs++;
+      stl += p.stl * f; blk += p.blk * f; drb += p.drb * f; orb += p.orb * f; ast += p.ast * f; ovr += cmp(coreOf(p) - 54) * (0.85 + 0.15 * en[on[k]] / 100); pf += p.pf; usg += p.usg; spc += clamp((p.r3 - 0.14) / 0.18, 0, 1) * clamp(0.5 + (p.p3 + 0.03) * 12, 0.3, 1.2); const T0 = traitCfg.on ? traitOf(p) : null; if (T0) tr[T0.k] = (tr[T0.k] || 0) + T0.s * f; if (p.guard || (T0 && T0.k === 'maestro')) { hnd++; if (p.ast * f > hq) hq = p.ast * f; } if (p.big) bigs++;
     }
     const sc = (v, k) => 1 + k * (v / 5 - 1);      // scaled effect of a component (raw values stay for who-does-what picks)
-    return { stl: stl / 5, blk: blk / 5, drb: drb / 5, orb: orb / 5, ast: ast / 5, ovr: ovr / 5, usg: usg / 5, spc, hnd, bigs, pf: pf / 5, hl: clamp((0.95 - hq) / 0.35, 0, 1), sum: { drb, orb },
+    return { stl: stl / 5, blk: blk / 5, drb: drb / 5, orb: orb / 5, ast: ast / 5, ovr: ovr / 5, usg: usg / 5, spc, hnd, bigs, pf: pf / 5, hl: clamp((0.95 - hq) / 0.35, 0, 1), tr, sum: { drb, orb },
       e: { stl: sc(stl, K.kStl), blk: sc(blk, K.kBlk), drb: sc(drb, K.kDrb), orb: sc(orb, K.kOrb), ast: clamp(sc(ast, K.kAst), 0.2, 3) } };
   }
 
@@ -224,9 +250,11 @@
       if (po.off === 'inside') w *= 1 + 0.45 * clamp((p.orb + p.blk) / 2 - 1, -0.5, 1.2) * (p.big ? 1 : 0.4);
       if (G.feed[o] === pi && G.feedLeft[o] > 0) w *= 2.3;
       if (po.off === 'iso' && pi === starOf(G, o)) w *= 1.35;
+      if (traitCfg.on) { const t0 = traitOf(p); if (t0 && t0.k === 'scorer') w *= 1 + TR.scorerU * t0.s; }
       return w;
     });
     const k = wpick(G, wsc), pi = on[k], S = P[pi];
+    const ST = traitCfg.on ? traitOf(S) : null;
     const st = G.st[o][pi];
     let secDone = dur;
 
@@ -250,7 +278,8 @@
     // ---- gubitak lopte ----
     const defPress = pd.def === 'press' ? T.prTov + T.prS * (D.stl - 1.13) : 0;
     let pT = 0.128 * (1 + K.kTov * (S.tov - 1)) * (1 + (K.hndT - 1) * A.hl) * (1 + 0.45 * (D.e.stl - 1)) + defPress + tp.tov + (isFB ? -0.02 : 0)
-      + (G.dbl[d] === pi ? 0.045 : 0);
+      + (G.dbl[d] === pi ? 0.045 : 0) + TR.lockT * (D.tr.lockdown || 0);
+    pT *= 1 - TR.maestroT * Math.min(A.tr.maestro || 0, 1.4);
     pT = clamp(pT, 0.03, 0.32);
     if (G.r() < pT) {
       st.tov++;
@@ -270,8 +299,8 @@
     const is3 = G.r() < r3;
 
     let pFoul = 0.082 * (1 + K.kFtr * (S.ftr - 1)) * (1 + K.kPf * (D.pf - 1)) * (po.off === 'inside' ? T.inFoul : po.off === 'threes' ? T.thFoul : 1)
-      * (pd.def === 'press' ? T.prFoul : pd.def === 'zone' ? T.znFoul : 1) * (is3 ? 0.30 : 1) * (isFB ? 1.1 : 1);
-    pFoul = clamp(pFoul, 0, 0.30);
+      * (pd.def === 'press' ? T.prFoul : pd.def === 'zone' ? T.znFoul : 1) * (is3 ? 0.30 : 1) * (isFB ? 1.1 : 1) * (traitCfg.on && ST && ST.k === 'magnet' ? 1 + TR.magnet * ST.s : 1);
+    pFoul = clamp(pFoul, 0, 0.45);
     const sq = tp.sq;
     // verovatnoća pogotka
     let p = (is3 ? BASE3 + K.d3 * S.p3 : BASE2 + K.d2 * S.p2);
@@ -291,10 +320,21 @@
     if (pd.def === 'zone') p += is3 ? T.zn3 + T.zn3S * (A.spc - 1.6) : T.zn2 - T.zn2S * (D.blk - 1.33);
     { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o] * K.gain * (is3 ? K.g3 : 1), ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + (K.sat - T) * Math.tanh((ax - T) / (K.sat - T)); p = base + (x < 0 ? -y : y); } }
     p += sq;
+    if (traitCfg.on) {
+      const mA = Math.min(A.tr.maestro || 0, 1.4), sn = Math.min(A.tr.sniper || 0, 1.4), er = Math.min(D.tr.eraser || 0, 1.4), lk = Math.min(D.tr.lockdown || 0, 1.4);
+      p += TR.maestroP * mA;
+      if (is3) p += TR.sniper3 * sn; else p += TR.sniper2 * sn - TR.eraserP * er;
+      p -= TR.lockP * lk;
+      if (pd.def === 'zone' && is3) p -= (T.zn3 + T.zn3S * (A.spc - 1.6)) * TR.zoneCut * Math.min(sn, 1);
+      if (ST && ST.k === 'scorer') {
+        p += TR.scorerP * ST.s;
+        if (G.q >= 4 && G.clock < 300 && Math.abs(G.score[o] - G.score[d]) <= 8) p += TR.scorerLate * ST.s;
+      }
+    }
     p -= 0.08 * Math.pow(1 - eo[pi] / 100, 1.4);
     p += G.form[o][pi] + 0.006 * G.heat[o][pi] + 0.005 * G.mom[o] + (o === 0 ? 0.005 : -0.005);
     if (isFB) p += 0.04;
-    if (G.dbl[d] === pi) p -= 0.045; else if (G.dbl[d] != null && onCourt(G, o, G.dbl[d])) p += 0.012;
+    if (G.dbl[d] === pi) p -= (traitCfg.on && ST && ST.k === 'scorer' ? TR.scorerDbl : 0.045); else if (G.dbl[d] != null && onCourt(G, o, G.dbl[d])) p += 0.012;
     p = clamp(p, 0.18, 0.82);
 
     // prekršaj pri šutu
@@ -317,7 +357,7 @@
 
     // blokada
     if (!is3) {
-      const pB = 0.056 * Math.pow(D.e.blk, 1.15) * (S.big ? 1.15 : 1) * (po.off === 'inside' ? 1.1 : 1);
+      const pB = 0.056 * Math.pow(D.e.blk, 1.15) * (S.big ? 1.15 : 1) * (po.off === 'inside' ? 1.1 : 1) * (1 + TR.eraserB * Math.min(D.tr.eraser || 0, 1.4));
       if (G.r() < clamp(pB, 0, 0.2)) {
         st.fga++;
         const bj = wpick(G, dn.map(j => Math.pow(Q[j].blk, 1.6) * fatF(ed[j])));
@@ -403,6 +443,7 @@
     const P = G.teams[o].players, Q = G.teams[d].players;
     const pd = G.plans[d];
     let rO = A.e.orb, rD = D.e.drb * (pd.def === 'zone' ? 1.0 : pd.def === 'press' ? 0.95 : 1);
+    rO *= 1 + TR.glass * Math.min(A.tr.glass || 0, 1.4); rD *= 1 + TR.glass * Math.min(D.tr.glass || 0, 1.4);
     const pOR = clamp(0.262 * rO / (0.262 * rO + 0.738 * rD), 0.1, 0.5) * mult;
     if (G.r() < pOR) {
       const on = G.on[o];
@@ -619,7 +660,7 @@
   }
 
   return {
-    K, T, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
+    K, T, TR, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
     setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview

@@ -259,6 +259,13 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .tile.on b{color:var(--amber)}
 .tile.on::after{content:"";position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber)}
 .tile:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+.trait{display:inline-flex;align-items:center;gap:5px;margin-top:3px;padding:1px 8px 1px 6px;border-radius:99px;font-family:var(--display);font-weight:700;letter-spacing:.07em;text-transform:uppercase;font-size:11.5px;line-height:1.5;color:var(--amber);background:rgba(255,182,39,.12);border:1px solid rgba(255,182,39,.5);white-space:nowrap}
+.trait svg{flex:none}
+.pcard .trow{padding:0 12px 6px}
+.tdesc{display:none;margin-top:5px;font-size:12px;line-height:1.3;color:var(--mute)}
+.pcard.sel .tdesc{display:block}
+.sw .trait,.rn .trait{display:flex;width:max-content;font-size:10.5px}
 .tile.rec{border-color:var(--good);box-shadow:0 0 0 1px rgba(54,209,122,.55),0 0 18px rgba(54,209,122,.12);background:linear-gradient(160deg,rgba(54,209,122,.10),var(--panel2) 65%)}
 .tile.rec.on{border-color:var(--amber);box-shadow:0 0 0 1px var(--good),0 0 18px rgba(54,209,122,.12)}
 .tile .fit{font-style:normal;font-family:var(--display);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:12px;justify-self:start;padding:2px 8px;border-radius:5px}

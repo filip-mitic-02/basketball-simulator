@@ -65,3 +65,7 @@ When the version changes, clear old results (their logs belong to the old simula
 ## Tactic fit
 
 Offense and defense options are balanced so that none is better for every roster (measured: each averages about 0 pts/g across rosters, and swings by about +-2 pts/g depending on fit). `Report.tacticFit` (public/report.js) predicts the fit of Inside, Threes, Ball movement, Zone and Press from minute-weighted roster features and frames the best one per group as "Best fit". Tempo and Isolation get no verdict. After changing tactic constants, bump `Core.VERSION`, run `node scripts/update-sim-lock.mjs`, and refit the `FIT` coefficients.
+
+## Signature traits
+
+About 2% of player-seasons (rated 72+ with one rare, league-leading skill) carry a trait: Foul Magnet, Playmaker, Shot Eraser, Lockdown, Sniper, Glass Cleaner or Go-To Scorer. `Engine.traitOf` derives it from the player's own stats, so it never needs hand-curation, and it is cached from the original stats before the league opponents are stretched. A trait acts on the court beyond what the rating pays for (constants in `Engine.TR`); each is calibrated to about +2 pts/g for the team that has the star (`ablation: tests removed the star's trait`). Both user and AI teams use them. Changing `TR` needs a new `Core.VERSION` and `node scripts/update-sim-lock.mjs`.
