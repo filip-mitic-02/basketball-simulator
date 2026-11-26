@@ -1,4 +1,4 @@
-/* 82-0 Coach: UI. Depends on Engine (engine.js) and League (league.js). */
+/* Perfect Season: UI. Depends on Engine (engine.js) and League (league.js). */
 (function () {
   'use strict';
   const E = Engine, LG = League;
@@ -32,9 +32,11 @@
   // the season, and averaging a triple-double), applied once at load so the simulation and the number on screen
   // agree. The display adds a stretch at the top so MVP-level seasons reach the mid and high 90s.
   function dispRating(raw) {
-    if (S.comp === 'el') raw += 6;     // EuroLeague players are rated against EuroLeague, not NBA, statistics
+    const el = S.comp === 'el';
+    if (el) raw += 3;                  // rated against EuroLeague, not NBA, statistics: the typical rotation player lands in the low 70s
     let t = 55 + (raw - 30) * 0.62 + 0.30 * Math.max(0, raw - 78);
     if (t > 92) t = 92 + 8 * (1 - Math.exp(-(t - 92) / 9));
+    if (el && t > 88) t = 88 + 7 * (1 - Math.exp(-(t - 88) / 7));   // the best EuroLeague seasons top out in the mid 90s
     return Math.max(0, Math.min(99, Math.round(t)));
   }
   const dp = p => dispRating(p.ovr0 != null ? p.ovr0 : p.ovr);
@@ -1146,7 +1148,7 @@
     newgame() { S.saved = false; go('menu'); },
     copy() {
       const L = S.L, r = L.rec[0];
-      const txt = `82-0 Coach: ${r.w}-${r.l}, ${resultLabel(L)} (${S.hard ? 'Hard' : 'Normal'}, ${eraLabel()}). Roster: ${S.user.players.map(p => p.name).join(', ')}.`;
+      const txt = `Perfect Season: ${r.w}-${r.l}, ${resultLabel(L)} (${S.hard ? 'Hard' : 'Normal'}, ${eraLabel()}). Roster: ${S.user.players.map(p => p.name).join(', ')}.`;
       const f = t => { const el = document.getElementById('saveInfo'); if (el) el.textContent = t; };
       try { navigator.clipboard.writeText(txt).then(() => f('Copied to clipboard.')).catch(() => f(txt)); } catch (e) { f(txt); }
     }

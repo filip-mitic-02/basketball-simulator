@@ -1,4 +1,4 @@
-# 82-0 Coach
+# Perfect Season (repo name: 82-0-coach)
 
 Draft 10 players from random historical NBA team-seasons (1950 to 2026), then coach them through a full
 82-game season and the playoffs, possession by possession. Sign in with Google to save results and appear on the leaderboard.

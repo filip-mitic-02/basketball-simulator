@@ -16,7 +16,7 @@
   // residual sd about 5.5 wins; the opposition, injuries of form and coaching make up the rest).
   const projWins = r => -151.8 + 4.886 * r - 0.027 * r * r;
   // EuroLeague (38 games), same method: ~150 simulated seasons of random-to-best drafts, residual sd about 3 wins.
-  const projWinsEL = r => -114.77 + 3.638 * r - 0.02243 * r * r;
+  const projWinsEL = r => -94.2 + 3.0418 * r - 0.01789 * r * r;
   const TG = [34, 33, 32, 30, 29, 24, 20, 16, 12, 10];
 
   // Each category: the part of the rating it stands for (ovr points, relative to an average player).

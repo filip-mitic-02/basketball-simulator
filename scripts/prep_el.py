@@ -84,8 +84,18 @@ mu = ref.groupby('Season').apply(lambda x: np.average(x.gs, weights=x.MP)).renam
 sd = ref.groupby('Season').apply(lambda x: np.sqrt(np.average((x.gs - np.average(x.gs, weights=x.MP)) ** 2, weights=x.MP))).rename('gsd')
 d = d.join(mu, on='Season').join(sd, on='Season')
 zz = (d.gs - d.gmu) / d.gsd
-w = mps / (mps + 350)
+w = mps / (mps + 350) * np.minimum(1.0, np.sqrt(d.G / 20.0))      # short first-stage seasons (10 to 14 games) are trusted less
 zs = zz * w + (-0.9) * (1 - w)
+# Volume and role: the per-36 game score alone rates an efficient 20-minute big above a 28-minute star. Blend in a per-game production z
+# (points, rebounds, assists, steals, blocks, same weights as the NBA build), then rescale so the spread of rotation players is unchanged.
+prod = (d.PTS + 1.5 * d.TRB + 1.5 * d.AST + 2.2 * d.STL + 2.5 * d.BLK) / d.G
+rot = (d.MP >= 12 * d.tg) & (d.G >= 0.4 * d.tg)
+pmu = prod[rot].groupby(d.Season[rot]).mean(); psd = prod[rot].groupby(d.Season[rot]).std()
+prz = ((prod - d.Season.map(pmu)) / d.Season.map(psd)) * w + (-0.9) * (1 - w)
+zb = 0.65 * zs + 0.35 * prz
+rt = (d.MP / d.G >= 15) & (d.G >= 0.4 * d.tg)
+zb = (zb - zb[rt].mean()) / zb[rt].std() * zs[rt].std() + zs[rt].mean()
+zs = zb
 zs = zs + 0.18 * (((mp / d.G) - 22) / 8).clip(-1.5, 1.5)
 d['ovr'] = (61 + 14.6 * zs).round().clip(28, 99)      # wider than the NBA constant so the EuroLeague talent spread matches the NBA scale the engine is tuned for
 # ---- rosters: the 13 busiest players of each team-season
