@@ -101,6 +101,26 @@ test('interactive moments: live games show them, answers are verified by replay,
   assert.equal(R2.L.rec[0].w, b.SE.L.rec[0].w);
   assert.throws(() => C.replay(o, [['lg', [[3, 'M', 0]]]]), /moment/, 'an answer with no moment pending is rejected');
 });
+test('hot hand and foul trouble moments: they show up, sitting a player really benches him, riding lifts the automatic penalty', () => {
+  const o = { picks: draft(p => p.ovr), pool, seed: 5, hard: false, name: 'T' };
+  const SE = C.createSeason(o), kinds = {}; let sat = 0, fed = 0;
+  for (let g = 0; g < 70; g++) {
+    const G = C.beginLive(SE, false); G.fast = true;
+    while (!G.over) {
+      C.step(SE, G); const pd = G.mo.pending; if (!pd) continue;
+      kinds[pd.kind || pd.mode] = (kinds[pd.kind || pd.mode] || 0) + 1;
+      const u = G.userSide;
+      if (pd.kind === 'foul') { assert.ok(G.st[u][pd.player].pf >= 2); C.answerMoment(SE, G, 0); assert.equal(G.on[u].indexOf(pd.player), -1, 'sat player is off the floor'); sat++; }
+      else if (pd.kind === 'hot') { assert.ok(pd.pts >= 8); C.answerMoment(SE, G, 0); assert.equal(G.feed[u], pd.player); fed++; }
+      else C.answerMoment(SE, G, 0);
+    }
+    C.finishLive(SE, G);
+  }
+  assert.ok(sat >= 1 && fed >= 1, 'both moments appear: ' + JSON.stringify(kinds));
+  while (SE.L.phase === 'season') C.quick(SE); C.startPlayoffs(SE); while (!['eliminated', 'champion', 'done'].includes(SE.L.phase)) C.quickPo(SE);
+  const R2 = C.replay(o, JSON.parse(JSON.stringify(SE.log)));
+  assert.equal(R2.L.rec[0].w, SE.L.rec[0].w, 'the server replay reproduces the same record');
+});
 const finishSeason = SE => { while (SE.L.phase === 'season') C.quick(SE); C.startPlayoffs(SE); while (!['eliminated', 'champion', 'done'].includes(SE.L.phase)) C.quickPo(SE); };
 test('injuries: rare, short, one at a time, the man really sits, and the server replay reproduces them', () => {
   let total = 0, long = 0;

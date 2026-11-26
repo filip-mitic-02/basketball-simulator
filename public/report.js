@@ -12,11 +12,11 @@
   const PPG_PER_RATING = 1.1, WINS_PER_PPG = 1.45;
   // Measured cost of the team-level synergies in the game engine (points per game, worst case).
   const SYN = { handler: 2.6, cramped: 0.5, usage: 0.7 };
-  // Projected wins from the minute-weighted rating of the roster (quadratic fit on ~670 simulated seasons with rating 58+,
+  // Projected wins from the minute-weighted rating of the roster (quadratic fit on ~110 simulated seasons of random-to-best drafts (1990-2026),
   // residual sd about 5.5 wins; the opposition, injuries of form and coaching make up the rest).
-  const projWins = r => -151.8 + 4.886 * r - 0.027 * r * r;
+  const projWins = r => -381.03 + 10.5477 * r - 0.059518 * r * r;
   // EuroLeague (38 games), same method: ~150 simulated seasons of random-to-best drafts, residual sd about 3 wins.
-  const projWinsEL = r => -94.2 + 3.0418 * r - 0.01789 * r * r;
+  const projWinsEL = r => -138.18 + 4.14897 * r - 0.024145 * r * r;
   const TG = [34, 33, 32, 30, 29, 24, 20, 16, 12, 10];
 
   // Each category: the part of the rating it stands for (ovr points, relative to an average player).
@@ -98,7 +98,7 @@
     const cats = Object.fromEntries(list.map(c => [c.k, c]));
     const rating = teamVal(p => N(p.ovr), players);
     const isEL = String(key).slice(0, 3) === 'el:';
-    const wins = complete ? (isEL ? Math.max(3, Math.min(36, Math.round(projWinsEL(rating) + 2.0 * synPts))) : Math.max(8, Math.min(78, Math.round(projWins(rating) + WINS_PER_PPG * synPts)))) : null;
+    const wins = complete ? (isEL ? Math.max(3, Math.min(38, Math.round(projWinsEL(rating) + 0.8 * synPts))) : Math.max(8, Math.min(82, Math.round(projWins(rating) + WINS_PER_PPG * synPts)))) : null;
     const holes = list.filter(c => c.pts <= -0.9 && c.pct < 25).sort((a, b) => a.pts - b.pts);
     const cost = holes.reduce((a, c) => a + c.pts, 0) + synPts;
     const verdict = (cost > -0.9 ? 'No real weakness' : holes.length + syn.filter(s => s.pts <= -0.8).length >= 2 ? 'Unbalanced roster' : 'One big hole');

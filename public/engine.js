@@ -142,9 +142,9 @@
 
   // Competition rules. Everything the engine needs to know about the league it is playing in; the NBA numbers are the defaults.
   const RULES = {
-    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
+    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, cmp: 30, sat: 0.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
       po: { conf: 2, seeds: 8, rounds: [{ name: 'First Round', need: 4 }, { name: 'Conference Semifinals', need: 4 }, { name: 'Conference Finals', need: 4 }, { name: 'NBA Finals', need: 4 }], confMvp: true } },
-    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
+    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, cmp: 24, sat: 0.50, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
       po: { conf: 1, seeds: 8, rounds: [{ name: 'Quarterfinals', need: 3 }, { name: 'Final Four semifinals', need: 1, neutral: true }, { name: 'Final', need: 1, neutral: true }], confMvp: false } }
   };
   function defaultPlan(team, R) {
@@ -185,7 +185,7 @@
       r, teams, plans, R, fast: !!opts.fast,
       q: 1, clock: R.q, score: [0, 0], qs: [[], []], qStart: [0, 0],
       poss: r() < 0.5 ? 0 : 1, firstPoss: null, over: false, ot: 0,
-      mom: [0, 0], to: [R.to, R.to], tf: [0, 0], feed: [null, null], feedLeft: [0, 0], dbl: [null, null],
+      mom: [0, 0], to: [R.to, R.to], tf: [0, 0], feed: [null, null], feedLeft: [0, 0], dbl: [null, null], fh: [{}, {}],
       fb: false, putback: false, elapsed: 0, sinceSub: [0, 0], runPts: [0, 0], bo: [{ n: 0, p: 0, dp: 0 }, { n: 0, p: 0, dp: 0 }],
       log: [], st: [], en: [], form: [], tform: [0, 0], es: [1, 1], heat: [], on: [], sub: [0, 0]
     };
@@ -216,7 +216,10 @@
     return ws.length - 1;
   }
   const fatF = e => 0.78 + 0.22 * e / 100;
-  const cmp = d => { const x = Math.abs(d), T = K.cmpT, y = x <= T ? x : T + (K.cmp - T) * Math.tanh((x - T) / (K.cmp - T)); return d < 0 ? -y : y; };
+  // Games that involve the user's team lift the ceilings on how much a stacked roster can gain (a dream draft can go unbeaten);
+  // games between two AI teams keep the original tighter ceilings, so the rest of the league stays realistic.
+  const withUser = G => !!(G.aiTeam && (!G.aiTeam[0] || !G.aiTeam[1]));
+  const cmp = (d, c) => { const x = Math.abs(d), T = K.cmpT, y = x <= T ? x : T + (c - T) * Math.tanh((x - T) / (c - T)); return d < 0 ? -y : y; };
 
   // agregati odbrane/napada za trenutnu petorku
   function agg(G, t) {
@@ -224,7 +227,7 @@
     let stl = 0, blk = 0, drb = 0, orb = 0, ast = 0, ovr = 0, usg = 0, spc = 0, hnd = 0, bigs = 0, pf = 0, hq = 0; const tr = {};
     for (let k = 0; k < 5; k++) {
       const p = P[on[k]], f = Math.pow(fatF(en[on[k]]), 0.7);
-      stl += p.stl * f; blk += p.blk * f; drb += p.drb * f; orb += p.orb * f; ast += p.ast * f; ovr += cmp(coreOf(p) - 54) * (0.85 + 0.15 * en[on[k]] / 100); pf += p.pf; usg += p.usg; spc += clamp((p.r3 - 0.14) / 0.18, 0, 1) * clamp(0.5 + (p.p3 + 0.03) * 12, 0.3, 1.2); const T0 = traitCfg.on ? traitOf(p) : null; if (T0) tr[T0.k] = (tr[T0.k] || 0) + T0.s * f; if (p.guard || (T0 && T0.k === 'maestro')) { hnd++; if (p.ast * f > hq) hq = p.ast * f; } if (p.big) bigs++;
+      stl += p.stl * f; blk += p.blk * f; drb += p.drb * f; orb += p.orb * f; ast += p.ast * f; ovr += cmp(coreOf(p) - 54, withUser(G) ? G.R.cmp : K.cmp) * (0.85 + 0.15 * en[on[k]] / 100); pf += p.pf; usg += p.usg; spc += clamp((p.r3 - 0.14) / 0.18, 0, 1) * clamp(0.5 + (p.p3 + 0.03) * 12, 0.3, 1.2); const T0 = traitCfg.on ? traitOf(p) : null; if (T0) tr[T0.k] = (tr[T0.k] || 0) + T0.s * f; if (p.guard || (T0 && T0.k === 'maestro')) { hnd++; if (p.ast * f > hq) hq = p.ast * f; } if (p.big) bigs++;
     }
     const sc = (v, k) => 1 + k * (v / 5 - 1);      // scaled effect of a component (raw values stay for who-does-what picks)
     return { stl: stl / 5, blk: blk / 5, drb: drb / 5, orb: orb / 5, ast: ast / 5, ovr: ovr / 5, usg: usg / 5, spc, hnd, bigs, pf: pf / 5, hl: clamp((0.95 - hq) / 0.35, 0, 1), tr, sum: { drb, orb },
@@ -313,7 +316,7 @@
     const sq = tp.sq;
     // verovatnoća pogotka
     let p = (is3 ? BASE3 + K.d3 * S.p3 : BASE2 + K.d2 * S.p2);
-    p += K.ovrO * cmp(coreOf(S) - 54) - K.ovrD * D.ovr;
+    p += K.ovrO * cmp(coreOf(S) - 54, withUser(G) ? G.R.cmp : K.cmp) - K.ovrD * D.ovr;
     p -= K.clump * Math.max(0, A.usg - 1.08);
     if (!is3) p += (A.spc >= 3.2 ? K.spcUp : A.spc < 1.6 ? K.spcDn : 0);
     p += K.hndP * A.hl;
@@ -327,7 +330,7 @@
     if (po.off === 'iso') p += clamp(T.isoS * (S.ovr - T.isoC), -0.020, 0.016);
     if (pd.def === 'press') p += T.prP;
     if (pd.def === 'zone') p += is3 ? T.zn3 + T.zn3S * (A.spc - 1.6) : T.zn2 - T.zn2S * (D.blk - 1.33);
-    { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o] * K.gain * (is3 ? K.g3 : 1), ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + (K.sat - T) * Math.tanh((ax - T) / (K.sat - T)); p = base + (x < 0 ? -y : y); } }
+    { const base = is3 ? BASE3 : BASE2; { const x = (p - base) * G.es[o] * K.gain * (is3 ? K.g3 : 1), ax = Math.abs(x), T = K.satT, y = ax <= T ? ax : T + ((withUser(G) ? G.R.sat : K.sat) - T) * Math.tanh((ax - T) / ((withUser(G) ? G.R.sat : K.sat) - T)); p = base + (x < 0 ? -y : y); } }
     p += sq;
     { const bo = G.bo; if (bo[o].n > 0) p += bo[o].p; if (bo[d].n > 0) p -= bo[d].dp; }   // a coach's call from an interactive moment
     if (traitCfg.on) {
@@ -542,6 +545,8 @@
     const e = G.en[t][i];
     if (s.pf >= G.R.fo) return -1e9;
     const TOT = 4 * G.R.q, el = G.q > 4 ? TOT : (G.q - 1) * G.R.q + (G.R.q - G.clock);
+    const hd = G.fh && G.fh[t][i], held = hd && el < hd.until ? hd.mode : null;      // the coach's call on a player in foul trouble
+    if (held === 'sit') return -1e3;
     const target = (plan.mins[i] || 0) * 60;
     if (target <= 0 && mode !== 'clutch') return -1e3;
     const desired = target * Math.min(1, el / TOT);
@@ -553,7 +558,7 @@
     // foul trouble
     const fl = s.pf + (6 - G.R.fo);          // a five-foul league reaches trouble one foul earlier
     const lim = G.q <= 1 ? 2 : G.q === 2 ? 3 : G.q === 3 ? 4 : 5;
-    if (fl > lim) v -= 14 * (fl - lim);
+    if (fl > lim && held !== 'ride') v -= 14 * (fl - lim);
     if (e < 38) v -= (38 - e) * 1.1;
     return v;
   }
@@ -642,6 +647,11 @@
     for (const i of idxs) if (G.on[t].indexOf(i) >= 0) replace(G, t, i, true);
     G.log.length = n; G.sub[t] = sub;
   }
+  // Coach's decision on a player in foul trouble: 'sit' keeps him out until `until` (seconds of game time), 'ride' lifts the automatic foul-trouble penalty until then.
+  function holdPlayer(G, t, i, mode, until) {
+    G.fh[t][i] = { mode, until };
+    if (mode === 'sit' && G.on[t].indexOf(i) >= 0) replace(G, t, i, false);
+  }
   function feedPlayer(G, t, i, n) { G.feed[t] = i; G.feedLeft[t] = n || 8; ev(G, { k: 'feed', t, p: i }); }
   function doubleTeam(G, t, oppIdx, n) {
     // t = tim koji dvoji; oppIdx = igrač protivnika
@@ -687,6 +697,6 @@
     agg, boost, K, T, TR, RULES, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
-    setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview, markOut
+    setLineup, callTimeout, holdPlayer, feedPlayer, doubleTeam, describe, subReview, markOut
   };
 });

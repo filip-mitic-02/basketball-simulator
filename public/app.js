@@ -245,10 +245,10 @@
   function eraInfo() {
     const n = S.pool.length;
     const lim = S.comp === 'nba' && S.from < 1974;
-    return `${n} team-seasons in the pool. ` + (n < MIN_POOL ? '<b class="warn">Widen the range (at least ' + MIN_POOL + ' needed).</b> ' : '') + (lim ? 'Before 1974 the database has no blocks, steals or turnovers, so those players have limited stats.' : S.comp === 'el' && S.from < 2016 ? 'Before 2016 the source has fewer games per player, so older seasons are estimated more cautiously. Players who changed clubs mid-season are left out.' : 'Full statistics for every player.');
+    return `${n} team-seasons in the pool. ` + (n < MIN_POOL ? '<b class="warn">Widen the range (at least ' + MIN_POOL + ' needed).</b> ' : '') + (lim ? 'Before 1974 the database has no blocks, steals or turnovers, so those players have limited stats.' : S.comp === 'el' && S.from < 2016 ? 'Before 2016 a season is about 20 games (group stage and Top 16), so older ratings are estimated a little more cautiously. Players who changed clubs mid-season are left out.' : 'Full statistics for every player.');
   }
   SCREENS.menu = () => {
-    const runs = S.runs || [];
+    const runs = (S.runs || []).filter(r => (r.comp || 'nba') === S.comp);
     const best = runs.slice().sort((a, b) => (b.score || 0) - (a.score || 0))[0];
     const titles = runs.filter(r => r.champ).length, perfect = runs.filter(r => r.l === 0).length;
     return `
@@ -295,9 +295,10 @@
   }
   function runsHtml() {
     if (!S.acct) return '<p class="note">Sign in with Google to save your seasons and achievements.</p>';
-    if (!S.runs.length) return '<p class="note">No saved seasons yet.</p>';
+    const mine = S.runs.filter(r => (r.comp || 'nba') === S.comp);
+    if (!mine.length) return '<p class="note">No saved ' + CF().name + ' seasons yet.</p>';
     return '<div class="tw"><table><tr><th>Record</th><th>Result</th><th>Mode</th><th class="r">Score</th></tr>' +
-      S.runs.slice(0, 8).map(r => `<tr><td class="num">${r.w}-${r.l}</td><td>${esc(trRes(r.res))}</td><td>${r.comp === 'el' ? 'EL &middot; ' : ''}${r.hard ? 'Hard' : 'Normal'} &middot; ${esc(r.eraLabel || '')}</td><td class="r num">${r.score}</td></tr>`).join('') + '</table></div>';
+      mine.slice(0, 8).map(r => `<tr><td class="num">${r.w}-${r.l}</td><td>${esc(trRes(r.res))}</td><td>${r.hard ? 'Hard' : 'Normal'} &middot; ${esc(r.eraLabel || '')}</td><td class="r num">${r.score}</td></tr>`).join('') + '</table></div>';
   }
   function updateRangeUI() {
     const pc = y => ((y - CF().minY) / (CF().maxY - CF().minY) * 100);
@@ -876,7 +877,13 @@
     timeout: ['Stop play, rest your players, and reset.', 'Costs one timeout. Always a safe choice.'],
     press: ['Pressure the ball the full length of the court.', 'Works best with quick hands and steals.'],
     zone: ['Pack the paint and make them shoot from outside.', 'Works best with shot blockers and rebounders.'],
-    double: ['Send two defenders at their best scorer.', 'Stops him, but opens a shot for someone else.']
+    double: ['Send two defenders at their best scorer.', 'Stops him, but opens a shot for someone else.'],
+    hfeed: ['Run the next plays through him.', 'Works best with a real star who is still fresh.'],
+    hspread: ['Move the ball and let the defense chase.', 'Works best with a tired or ordinary scorer and good passers.'],
+    hrest: ['Stop play and let everyone catch their breath.', 'Costs one timeout. Helps when he is running out of gas.'],
+    fsit: ['He goes to the bench for the rest of the quarter.', 'Right for role players, or when he is deep in trouble.'],
+    fshort: ['A quick breather, then the staff decides again.', 'A middle road when it is not clear-cut.'],
+    fride: ['No restrictions: he stays in unless he fouls out.', 'Right for a real star who is just at the limit.']
   };
   function momentSb() {
     const G = S.G, u = G.userSide;
@@ -900,16 +907,19 @@
   }
   const STATS_ = Core.STATS;
   function callHtml(pd, done) {
-    const G = S.G, P = G.teams[G.userSide].players, res = done && done.type === 'call' ? done : null, T = MO_TXT[pd.kind];
+    const G = S.G, P = G.teams[G.userSide].players, res = done && done.type === 'call' ? done : null;
+    const pn = pd.player != null && P[pd.player] ? P[pd.player] : null, fl = pn ? G.st[G.userSide][pd.player].pf : 0;
+    const T = pd.kind === 'hot' && pn ? ['Hot hand: ' + pn.name, pn.name + ' has scored ' + pd.pts + ' points in the last few minutes.']
+      : pd.kind === 'foul' && pn ? ['Foul trouble: ' + pn.name, pn.name + ' has ' + fl + ' fouls and it is still early. Sit him or ride the risk?'] : MO_TXT[pd.kind];
     const opt = (o, i) => `<button class="mo-opt ${res && res.idx === i ? 'chosen' : ''}" data-a="mochoice" data-i="${i}" ${res || o.off ? 'disabled' : ''}><b>${o.label}</b><span>${MO_HELP[o.id][0]}</span><span class="mo-need">${MO_HELP[o.id][1]}</span>${o.who && o.who.length ? `<em>On your floor: ${o.who.map(i => esc(P[i].name.split(' ').slice(-1)[0])).join(', ')}</em>` : o.off ? '<em>No timeouts left</em>' : ''}</button>`;
     let verdict = '';
     if (res) {
       const b = res.res.b;
-      verdict = pd.kind === 'run' ? '<div class="mo-verdict">Play called</div>' : b > 0.03 ? '<div class="mo-verdict win">Good read: this lineup suits it</div>' : b < -0.03 ? '<div class="mo-verdict lose">Poor fit for this lineup</div>' : '<div class="mo-verdict">Play called</div>';
+      verdict = pd.kind === 'hot' || pd.kind === 'foul' ? (b > 0.03 ? '<div class="mo-verdict win">Good read</div>' : b < -0.03 ? '<div class="mo-verdict lose">Poor read for this player</div>' : '<div class="mo-verdict">Decision made</div>') : pd.kind === 'run' ? '<div class="mo-verdict">Play called</div>' : b > 0.03 ? '<div class="mo-verdict win">Good read: this lineup suits it</div>' : b < -0.03 ? '<div class="mo-verdict lose">Poor fit for this lineup</div>' : '<div class="mo-verdict">Play called</div>';
       verdict += '<p class="note">The next few possessions will show how it works out.</p>';
     }
     return `<div class="mo-head"><span class="mo-ic">${MO_ICON.call}</span><div><h2>${T[0]}</h2><p class="note">${T[1]}</p></div></div>${momentSb()}
-      ${res ? '' : '<p class="mo-how">Pick one play. It affects the next ten possessions, and the best choice depends on who is on your floor right now.</p>'}<div class="mo-opts">${pd.opts.map(opt).join('')}</div>${verdict}
+      ${res ? '' : '<p class="mo-how">' + (pd.kind === 'foul' ? 'Pick one. The right call depends on how much better he is than your bench and how deep in trouble he is.' : pd.kind === 'hot' ? 'Pick one. It affects the next ten possessions, and the right call depends on how good and how fresh he is.' : 'Pick one play. It affects the next ten possessions, and the best choice depends on who is on your floor right now.') + '</p>'}<div class="mo-opts">${pd.opts.map(opt).join('')}</div>${verdict}
       <div class="ctrl">${res ? '<button class="btn pri" data-a="mocont">Continue</button>' : '<button class="btn" data-a="moauto">Skip: let the staff decide</button>'}</div>`;
   }
   function showMoment(done) {
@@ -1000,7 +1010,7 @@
       <p><b>Draft.</b> Ten times, spin a random team and season from your chosen era and take one player from that roster. Every position (PG, SG, SF, PF, C) needs exactly two players. Versatile players can fill more than one position. You get 2 re-spins. Hard mode hides stats and overalls, with one Scout to reveal a full roll.</p>
       <p><b>Season.</b> ${RL().games} games against ${RL().teams - 1} strong historical rosters from the same era${S.comp === 'el' ? ' (EuroLeague rules: 40-minute games, five fouls to foul out, one table of 20 clubs)' : ''}. You coach games possession by possession. Play pauses at the end of each quarter and when the opponent goes on a run or your player picks up a fifth foul.</p>
       <p><b>Coaching.</b> Starting five, target minutes, tempo, offense and defense. During a game you can change things at quarter breaks and during timeouts: substitutions, tactics, feeding the ball to a player, doubling a star. Timeouts also restore energy and stop runs. Players tire and foul out.</p>
-      <p><b>Moments.</b> When you coach a game step by step, play pauses a few times: a matchup duel in each half, and a coach's call in a close finish, in overtime, after a long scoring drought or when the opponent goes on a big run. The right read is worth about a point a moment, a guess is worth nothing, and skipping costs nothing. Quick sims have no moments.</p>
+      <p><b>Moments.</b> When you coach a game step by step, play pauses a few times: a matchup duel in each half, and a coach's call in a close finish, in overtime, after a long scoring drought or when the opponent goes on a big run. A player on a hot streak or in early foul trouble also gets a decision: feed him or spread the ball, sit him or ride the risk. The right read is worth about a point a moment, a guess is worth nothing, and skipping costs nothing. Quick sims have no moments.</p>
       <p><b>Injuries.</b> Now and then one of your players is hurt for one to three games, never more than one at a time. He sits out in quick sims and coached games alike, and the rotation covers for him.</p>
       <p><b>Trades.</b> Until game 55 you can make up to two trades from the hub: choose a player to give up and pick one of three offers of similar quality from your era. The new player takes the old one's minutes and spot. A trade cannot be undone.</p>
       <p><b>Playoffs.</b> ${S.comp === 'el' ? 'The top eight of the table play best-of-five quarterfinals, then the Final Four: two single-game semifinals and the final on neutral ground.' : 'Top eight in each conference, best-of-seven series up to the Finals.'}</p>

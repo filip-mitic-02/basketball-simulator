@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-26.1';
+  const VERSION = 'sim-2026-11-26.3';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -187,16 +187,18 @@
   // While the user coaches a game live, play pauses at a few moments and offers a choice. Everything here is a pure function of the game
   // state (no random numbers), so the server reaches the same moment and checks the same answer. An unanswered moment resolves as "auto",
   // which changes nothing. The best answer is worth about half a point per moment; a guess is worth nothing on average.
-  const MO = { max: 6, gap: 8, halfAt: 360, crunchAt: 120, crunchMargin: 6, runWin: 300, runLead: 10, dry: 240, boostN: 10, duel: 0.06, call: 0.09, callMax: 0.14, safe: 0.025 };
+  const MO = { max: 6, gap: 8, halfAt: 360, crunchAt: 120, crunchMargin: 6, runWin: 300, runLead: 10, dry: 240, boostN: 10, hotWin: 300, hotPts: 12, softMax: 4, duel: 0.06, call: 0.09, callMax: 0.14, safe: 0.025 };
   const STATS = [['ppg', 'Scoring', 'PPG', p => p.ppg], ['apg', 'Playmaking', 'APG', p => p.apg], ['rpg', 'Rebounding', 'RPG', p => p.rpg], ['stk', 'Defense', 'STL + BLK', p => (p.spg || 0) + (p.bpg || 0)]];
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
   const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  function moInit(G) { G.mo = { pending: null, n: 0, h1: false, h2: false, crunch: false, ot: {}, last: -99, hist: [], lastScore: 0, lastRun: -99, lastDry: -99, log: [] }; }
+  function moInit(G) { G.mo = { fseen: {}, hseen: {}, ph: [], pending: null, n: 0, h1: false, h2: false, crunch: false, ot: {}, last: -99, hist: [], lastScore: 0, lastRun: -99, lastDry: -99, log: [] }; }
   const oncourt = (G, t) => G.on[t].map(i => [i, G.teams[t].players[i]]);
   const best = (list, f) => list.reduce((b, x) => (b == null || f(x[1]) > f(b[1]) ? x : b), null);
   function afterStep(G) {
     const m = G.mo || (moInit(G), G.mo), u = G.userSide, o = 1 - u, el = G.elapsed;
     m.hist.push([el, G.score[u], G.score[o]]);
+    if (!m.ph.length || el - m.ph[m.ph.length - 1][0] >= 30) m.ph.push([el, G.st[u].map(x => x.pts)]);
+    while (m.ph.length > 1 && m.ph[0][0] < el - MO.hotWin - 40) m.ph.shift();
     while (m.hist.length > 2 && m.hist[0][0] < el - MO.runWin - 60) m.hist.shift();
     const pu = m.prevScore == null ? 0 : m.prevScore, po = m.prevO == null ? 0 : m.prevO;
     if (G.score[u] !== pu) { m.lastScore = el; m.opRun = 0; }
@@ -215,13 +217,35 @@
       if (G.np - m.lastRun > 20 && (m.opRun >= MO.runLead || (w && (G.score[o] - w[2]) >= MO.runLead && (G.score[o] - w[2]) - (G.score[u] - w[1]) >= MO.runLead))) { m.lastRun = G.np; m.opRun = 0; type = ['call', 'run']; }
       else if (gp < MO.gap) return;
       else if (el > MO.dry && el - m.lastScore >= MO.dry && G.np - m.lastDry > 20) { m.lastDry = G.np; type = ['call', 'dry']; }
+      else if (m.n < MO.softMax && G.q <= 3 && (m.fi = foulTrouble(G)) != null) { type = ['call', 'foul']; m.fseen[m.fi] = 1; }
+      else if (m.n < MO.softMax && (m.hi = hotHand(G)) != null) { type = ['call', 'hot']; m.hseen[m.hi] = 1; }
       else if (!m.h1 && G.q === 2 && G.clock <= MO.halfAt) { m.h1 = true; type = ['duel', 'attack']; }
       else if (!m.h2 && G.q === 3 && G.clock <= MO.halfAt) { m.h2 = true; type = ['duel', 'defend']; }
     }
     if (!type) return;
     m.n++; m.last = G.np;
     m.pending = type[0] === 'duel' ? buildDuel(G, type[1]) : buildCall(G, type[1]);
+    if (type[1] === 'foul') m.pending.player = m.fi; else if (type[1] === 'hot') { m.pending.player = m.hi; m.pending.pts = m.hotPts; }
     m.pending.at = G.np;
+  }
+  const foulThr = G => [0, G.R.fo - 3, G.R.fo - 2, G.R.fo - 2];
+  // A starter in foul trouble: three fouls in the first quarter, four before the half and in the third (one fewer with five-foul rules).
+  function foulTrouble(G) {
+    const u = G.userSide, m = G.mo, thr = foulThr(G)[G.q];
+    if (!thr) return null;
+    let pick = null;
+    const third = G.teams[u].players.map(p => p.ovr).sort((a, b) => b - a)[2];
+    for (const i of G.on[u]) { const f = G.st[u][i].pf; if (G.teams[u].players[i].ovr < third) continue; if (f >= thr && f < G.R.fo - 1 && !m.fseen[i] && !(G.out && G.out[u][i]) && (pick == null || G.teams[u].players[i].ovr > G.teams[u].players[pick].ovr)) pick = i; }
+    return pick;
+  }
+  // A player who has scored a lot lately (the threshold scales with how much the league scores).
+  function hotHand(G) {
+    const u = G.userSide, m = G.mo, need = Math.round(MO.hotPts * G.R.avgPts / 112), base = m.ph[0];
+    if (!base || G.elapsed < 240 || G.elapsed - base[0] < 150) return null;
+    let pick = null, bp = 0;
+    for (const i of G.on[u]) { const d = G.st[u][i].pts - (base[1][i] || 0); if (d >= need && !m.hseen[i] && d > bp) { pick = i; bp = d; } }
+    m.hotPts = bp;
+    return pick;
   }
   const defScoreOf = p => p.stl + p.blk + p.drb;
   function buildDuel(G, mode) {
@@ -243,6 +267,12 @@
       return { type: 'call', kind, opts: [{ id: 'timeout', label: 'Timeout and reset', off: G.to[u] <= 0 }, { id: 'press', label: 'Full-court press', who: top(p => p.stl, 2) },
         { id: 'zone', label: 'Pack the paint (zone)', who: top(p => p.blk, 2) }, { id: 'double', label: 'Double their star', who: [] }] };
     }
+    if (kind === 'hot') {
+      return { type: 'call', kind, opts: [{ id: 'hfeed', label: 'Keep feeding him', who: [] }, { id: 'hspread', label: 'Spread the ball', who: [] }, { id: 'hrest', label: 'Timeout: calm things down', off: G.to[u] <= 0 }] };
+    }
+    if (kind === 'foul') {
+      return { type: 'call', kind, opts: [{ id: 'fsit', label: 'Sit him until the next quarter', who: [] }, { id: 'fshort', label: 'Short rest, four minutes', who: [] }, { id: 'fride', label: 'Ride with him', who: [] }] };
+    }
     return { type: 'call', kind, opts: [{ id: 'iso', label: 'Feed the star', who: top(p => p.ovr, 1) }, { id: 'pnr', label: 'Pick and roll', who: top(p => p.ast, 2) },
       { id: 'three', label: 'Spot-up threes', who: top(p => p.p3 + 0.3 * p.r3, 2) }, { id: 'foul', label: 'Attack and draw fouls', who: top(p => p.ftr, 2) }] };
   }
@@ -263,6 +293,25 @@
       else if (opt.id === 'double') { const t = best(oncourt(G, o), p => p.usg * p.ovr); E.doubleTeam(G, u, t[0], 8); }
       else { const z = opt.id === 'press' ? (A.stl - 1.13) / 0.25 : (A.blk - 1.33) / 0.5; E.boost(G, u, 0, clampN(MO.call * z, -MO.callMax, MO.callMax), MO.boostN); }
       res = {};
+    } else if (pd.kind === 'hot' || pd.kind === 'foul') {
+      const i = pd.player, p = G.teams[u].players[i], en = G.en[u][i], b0 = G.elapsed;
+      let f, ks;
+      if (pd.kind === 'hot') {
+        const A = E.agg(G, u), feed = (p.ovr - 70) / 10 + (en - 60) / 25;
+        f = { hfeed: feed, hspread: 0.8 - 0.6 * feed + 0.3 * (A.ast - 1.45) / 0.25, hrest: (65 - en) / 12 };
+      } else {
+        const bench = G.teams[u].players.filter((q, j) => G.on[u].indexOf(j) < 0 && G.st[u][j].pf < G.R.fo && !(G.out && G.out[u][j])).reduce((a, q) => Math.max(a, q.ovr), 0);
+        const st = clampN((p.ovr - bench) / 12, -1, 2), ex = G.st[u][i].pf - foulThr(G)[Math.min(G.q, 3)] + 1;
+        f = { fride: 1.2 * st - 0.9 * ex + 0.6, fshort: 0.4 - 0.4 * Math.abs(st - 0.5 * ex), fsit: -0.9 * st + 0.7 * ex - 0.2 };
+      }
+      ks = Object.keys(f);
+      const b = clampN(MO.call * (f[opt.id] - mean(ks.map(k => f[k]))), -MO.callMax, MO.callMax);
+      if (opt.id === 'hfeed') E.feedPlayer(G, u, i, 8);
+      else if (opt.id === 'hrest') { E.callTimeout(G, u); G.coachOpen = true; }
+      else if (opt.id === 'fsit') E.holdPlayer(G, u, i, 'sit', Math.min(4, G.q) * G.R.q);
+      else if (opt.id === 'fshort') E.holdPlayer(G, u, i, 'sit', b0 + 240);
+      else if (opt.id === 'fride') E.holdPlayer(G, u, i, 'ride', Math.min(4, G.q + 1) * G.R.q);
+      E.boost(G, u, b, 0, MO.boostN); res = { b };
     } else {
       const f = offenseFit(G), ks = Object.keys(f), mu = mean(ks.map(k => f[k]));
       const b = clampN(MO.call * (f[opt.id] - mu), -MO.callMax, MO.callMax);

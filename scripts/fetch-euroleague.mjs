@@ -3,6 +3,7 @@
 //   node scripts/fetch-euroleague.mjs                 # seasons 2000..current, writes data/euroleague/
 //   node scripts/fetch-euroleague.mjs 2022 2024       # only these start years
 //   node scripts/fetch-euroleague.mjs --probe 2023    # print the field names of one season and stop
+//   node scripts/fetch-euroleague.mjs --probe 2010 TS # same, for another phase (older seasons: the Top 16 stage)
 //
 // Output (all in data/euroleague/):
 //   raw/E<year>.json     the unmodified API answer per season (send these to Claude if the mapping below needs fixing)
@@ -64,10 +65,10 @@ function mapRow(row, miss) {
 }
 const rowsOf = b => (Array.isArray(b) ? b : b?.players || b?.data || []);
 
-async function season(y) {
-  const file = `${OUT}/raw/E${y}.json`;
+async function season(y, ph = 'RS') {
+  const file = ph === 'RS' ? `${OUT}/raw/E${y}.json` : `${OUT}/raw/E${y}-${ph}.json`;
   if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8'));
-  const url = `${BASE}/v3/competitions/E/statistics/players/traditional?SeasonMode=Single&SeasonCode=E${y}&statisticMode=Accumulated&phaseTypeCode=RS&limit=500`;
+  const url = `${BASE}/v3/competitions/E/statistics/players/traditional?SeasonMode=Single&SeasonCode=E${y}&statisticMode=Accumulated&phaseTypeCode=${ph}&limit=500`;
   const r = await get(url);
   if (!r.body) return { status: r.status, players: [] };
   if (r.body.total > rowsOf(r.body).length) { const r2 = await get(url.replace('limit=500', `limit=${r.body.total + 1}`)); if (r2.body) r.body = r2.body; }
@@ -79,7 +80,7 @@ async function season(y) {
 
 mkdirSync(`${OUT}/raw`, { recursive: true });
 if (probe) {
-  const b = await season(from), rows = rowsOf(b);
+  const b = await season(from, args[2] || 'RS'), rows = rowsOf(b);
   console.log('rows:', rows.length, 'total:', b.total);
   console.log('first row:', JSON.stringify(rows[0], null, 1));
   console.log('mapped:', rows[0] ? mapRow(rows[0], {}) : null);
@@ -88,17 +89,26 @@ if (probe) {
 
 const lines = ['Player,Code,Age,Tm,TmName,Season,G,MP,PTS,2P,2PA,3P,3PA,FT,FTA,ORB,DRB,TRB,AST,STL,BLK,TOV,PF'];
 const rep = []; const miss = {};
+// Before 2016-17 the league played a first group stage (10 to 14 games) and then a Top 16 stage. The default phase RS holds only the first one,
+// so for those seasons the other stages are fetched as well (codes that do not exist are skipped) and added up per player and club.
+const EXTRA = (process.env.EL_PHASES || 'TS,T16,LS').split(',').filter(Boolean), SUM = ['G', 'MP', 'PTS', 'FG2', 'FG2A', 'FG3', 'FG3A', 'FT', 'FTA', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'TOV', 'PF'];
 for (let y = from; y <= to; y++) {
   const b = await season(y), rows = rowsOf(b);
   if (!rows.length) { rep.push(`${y}: no data (status ${b.status ?? 'n/a'})`); continue; }
-  let n = 0;
-  for (const row of rows) {
-    const o = mapRow(row, miss); if (!o.Player || !(o.G > 0)) continue;
+  let n = 0; const merged = new Map(), got = ['RS:' + rows.length];
+  const add = row => {
+    const o = mapRow(row, miss); if (!o.Player || !(o.G > 0)) return;
+    const k = (o.Code || o.Player) + '|' + o.Tm, m = merged.get(k);
+    if (!m) merged.set(k, o); else for (const c of SUM) m[c] = (Number(m[c]) || 0) + (Number(o[c]) || 0);
+  };
+  rows.forEach(add);
+  if (y < 2016) for (const ph of EXTRA) { const e = await season(y, ph), er = rowsOf(e); if (er.length) { got.push(ph + ':' + er.length); er.forEach(add); } }
+  for (const o of merged.values()) {
     // the API reports minutes as decimal minutes in per-game mode and as totals in accumulated mode; keep totals
     lines.push([JSON.stringify(o.Player), o.Code, o.Age, o.Tm, JSON.stringify(o.TmName), y, o.G, o.MP, o.PTS, o.FG2, o.FG2A, o.FG3, o.FG3A, o.FT, o.FTA, o.ORB, o.DRB, o.TRB, o.AST, o.STL, o.BLK, o.TOV, o.PF].join(','));
     n++;
   }
-  rep.push(`${y}: ${n} player rows`);
+  rep.push(`${y}: ${n} player rows (${got.join(', ')})`);
   console.log(rep.at(-1));
 }
 writeFileSync(`${OUT}/players.csv`, lines.join('\n') + '\n');
