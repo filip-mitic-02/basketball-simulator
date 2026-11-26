@@ -4,8 +4,15 @@
   const E = Engine, LG = League;
   const app = document.getElementById('app');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
-  const PRESETS = [['All-Time', 1950, 2026], ['1950s', 1950, 1959], ['1960s', 1960, 1969], ['1970s', 1970, 1979], ['1980s', 1980, 1989], ['1990s', 1990, 1999], ['2000s', 2000, 2009], ['2010s', 2010, 2019], ['2020s', 2020, 2026]];
+  const MIN_POOL = 60;
+  const COMPS = {
+    nba: { id: 'nba', name: 'NBA', file: 'data.json', minY: 1950, maxY: 2026, from: 1980, to: 1999, ticks: [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020, 2026],
+      presets: [['All-Time', 1950, 2026], ['1950s', 1950, 1959], ['1960s', 1960, 1969], ['1970s', 1970, 1979], ['1980s', 1980, 1989], ['1990s', 1990, 1999], ['2000s', 2000, 2009], ['2010s', 2010, 2019], ['2020s', 2020, 2026]] },
+    el: { id: 'el', name: 'EuroLeague', file: 'data-el.json', minY: 2000, maxY: 2026, from: 2010, to: 2026, ticks: [2000, 2005, 2010, 2015, 2020, 2026],
+      presets: [['All-Time', 2000, 2026], ['2000s', 2000, 2009], ['2010s', 2010, 2019], ['2020s', 2020, 2026]] }
+  };
+  const CF = () => COMPS[S.comp || 'nba'];
+  const RL = () => E.RULES[S.comp || 'nba'];
   const TEMPO_I = { slow: ['Slow', 'Fewer possessions and less fatigue. More variance, which helps the underdog.'], normal: ['Normal', 'Balanced pace and fatigue.'], fast: ['Fast', 'More possessions, which favors the better team. Costs stamina and turnovers.'], push: ['Push', 'Maximum pace. Wears players down and risks turnovers. Use it when chasing a lead.'] };
   const OFF_I = { balanced: ['Balanced', 'No bonus and no penalty.'], inside: ['Inside', 'Feeds the post and cuts your threes. Pays off with strong rebounders and shot blockers.'], threes: ['Threes', 'More three-point attempts. Works only with real shooters on the floor.'], ballmove: ['Ball movement', 'Spreads shots and adds assists. Best with strong passers.'], iso: ['Isolation', 'Your star takes over. Only worth it with a truly dominant scorer; otherwise it costs you.'] };
   const DEF_I = { man: ['Man', 'Standard defense.'], zone: ['Zone', 'Protects the paint and cuts fouls, but gives up threes. Best with shot blockers.'], press: ['Press', 'More steals and turnovers. Pays off with active hands; tires your players and gives easier shots when beaten.'] };
@@ -13,7 +20,7 @@
   const AUTO_I = { auto: 'Automatic', forced: 'Forced only', manual: 'Manual' };
 
   const S = {
-    screen: 'loading', from: 1980, to: 1999, hard: false, teams: [], pool: [], D: null, user: null, plan: null, L: null, G: null, live: null,
+    screen: 'loading', comp: 'nba', cache: {}, from: 1980, to: 1999, hard: false, teams: [], pool: [], D: null, user: null, plan: null, L: null, G: null, live: null,
     acct: null, runs: [], board: [], saved: false, teamName: 'My Team', coachBack: 'hub', revealed: false
   };
 
@@ -35,7 +42,7 @@
   const ovrCls = v => v >= 90 ? 't4' : v >= 80 ? 't3' : v >= 68 ? 't2' : 't1';
   const rnd = n => Math.floor(Math.random() * n);
   const mmss = c => Math.floor(c / 60) + ':' + String(c % 60).padStart(2, '0');
-  const eraLabel = () => (S.from === MIN_Y && S.to === MAX_Y) ? 'All-Time' : S.from + '-' + S.to;
+  const eraLabel = () => (S.comp === 'el' ? 'EuroLeague ' : '') + ((S.from === CF().minY && S.to === CF().maxY) ? 'All-Time' : S.from + '-' + S.to);
   // Real club colours [primary, secondary] by franchise code. Colours only: no logos.
   const CLUB = {
     ATL: ['#E03A3E', '#C1D32F'], BOS: ['#007A33', '#BA9653'], BRK: ['#4A5568', '#FFFFFF'], NJN: ['#1F4E9E', '#CD1041'], NYN: ['#1F4E9E', '#CD1041'],
@@ -187,7 +194,7 @@
     if (S.screen === 'menu') render();
   }
   async function loadProfile() {
-    try { S.board = (await api('/api/leaderboard')).board || []; } catch (e) { S.board = []; }
+    try { S.board = (await api('/api/leaderboard?comp=' + S.comp)).board || []; } catch (e) { S.board = []; }
     if (!S.acct) { S.runs = []; return; }
     try { S.runs = (await api('/api/runs')).runs || []; } catch (e) { S.runs = []; }
   }
@@ -212,39 +219,40 @@
   const ICON_BLIND = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="${EYE}" fill="none" stroke="#ffb627" stroke-width="2" stroke-linejoin="round" opacity=".55"/><path d="M6 27 26 5" stroke="#ffb627" stroke-width="2.6" stroke-linecap="round"/></svg>`;
 
   function rangeHtml() {
-    const pc = y => ((y - MIN_Y) / (MAX_Y - MIN_Y) * 100);
-    const ticks = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020, 2026].map(y => `<span style="left:${pc(y)}%">${y}</span>`).join('');
+    const pc = y => ((y - CF().minY) / (CF().maxY - CF().minY) * 100);
+    const ticks = CF().ticks.map(y => `<span style="left:${pc(y)}%">${y}</span>`).join('');
     return `<div class="range" id="range"><div class="track"><div class="fill" id="rfill" style="left:${pc(S.from)}%;right:${100 - pc(S.to)}%"></div></div>
-      <input type="range" id="rf" min="${MIN_Y}" max="${MAX_Y}" value="${S.from}" aria-label="From season">
-      <input type="range" id="rt" min="${MIN_Y}" max="${MAX_Y}" value="${S.to}" aria-label="To season"><div class="ticks">${ticks}</div></div>`;
+      <input type="range" id="rf" min="${CF().minY}" max="${CF().maxY}" value="${S.from}" aria-label="From season">
+      <input type="range" id="rt" min="${CF().minY}" max="${CF().maxY}" value="${S.to}" aria-label="To season"><div class="ticks">${ticks}</div></div>`;
   }
   function eraInfo() {
     const n = S.pool.length;
-    const lim = S.from < 1974;
-    return `${n} team-seasons in the pool. ` + (n < MIN_POOL ? '<b class="warn">Widen the range (at least ' + MIN_POOL + ' needed).</b> ' : '') + (lim ? 'Before 1974 the database has no blocks, steals or turnovers, so those players have limited stats.' : 'Full statistics for every player.');
+    const lim = S.comp === 'nba' && S.from < 1974;
+    return `${n} team-seasons in the pool. ` + (n < MIN_POOL ? '<b class="warn">Widen the range (at least ' + MIN_POOL + ' needed).</b> ' : '') + (lim ? 'Before 1974 the database has no blocks, steals or turnovers, so those players have limited stats.' : S.comp === 'el' && S.from < 2016 ? 'Before 2016 the source has fewer games per player, so older seasons are estimated more cautiously. Players who changed clubs mid-season are left out.' : 'Full statistics for every player.');
   }
   SCREENS.menu = () => {
     const runs = S.runs || [];
     const best = runs.slice().sort((a, b) => (b.score || 0) - (a.score || 0))[0];
-    const titles = runs.filter(r => r.champ).length, perfect = runs.filter(r => r.w === 82).length;
+    const titles = runs.filter(r => r.champ).length, perfect = runs.filter(r => r.l === 0).length;
     return `
     <div class="hero">
       <div>
-        <h1>Draft <em>10</em>.<br>Coach them to <em>82-0</em>.</h1>
-        <p>Spin a team and a season, pick one player from that roster, and fill two spots at every position. Then coach the season game by game, quarter by quarter: substitutions, tempo, defense, timeouts. Then the playoffs.</p>
+        <h1>Draft <em>10</em>.<br>Coach them to <em>${RL().games}-0</em>.</h1>
+        <p>Spin a team and a season, pick one player from that roster, and fill two spots at every position. Then coach the season game by game, quarter by quarter: substitutions, tempo, defense, timeouts. Then ${S.comp === 'el' ? 'the playoffs and the Final Four' : 'the playoffs'}.</p>
       </div>
       <div class="board">
         <div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">The target</div>
-        <div class="led big num">82&ndash;0</div>
+        <div class="led big num">${RL().games}&ndash;0</div>
         <div class="muted">${S.acct ? (best ? 'Your best: <b class="led">' + best.w + '-' + best.l + '</b> &middot; ' + esc(trRes(best.res)) + ' &middot; ' + titles + ' titles &middot; ' + perfect + ' perfect seasons' : 'No saved seasons yet.') : 'Playing as guest: results are not saved. Sign in with Google to keep your results and achievements.'}</div>
       </div>
     </div>
+    <div class="comps seg" id="comps">${Object.values(COMPS).map(c => `<button class="${S.comp === c.id ? 'on' : ''}" data-a="comp" data-v="${c.id}">${c.name}</button>`).join('')}</div>
     <div class="panel setup">
       <section class="era">
         <div class="eyebrow">Era</div>
-        <div class="yr"><span class="led num" id="yrtxt">${S.from === MIN_Y && S.to === MAX_Y ? 'All-Time' : S.from + ' &ndash; ' + S.to}</span></div>
+        <div class="yr"><span class="led num" id="yrtxt">${S.from === CF().minY && S.to === CF().maxY ? 'All-Time' : S.from + ' &ndash; ' + S.to}</span></div>
         ${rangeHtml()}
-        <div class="presets" id="presets">${PRESETS.map(p => `<button class="pre ${S.from === p[1] && S.to === p[2] ? 'on' : ''} ${p[0] === 'All-Time' ? 'all' : ''}" data-a="preset" data-f="${p[1]}" data-t="${p[2]}"><b>${p[0]}</b><span>${p[1]} &ndash; ${p[2]}</span></button>`).join('')}</div>
+        <div class="presets" id="presets">${CF().presets.map(p => `<button class="pre ${S.from === p[1] && S.to === p[2] ? 'on' : ''} ${p[0] === 'All-Time' ? 'all' : ''}" data-a="preset" data-f="${p[1]}" data-t="${p[2]}"><b>${p[0]}</b><span>${p[1]} &ndash; ${p[2]}</span></button>`).join('')}</div>
         <div class="note" id="eranote" style="margin-top:12px">${eraInfo()}</div>
       </section>
       <section class="side">
@@ -255,7 +263,7 @@
         </div>
         <div class="note" style="margin:10px 0 18px">The season plays exactly the same in both modes. Hard only changes how you draft.</div>
         <button class="btn pri go" data-a="start" id="startbtn" ${S.pool.length < MIN_POOL ? 'disabled' : ''}>Start draft</button><p class="note" id="startErr" role="alert"></p>
-        <div class="note" style="margin-top:8px">Opponents are 29 historical rosters from the same era.</div>
+        <div class="note" style="margin-top:8px">${S.comp === 'el' ? 'Opponents are ' + (RL().teams - 1) + ' EuroLeague rosters from the same era. 38 games, then the top eight go to the playoffs.' : 'Opponents are 29 historical rosters from the same era.'}</div>
       </section>
     </div>
     <div class="two" style="margin-top:18px">
@@ -272,13 +280,13 @@
     if (!S.acct) return '<p class="note">Sign in with Google to save your seasons and achievements.</p>';
     if (!S.runs.length) return '<p class="note">No saved seasons yet.</p>';
     return '<div class="tw"><table><tr><th>Record</th><th>Result</th><th>Mode</th><th class="r">Score</th></tr>' +
-      S.runs.slice(0, 8).map(r => `<tr><td class="num">${r.w}-${r.l}</td><td>${esc(trRes(r.res))}</td><td>${r.hard ? 'Hard' : 'Normal'} &middot; ${esc(r.eraLabel || '')}</td><td class="r num">${r.score}</td></tr>`).join('') + '</table></div>';
+      S.runs.slice(0, 8).map(r => `<tr><td class="num">${r.w}-${r.l}</td><td>${esc(trRes(r.res))}</td><td>${r.comp === 'el' ? 'EL &middot; ' : ''}${r.hard ? 'Hard' : 'Normal'} &middot; ${esc(r.eraLabel || '')}</td><td class="r num">${r.score}</td></tr>`).join('') + '</table></div>';
   }
   function updateRangeUI() {
-    const pc = y => ((y - MIN_Y) / (MAX_Y - MIN_Y) * 100);
+    const pc = y => ((y - CF().minY) / (CF().maxY - CF().minY) * 100);
     const f = document.getElementById('rfill'); if (!f) return;
     f.style.left = pc(S.from) + '%'; f.style.right = (100 - pc(S.to)) + '%';
-    document.getElementById('yrtxt').innerHTML = S.from === MIN_Y && S.to === MAX_Y ? 'All-Time' : S.from + ' &ndash; ' + S.to;
+    document.getElementById('yrtxt').innerHTML = S.from === CF().minY && S.to === CF().maxY ? 'All-Time' : S.from + ' &ndash; ' + S.to;
     document.getElementById('eranote').innerHTML = eraInfo();
     document.getElementById('startbtn').disabled = S.pool.length < MIN_POOL;
     document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', +b.dataset.f === S.from && +b.dataset.t === S.to));
@@ -369,7 +377,7 @@
   const IC_CHK = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 8.3 7.2 10.4 11 5.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const IC_BAD = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.4 5.4l5.2 5.2M10.6 5.4l-5.2 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   // ---------- team report: does the roster have everything a team needs ----------
-  const poolKey = () => S.from + '-' + S.to;
+  const poolKey = () => S.comp + ':' + S.from + '-' + S.to;
   function teamReport(players, title) {
     if (S.hard && !S.revealed) return `<div class="panel rp"><div class="eyebrow">${title}</div><div class="rp-lock">Hidden in Hard mode until the draft is over. The report would give away the stats.</div></div>`;
     const a = Report.analyze(players, S.pool, poolKey());
@@ -491,7 +499,7 @@
     const rows = P.map((p, i) => `<tr><td><div class="rn">${crest(p.fromTm, 20)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}${injOf(i) ? '<span class="inj">Out ' + injOf(i) + '</span>' : ''}</div></div></td>
       <td><span class="pill">${esc(p.slot)}</span></td><td class="r"><span class="ovr ${ovrCls(dp(p))}" style="font-size:20px">${dp(p)}</span></td>
       <td class="r num">${dec(p.ppg)}</td><td class="r num">${dec(p.rpg)}</td><td class="r num">${dec(p.apg)}</td>
-      <td><div class="mrow"><input class="mins" type="range" min="0" max="44" step="1" value="${plan.mins[i]}" data-a="mins" data-i="${i}" aria-label="Minutes for ${esc(p.name)}"><span class="num mv" id="m${i}">${plan.mins[i]}</span></div></td></tr>`).join('');
+      <td><div class="mrow"><input class="mins" type="range" min="0" max="${RL().maxMin}" step="1" value="${plan.mins[i]}" data-a="mins" data-i="${i}" aria-label="Minutes for ${esc(p.name)}"><span class="num mv" id="m${i}">${plan.mins[i]}</span></div></td></tr>`).join('');
     const F = fitOf();
     const recBar = F ? `<div class="recbar"><div><b>Tactics that fit your roster</b><span>${F.best.off || F.best.def ? 'The green-framed options are the ones this roster is built for. They update when you change minutes or starters.' : 'No tactic stands out for this roster right now. Balanced and Man are a safe choice. This updates when you change minutes or starters.'}</span></div>${F.best.off || F.best.def ? `<button class="btn sm pri" data-a="applyrec" ${recMissing(F) ? '' : 'disabled'}>${recMissing(F) ? 'Apply recommended' : 'Applied'}</button>` : ''}</div>` : '';
     return `<div class="coach-grid">
@@ -499,7 +507,7 @@
         <div class="panel"><div class="eyebrow">Starting five</div><div class="five">${five}</div></div>
         <div class="panel" style="margin-top:16px"><div class="eyebrow">Rotation and minutes</div>
           <div class="tw"><table class="rot-t"><tr><th>Player</th><th>Slot</th><th class="r">OVR</th><th class="r">PTS</th><th class="r">REB</th><th class="r">AST</th><th>Target minutes</th></tr>${rows}</table></div>
-          <div class="mtotal ${tot === 240 ? 'ok' : ''}"><span>Total target minutes</span><b class="num"><span id="mtot">${tot}</span> / 240</b></div>
+          <div class="mtotal ${tot === RL().mins ? 'ok' : ''}"><span>Total target minutes</span><b class="num"><span id="mtot">${tot}</span> / ${RL().mins}</b></div>
           <div class="note">Targets steer automatic substitutions. In close late-game situations your best players stay on regardless.</div>
           <div style="margin-top:10px"><button class="btn sm" data-a="resetplan">Reset rotation to recommended</button></div></div>
       </div>
@@ -522,8 +530,8 @@
   // ---------- season hub ----------
   function oppSummary(idx) { const t = S.L.teams[idx], top = t.players.slice().sort((a, b) => b.ovr - a.ovr).slice(0, 3); return { t, top, ovr: E.teamOvr(t, S.L.plans[idx]) }; }
   function standingsHtml() {
-    const L = S.L, all = S.standAll, st = LG.standings(L).filter(x => all || x.conf === L.conf[0]);
-    const tg = `<div class="tabs" style="margin-bottom:8px"><button class="chip ${all ? '' : 'on'}" data-a="stand" data-v="0">My conference</button><button class="chip ${all ? 'on' : ''}" data-a="stand" data-v="1">Full league</button></div>`;
+    const L = S.L, all = S.standAll || L.R.po.conf < 2, st = LG.standings(L).filter(x => all || x.conf === L.conf[0]);
+    const tg = L.R.po.conf < 2 ? '' : `<div class="tabs" style="margin-bottom:8px"><button class="chip ${all ? '' : 'on'}" data-a="stand" data-v="0">My conference</button><button class="chip ${all ? 'on' : ''}" data-a="stand" data-v="1">Full league</button></div>`;
     return tg + `<div class="tw"><table><tr><th>#</th><th>Team</th><th class="r">W</th><th class="r">L</th><th class="r">+/-</th></tr>` +
       st.map((x, i) => `<tr class="${x.i === 0 ? 'me' : ''}"><td>${i + 1}</td><td>${x.i === 0 ? '<b>' + esc(S.teamName) + '</b>' : esc(x.team.label)}</td><td class="r num">${x.w}</td><td class="r num">${x.l}</td><td class="r num">${x.w + x.l ? (x.diff / (x.w + x.l)).toFixed(1) : '0.0'}</td></tr>`).join('') + '</table></div>';
   }
@@ -534,7 +542,7 @@
   }
   function pipsHtml() {
     const L = S.L; let h = '';
-    for (let i = 0; i < 82; i++) { const g = L.userGames[i]; h += `<i class="${g ? (g.win ? 'w' : 'l') : (i === L.userGames.length ? 'n' : '')}" title="Game ${i + 1}"></i>`; }
+    for (let i = 0; i < L.R.games; i++) { const g = L.userGames[i]; h += `<i class="${g ? (g.win ? 'w' : 'l') : (i === L.userGames.length ? 'n' : '')}" title="Game ${i + 1}"></i>`; }
     return `<div class="pips">${h}</div>`;
   }
   function lastGames() {
@@ -566,7 +574,7 @@
   // Big showcase of the honours the user earned this season
   function trophyCase(L) {
     const mine = ((L.awards && L.awards.mine) || []).concat((L.poAwards && L.poAwards.mine) || []);
-    if (L.phase === 'champion') mine.unshift('NBA Champions');
+    if (L.phase === 'champion') mine.unshift(L.R.id === 'el' ? 'EuroLeague Champions' : 'NBA Champions');
     if (!mine.length) return '';
     const icon = s => /Champions/.test(s) ? ['ball', ''] : /Finals MVP|^MVP/.test(s) ? ['cup', ''] : /Defensive Player/.test(s) ? ['shield', ''] : /Coach/.test(s) ? ['clip', ''] : /Scoring/.test(s) ? ['medal', 'PTS'] : /Rebound/.test(s) ? ['medal', 'REB'] : /Assist/.test(s) ? ['medal', 'AST'] : /Steal/.test(s) ? ['medal', 'STL'] : /Block/.test(s) ? ['medal', 'BLK'] : ['star', ''];
     return `<div class="tcase"><div class="eyebrow">Trophy case</div><div class="tc-row">${mine.map(s => { const i = s.indexOf(': '), ic = icon(s); return `<div class="tc">${trophy(ic[0], ic[1], 76)}<div class="tcn">${esc(i > 0 ? s.slice(0, i) : s)}</div>${i > 0 ? `<div class="tcp">${esc(s.slice(i + 2))}</div>` : ''}</div>`; }).join('')}</div></div>`;
@@ -607,7 +615,7 @@
     const L = S.L, r = L.rec[0];
     if (L.phase === 'seasonDone') {
       return `<div class="panel" style="text-align:center;padding:40px 16px"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Regular season complete</div>
-        <div class="rec led num">${r.w}&ndash;${r.l}</div>${r.l === 0 ? '<h2 style="color:var(--good)">Undefeated. 82-0.</h2>' : ''}
+        <div class="rec led num">${r.w}&ndash;${r.l}</div>${r.l === 0 ? '<h2 style="color:var(--good)">Undefeated. ${L.R.games}-0.</h2>' : ''}
         <p class="note">Conference seed: ${LG.standings(L).filter(x => x.conf === L.conf[0]).findIndex(x => x.i === 0) + 1}</p>${pipsHtml()}
         <div style="margin-top:20px"><button class="btn pri" data-a="startpo">Start playoffs</button></div></div>
         ${trophyCase(L)}<div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
@@ -616,16 +624,16 @@
     const g = LG.nextUserGame(L), o = oppSummary(g.opp);
     return `${injBar()}<div class="grid2">
       <div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-end">
-        <div><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">${esc(S.teamName)} &middot; game ${L.day + 1} of 82</div><div class="rec led num">${r.w}&ndash;${r.l}</div></div>
+        <div><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">${esc(S.teamName)} &middot; game ${L.day + 1} of ${L.R.games}</div><div class="rec led num">${r.w}&ndash;${r.l}</div></div>
         <div style="text-align:right"><div class="muted">Win streak</div><div class="led num" style="font-size:46px">${L.streak}</div></div></div>${pipsHtml()}
-        <p class="note" style="margin-top:12px">${r.l > 0 ? 'The undefeated run is over. Keep winning for seeding and the playoffs.' : 'Still undefeated. One loss ends the 82-0 chase.'}</p></div>
+        <p class="note" style="margin-top:12px">${r.l > 0 ? 'The undefeated run is over. Keep winning for seeding and the playoffs.' : 'Still undefeated. One loss ends the ${L.R.games}-0 chase.'}</p></div>
       <div class="panel opp"><div class="vs">${g.userHome ? 'Home vs' : 'Away at'}</div>
         <div class="row" style="flex-wrap:nowrap">${crest(o.t.tm, 44)}<div class="t">${esc(o.t.label)}</div></div>
         <div class="note">${o.top.map(p => esc(p.name) + ' (' + dp(p) + ')').join(' &middot; ')}</div>
         <div class="note">Roster strength <b>${od(o.ovr).toFixed(0)}</b> &middot; yours <b>${od(E.teamOvr(S.user, S.plan)).toFixed(0)}</b></div>
         <div class="ctrl" style="margin-top:4px"><button class="btn pri" data-a="play">Coach this game</button><button class="btn" data-a="quick">Quick sim</button></div>
         <div class="ctrl" style="margin-top:0"><button class="btn sm" data-a="sim10">Sim 10 games</button><button class="btn sm" data-a="simall">Sim to end of season</button><button class="btn sm" data-a="gocoach">Tactics</button>${tradeBtn()}</div></div></div>
-      <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Recent games</div>${lastGames()}</div><div class="panel"><div class="eyebrow">Conference standings</div>${standingsHtml()}</div></div>
+      <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Recent games</div>${lastGames()}</div><div class="panel"><div class="eyebrow">${S.L.R.po.conf < 2 ? 'Standings' : 'Conference standings'}</div>${standingsHtml()}</div></div>
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Season stats</div>${statsHtml()}</div>
       ${teamReport(S.user.players, 'Team report')}`;
   };
@@ -636,9 +644,9 @@
     const nm = i => i === 0 ? esc(S.teamName) : esc(L.teams[i].label);
     const ser = s => `<div class="ser ${s.a === 0 || s.b === 0 ? 'me' : ''}"><div><span>${nm(s.a)}</span><span class="${s.done && s.winner === s.a ? 'w' : ''} num">${s.wa}</span></div><div><span>${nm(s.b)}</span><span class="${s.done && s.winner === s.b ? 'w' : ''} num">${s.wb}</span></div></div>`;
     const tbd = '<div class="ser tbd"><div><span>To be decided</span><span class="num">&ndash;</span></div><div><span>To be decided</span><span class="num">&ndash;</span></div></div>';
-    const cols = [8, 4, 2, 1].map((n, ri) => `<div class="bcol"><div class="eyebrow">${LG.roundName(ri)}</div><div class="bcells">${Array.from({ length: n }, (_, i) => { const s = po.rounds[ri] && po.rounds[ri][i]; return `<div class="bcell ${i % 2 ? 'odd' : 'even'}">${s ? ser(s) : tbd}</div>`; }).join('')}</div></div>`).join('');
+    const cols = L.R.po.rounds.map((_, ri) => (L.R.po.seeds * L.R.po.conf / 2) >> ri).map((n, ri) => `<div class="bcol"><div class="eyebrow">${LG.roundName(ri, L.R)}</div><div class="bcells">${Array.from({ length: n }, (_, i) => { const s = po.rounds[ri] && po.rounds[ri][i]; return `<div class="bcell ${i % 2 ? 'odd' : 'even'}">${s ? ser(s) : tbd}</div>`; }).join('')}</div></div>`).join('');
     const pw = (L.poGames || []).filter(g => g.win).length, pl = (L.poGames || []).filter(g => !g.win).length;
-    return `${injBar()}<div class="grid2"><div class="panel"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Playoffs &middot; ${LG.roundName(po.round)}</div>
+    return `${injBar()}<div class="grid2"><div class="panel"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Playoffs &middot; ${LG.roundName(po.round, L.R)}</div>
       <div class="rec led num">${us ? (us.a === 0 ? us.wa : us.wb) + '&ndash;' + (us.a === 0 ? us.wb : us.wa) : ''}</div>
       <div class="note">Playoff record ${pw}-${pl} &middot; regular season ${L.rec[0].w}-${L.rec[0].l}</div></div>
       <div class="panel opp"><div class="vs">${ng ? 'Game ' + (ng.gameNo + 1) + ' &middot; ' + (ng.userHome ? 'home vs' : 'away at') : ''}</div>
@@ -652,12 +660,12 @@
   function seedOf(L) { const st = LG.standings(L).filter(x => x.conf === L.conf[0]); return st.findIndex(x => x.i === 0) + 1; }
   function pathHtml(L) {
     const po = L.po; if (!po || !L.userInPlayoffs) return '<p class="note">The team did not qualify for the playoffs.</p>';
-    return `<div class="path">` + [0, 1, 2, 3].map(ri => {
+    return `<div class="path">` + L.R.po.rounds.map((_, ri) => {
       const R = po.rounds[ri]; const s = R && R.find(x => x.a === 0 || x.b === 0);
-      if (!s) return `<div class="step na"><div class="sn">${LG.roundName(ri)}</div><div class="sv">Not reached</div></div>`;
+      if (!s) return `<div class="step na"><div class="sn">${LG.roundName(ri, L.R)}</div><div class="sv">Not reached</div></div>`;
       const us = s.a === 0 ? s.wa : s.wb, them = s.a === 0 ? s.wb : s.wa, opp = s.a === 0 ? s.b : s.a;
       const state = !s.done ? 'na' : us > them ? 'win' : 'loss';
-      return `<div class="step ${state}"><div class="sn">${LG.roundName(ri)}</div><div class="sv num">${state === 'win' ? 'Won' : state === 'loss' ? 'Lost' : ''} ${us}-${them}</div><div class="so">vs ${esc(L.teams[opp].label)}</div></div>`;
+      return `<div class="step ${state}"><div class="sn">${LG.roundName(ri, L.R)}</div><div class="sv num">${state === 'win' ? 'Won' : state === 'loss' ? 'Lost' : ''} ${us}-${them}</div><div class="so">vs ${esc(L.teams[opp].label)}</div></div>`;
     }).join('') + '</div>';
   }
   SCREENS.end = () => {
@@ -684,8 +692,8 @@
         ${tile('Longest win streak', L.longestW, 'games in a row')}
         ${tile('Average margin', (margin > 0 ? '+' : '') + margin.toFixed(1), 'points per game')}
         ${tile('Scoring', (r.pf / G).toFixed(1), 'allowed ' + (r.pa / G).toFixed(1))}
-        ${tile('Conference seed', '#' + seedOf(L), 'out of 15 teams')}
-        ${tile('Playoff record', pw + '-' + pl, L.userInPlayoffs ? 'best of 7 series' : 'did not qualify')}
+        ${tile(L.R.po.conf < 2 ? 'League position' : 'Conference seed', '#' + seedOf(L), 'out of ' + (L.R.po.conf < 2 ? L.R.teams : L.R.teams / 2) + ' teams')}
+        ${tile('Playoff record', pw + '-' + pl, L.userInPlayoffs ? (L.R.id === 'el' ? 'playoffs and Final Four' : 'best of 7 series') : 'did not qualify')}
       </div>
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff run</div>${pathHtml(L)}</div>
       <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Achievements</div>${ach.length ? ach.map(x => `<div class="ach"><div><b>${x[0]}</b><div class="note">${x[1]}</div></div></div>`).join('') : '<p class="note">No achievements this time. Try a tighter rotation.</p>'}</div>
@@ -754,7 +762,7 @@
     if (live.tab === 'rot') {
       const order = P.map((_, i) => i).sort((a, b) => (on.includes(b) - on.includes(a)) || (P[b].ovr - P[a].ovr));
       body = `<div class="note" style="margin-bottom:8px">${open ? 'Click a bench player, then a player on the floor to swap them.' : 'Locked until the next break or timeout.'}</div><div class="rot ${open ? '' : 'lock'}">` + order.map(i => {
-        const p = P[i], s = st[i], e = Math.round(en[i]), out = s.pf >= 6, hurt = !!(G.out && G.out[side][i]);
+        const p = P[i], s = st[i], e = Math.round(en[i]), out = s.pf >= G.R.fo, hurt = !!(G.out && G.out[side][i]);
         return `<div class="pl ${on.includes(i) ? 'on' : ''} ${live.sel === i ? 'pick' : ''} ${out ? 'out' : ''}" data-a="pl" data-i="${i}">
           <div class="a"><span>${esc(p.name)}</span><span class="pill">${esc(p.slot)}</span>${hurt ? '<span class="inj">Injured</span>' : ''}</div><div class="b">${s.pts} pts</div>
           <div class="c"><div class="bar ${e < 35 ? 'low' : e < 60 ? 'mid' : ''}"><i style="width:${e}%"></i></div><span>${Math.round(s.sec / 60)}' &middot; ${s.reb}r ${s.ast}a &middot; ${hurt ? 'out for this game' : `<span class="${s.pf >= 4 ? 'fl' : ''}">${s.pf}pf</span>`}</span></div></div>`;
@@ -932,14 +940,25 @@
     'Wilt Chamberlain grabbed 55 rebounds in a single game in 1960.',
     'Chamberlain averaged 50.4 points per game in 1961-62.'
   ];
+  const FACTS_EL = [
+    'The EuroLeague Final Four has decided the champion since 1988.',
+    'Real Madrid holds the record for the most European club titles.',
+    'EuroLeague games last 40 minutes, four quarters of ten.',
+    'The EuroLeague three-point line sits 6.75 metres from the basket.',
+    'Under FIBA rules a player fouls out on his fifth personal foul.',
+    'The current format has 20 clubs and a 38-game regular season.',
+    'Each club gets five team fouls per quarter before the opponent shoots bonus free throws.',
+    'The game was called the European Champions Cup before it became the EuroLeague.',
+    'A single bad quarter matters more in a 38-game season than in an 82-game one.'
+  ];
   const simFact = { base: 0, t0: 0 };
   function simPanel(L) {
     const g = L.userGames, n = g.length, r = L.rec[0], last = g.slice(-12), lg = g[n - 1];
     const pips = last.map(x => `<i class="pip ${x.win ? 'w' : 'l'}">${x.win ? 'W' : 'L'}</i>`).join('');
-    const fact = FACTS[(simFact.base + Math.floor((performance.now() - simFact.t0) / 6500)) % FACTS.length], opp = lg && L.teams[lg.opp];
-    return `<div class="simp"><div class="simp-top"><span class="eyebrow">Simulating the season</span><span class="simp-n num">Game ${n} of 82</span></div>
+    const FL = S.comp === 'el' ? FACTS_EL : FACTS, fact = FL[(simFact.base + Math.floor((performance.now() - simFact.t0) / 6500)) % FL.length], opp = lg && L.teams[lg.opp];
+    return `<div class="simp"><div class="simp-top"><span class="eyebrow">Simulating the season</span><span class="simp-n num">Game ${n} of ${L.R.games}</span></div>
       <div class="simp-rec led num">${r.w}<small>&ndash;</small>${r.l}</div>
-      <div class="simp-bar"><div style="width:${Math.round(n / 82 * 100)}%"></div></div>
+      <div class="simp-bar"><div style="width:${Math.round(n / L.R.games * 100)}%"></div></div>
       <div class="simp-pips">${pips}</div>
       ${lg ? `<div class="simp-last ${lg.win ? 'w' : 'l'}"><b>${lg.win ? 'W' : 'L'}</b><span>${lg.home ? 'vs' : '@'} ${esc(opp ? opp.label : '')}</span><b class="num">${lg.us}-${lg.them}${lg.ot ? ' OT' : ''}</b></div>` : ''}
       <div class="simp-fact"><small>Did you know</small>${esc(fact)}</div></div>`;
@@ -962,17 +981,22 @@
     rules() {
       document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box"><h2>Rules</h2>
       <p><b>Draft.</b> Ten times, spin a random team and season from your chosen era and take one player from that roster. Every position (PG, SG, SF, PF, C) needs exactly two players. Versatile players can fill more than one position. You get 2 re-spins. Hard mode hides stats and overalls, with one Scout to reveal a full roll.</p>
-      <p><b>Season.</b> 82 games against 29 strong historical rosters from the same era. You coach games possession by possession. Play pauses at the end of each quarter and when the opponent goes on a run or your player picks up a fifth foul.</p>
+      <p><b>Season.</b> ${RL().games} games against ${RL().teams - 1} strong historical rosters from the same era${S.comp === 'el' ? ' (EuroLeague rules: 40-minute games, five fouls to foul out, one table of 20 clubs)' : ''}. You coach games possession by possession. Play pauses at the end of each quarter and when the opponent goes on a run or your player picks up a fifth foul.</p>
       <p><b>Coaching.</b> Starting five, target minutes, tempo, offense and defense. During a game you can change things at quarter breaks and during timeouts: substitutions, tactics, feeding the ball to a player, doubling a star. Timeouts also restore energy and stop runs. Players tire and foul out.</p>
       <p><b>Moments.</b> When you coach a game step by step, play pauses a few times: a matchup duel in each half, and a coach's call in a close finish, in overtime, after a long scoring drought or when the opponent goes on a big run. The right read is worth about a point a moment, a guess is worth nothing, and skipping costs nothing. Quick sims have no moments.</p>
       <p><b>Injuries.</b> Now and then one of your players is hurt for one to three games, never more than one at a time. He sits out in quick sims and coached games alike, and the rotation covers for him.</p>
       <p><b>Trades.</b> Until game 55 you can make up to two trades from the hub: choose a player to give up and pick one of three offers of similar quality from your era. The new player takes the old one's minutes and spot. A trade cannot be undone.</p>
-      <p><b>Playoffs.</b> Top eight in each conference, best-of-seven series up to the Finals.</p>
+      <p><b>Playoffs.</b> ${S.comp === 'el' ? 'The top eight of the table play best-of-five quarterfinals, then the Final Four: two single-game semifinals and the final on neutral ground.' : 'Top eight in each conference, best-of-seven series up to the Finals.'}</p>
       <p><b>Saving.</b> Results and achievements are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID and your finished seasons, nothing else. <button class="btn sm" data-a="delacct">Delete my account and data</button></p>
       <div class="ctrl"><button class="btn pri" data-a="closemodal">Close</button></div></div></div>`);
     },
     closemodal() { closeModal(); },
     preset(d) { S.from = +d.f; S.to = +d.t; setPool(); updateRangeUI(); const a = document.getElementById('rf'), b = document.getElementById('rt'); if (a) { a.value = S.from; b.value = S.to; } },
+    async comp(d) {
+      if (S.comp === d.v || S.starting) return;
+      S.comp = d.v; await ensureData();
+      S.from = CF().from; S.to = CF().to; setPool(); await loadProfile(); render();
+    },
     hard(d) { S.hard = d.v === '1'; document.querySelectorAll('.mode').forEach((m, i) => m.classList.toggle('on', (i === 1) === S.hard)); },
     async start() {
       setPool(); if (S.pool.length < MIN_POOL || S.starting) return;
@@ -980,7 +1004,7 @@
       if (S.acct) {                               // signed in: the draft lives on the server so results can be verified
         S.starting = true;
         try {
-          const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'start', hard: S.hard, from: S.from, to: S.to, ver: Core.VERSION }) });
+          const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'start', comp: S.comp, hard: S.hard, from: S.from, to: S.to, ver: Core.VERSION }) });
           S.D.id = r.id;
         } catch (e) {
           S.starting = false;
@@ -1017,7 +1041,7 @@
       D.round++; D.sel = null; D.cur = null; D.phase = 'idle'; D.reel = null;
       if (D.round >= 10) {
         S.revealed = true; S.seed = D.id ? seed : newSeed();
-        S.user = E.userTeam(D.picks, S.teamName); S.plan = E.defaultPlan(S.user);
+        S.user = E.userTeam(D.picks, S.teamName); S.plan = E.defaultPlan(S.user, RL());
         go('prep');
       } else render();
     },
@@ -1040,10 +1064,10 @@
       if (F.best.def) S.plan.def = F.best.def;
       refreshCoach();
     },
-    resetplan() { const k = { t: S.plan.tempo, o: S.plan.off, d: S.plan.def, a: S.plan.auto }; const np = E.defaultPlan(S.user); np.tempo = k.t; np.off = k.o; np.def = k.d; np.auto = k.a; Object.assign(S.plan, np); refreshCoach(); },
+    resetplan() { const k = { t: S.plan.tempo, o: S.plan.off, d: S.plan.def, a: S.plan.auto }; const np = E.defaultPlan(S.user, RL()); np.tempo = k.t; np.off = k.o; np.def = k.d; np.auto = k.a; Object.assign(S.plan, np); refreshCoach(); },
     beginSeason() {
       const nm = document.getElementById('tname'); if (nm && nm.value.trim()) S.teamName = nm.value.trim();
-      const SE = Core.createSeason({ picks: S.D.picks, pool: S.pool, seed: S.seed, hard: S.hard, name: S.teamName });
+      const SE = Core.createSeason({ picks: S.D.picks, pool: S.pool, seed: S.seed, hard: S.hard, name: S.teamName, comp: S.comp });
       Object.assign(SE.plan, { starters: S.plan.starters.slice(), mins: S.plan.mins.slice(), tempo: S.plan.tempo, off: S.plan.off, def: S.plan.def, auto: S.plan.auto });
       SE.user.name = SE.user.label = S.teamName;
       S.SE = SE; S.L = SE.L; S.user = SE.user; S.plan = SE.plan; S.saved = false; S.lastRun = null; S.verdict = null;
@@ -1064,7 +1088,7 @@
     play() { beginGame(Core.beginLive(S.SE, false)); },
     quick() { Core.quick(S.SE); go('hub'); },
     sim10() { chunkSim(10); },
-    simall() { chunkSim(82); },
+    simall() { chunkSim(S.L.R.games); },
     startpo() { Core.startPlayoffs(S.SE); S.saved = false; routeByPhase(); },
     playpo() { beginGame(Core.beginLive(S.SE, true)); },
     quickpo() { Core.quickPo(S.SE); routeByPhase(); },
@@ -1081,7 +1105,7 @@
     pl(d) {
       if (!canCoach()) return locked();
       const G = S.G, live = S.live, side = mySide(), i = +d.i, on = G.on[side];
-      if (G.st[side][i].pf >= 6) return;
+      if (G.st[side][i].pf >= G.R.fo) return;
       if (live.sel == null) { live.sel = i; renderSide(); return; }
       if (live.sel === i) { live.sel = null; renderSide(); return; }
       const a = live.sel, aOn = on.includes(a), bOn = on.includes(i);
@@ -1147,10 +1171,13 @@
     }
   });
 
-  fetch('data.json').then(r => r.json()).then(D => {
+  async function ensureData() {
+    const c = S.comp;
+    if (!S.cache[c]) { const D = await (await fetch(CF().file)).json(); S.cache[c] = Core.mkTeams(D); }
+    S.teams = S.cache[c]; S.byId = new Map(S.teams.map(t => [t.id, t]));
+  }
+  ensureData().then(() => {
     Report.setCore(Core, E);
-    S.teams = Core.mkTeams(D);
-    S.byId = new Map(S.teams.map(t => [t.id, t]));
     setPool(); S.screen = 'menu'; render(); initAccount();
   }).catch(err => { app.innerHTML = '<div class="loading">Could not load data: ' + esc(err.message) + '</div>'; });
   window.__S = S; window.__dp = dp;

@@ -7,19 +7,20 @@ import { ApiError, opStart, opSpin, opPick, opState, opSubmit } from '../lib/dra
 import { memStore } from './helpers/memstore.js';
 
 // Drives the real client (app.js + core.js) in jsdom against the real server logic (in-memory store), signed in.
-async function run(signedIn) {
+async function run(signedIn, comp = 'nba') {
   const dir = new URL('../public/', import.meta.url), store = memStore(), calls = [];
   const html = readFileSync(new URL('index.html', dir), 'utf8').replace(/<script src="[^"]+"><\/script>/g, '').replace(/<link[^>]+googleapis[^>]*>/g, '');
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/', pretendToBeVisual: true });
-  const w = dom.window, data = readFileSync(new URL('data.json', dir), 'utf8');
+  const w = dom.window, data = { nba: readFileSync(new URL('data.json', dir), 'utf8'), el: readFileSync(new URL('data-el.json', dir), 'utf8') };
   w.setTimeout = (f) => setTimeout(f, 0);
   w.alert = () => {}; if (!w.crypto || !w.crypto.getRandomValues) Object.defineProperty(w, 'crypto', { value: globalThis.crypto });
   const json = (status, body) => ({ ok: status < 400, status, json: async () => body });
   w.fetch = async (u, o = {}) => {
     u = String(u);
-    if (u.startsWith('data.json')) return json(200, JSON.parse(data));
+    if (u.startsWith('data.json')) return json(200, JSON.parse(data.nba));
+    if (u.startsWith('data-el.json')) return json(200, JSON.parse(data.el));
     if (u === '/api/me') return signedIn ? json(200, { user: { id: 'u1', name: 'Test U.' } }) : json(401, {});
-    if (u === '/api/leaderboard') return json(200, { board: [] });
+    if (u.startsWith('/api/leaderboard')) return json(200, { board: [] });
     if (u === '/api/runs' && (!o.method || o.method === 'GET')) return json(200, { runs: [] });
     const b = o.body ? JSON.parse(o.body) : {};
     try {
@@ -37,6 +38,8 @@ async function run(signedIn) {
   const until = async (fn, what) => { for (let i = 0; i < 600; i++) { if (fn()) return; await tick(10); } assert.fail('timeout: ' + what); };
   await until(() => /Start draft/.test(doc.getElementById('app').innerHTML), 'menu');
   await tick(50);
+  if (comp === 'el') { click('[data-a=comp][data-v=el]'); await until(() => w.__S.comp === 'el' && /EuroLeague rosters/.test(doc.getElementById('app').innerHTML), 'EuroLeague menu'); }
+  if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elmenu.html', '<!doctype html>' + doc.documentElement.outerHTML);
   click('[data-a=start]');
   await until(() => /Draft &middot; pick|Draft · pick/.test(doc.getElementById('app').innerHTML), 'draft screen');
   for (let k = 0; k < 10; k++) {
@@ -93,6 +96,7 @@ async function run(signedIn) {
     await tick(5);
   }
   await until(() => doc.querySelector('[data-a=newgame]'), 'end screen');
+  if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elend.html', '<!doctype html>' + doc.documentElement.outerHTML);
   await until(() => !/Verifying/.test(doc.getElementById('saveInfo').textContent), 'verdict');
   return { text: doc.getElementById('saveInfo').textContent, calls, store, S: w.__S };
 }
@@ -110,4 +114,12 @@ test('guest: plays locally, nothing is sent to the server', async () => {
   const r = await run(false);
   assert.match(r.text, /Sign in with Google/);
   assert.deepEqual(r.calls, []);
+});
+test('EuroLeague: draft, 38-game season, playoffs and Final Four are verified by replay', async () => {
+  const r = await run(true, 'el');
+  assert.match(r.text, /verified and saved/);
+  assert.equal(r.store.runs.length, 1);
+  assert.equal(r.store.runs[0].comp, 'el');
+  assert.equal(r.S.L.R.games, 38);
+  assert.equal(r.store.runs[0].wins, r.S.L.rec[0].w, 'client and server agree on the record');
 });

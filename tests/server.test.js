@@ -133,3 +133,23 @@ test('a draft that is not finished cannot be submitted', async () => {
   const { id } = await opStart(store, U, { hard: false, from: 1990, to: 2012, ver: sim.version });
   await rejects(opSubmit(store, U, { id, log: [] }), 409);
 });
+test('EuroLeague: the whole draft and season are driven and verified through the same server code', async () => {
+  const S2 = loadSim('el'), C2 = S2.Core, store = memStore();
+  const { id } = await opStart(store, U, { hard: false, from: 2016, to: 2026, ver: S2.version, comp: 'el' });
+  const recs = [];
+  for (let k = 0; k < 10; k++) {
+    const roll = await opSpin(store, U, { id }), t = S2.byId.get(roll.team);
+    assert.ok(t, 'rolled team belongs to the EuroLeague pool');
+    const have = []; recs.forEach(r => have.push(C2.makePick(have, S2.byId.get(r.t), r.i, r.p)));
+    const [, i] = t.players.map((p, i) => [p, i]).filter(([p, i]) => C2.makePick(have, t, i, null)).sort((a, b) => b[0].ovr - a[0].ovr)[0];
+    const out = await opPick(store, U, { id, i, pos: null }); recs.push({ t: t.id, i, p: null });
+    if (k === 9) { var seed = out.seed; assert.equal(out.done, true); }
+  }
+  const picks = []; recs.forEach(r => picks.push(C2.makePick(picks, S2.byId.get(r.t), r.i, r.p)));
+  const SE = C2.createSeason({ picks, pool: C2.poolOf(S2.teams, 2016, 2026), seed, hard: false, name: 'My Team', comp: 'el' });
+  while (SE.L.phase === 'season') C2.quick(SE);
+  C2.startPlayoffs(SE); while (SE.L.phase === 'playoffs') C2.quickPo(SE);
+  const out = await opSubmit(store, U, { id, log: SE.log });
+  assert.equal(out.summary.w + out.summary.l, 38); assert.equal(store.runs[0].comp, 'el');
+  assert.equal(out.summary.w, SE.L.rec[0].w);
+});

@@ -140,7 +140,15 @@
     return five;
   }
 
-  function defaultPlan(team) {
+  // Competition rules. Everything the engine needs to know about the league it is playing in; the NBA numbers are the defaults.
+  const RULES = {
+    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
+      po: { conf: 2, seeds: 8, rounds: [{ name: 'First Round', need: 4 }, { name: 'Conference Semifinals', need: 4 }, { name: 'Conference Finals', need: 4 }, { name: 'NBA Finals', need: 4 }], confMvp: true } },
+    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
+      po: { conf: 1, seeds: 8, rounds: [{ name: 'Quarterfinals', need: 3 }, { name: 'Final Four semifinals', need: 1, neutral: true }, { name: 'Final', need: 1, neutral: true }], confMvp: false } }
+  };
+  function defaultPlan(team, R) {
+    R = R || RULES.nba;
     const P = team.players, n = P.length;
     const order = P.map((_, i) => i);
     let starters, mins = new Array(n).fill(0);
@@ -148,14 +156,14 @@
       starters = bestFive(P);   // pet najboljih po oceni, uz bar jednog beka i jednog visokog
       const rest = order.filter(i => !starters.includes(i)).sort((a, b) => P[b].ovr - P[a].ovr);
       const ord = starters.slice().sort((a, b) => P[b].ovr - P[a].ovr).concat(rest);
-      const tg = [34, 33, 32, 30, 29, 24, 20, 16, 12, 10];
+      const tg = R.tg;
       ord.forEach((i, k) => mins[i] = tg[k] || 0);
     } else {
       // istorijski timovi: prvih 5 po minutaži; minute ~ stvarni mpg, normalizovano na 240
       starters = order.slice(0, 5);
-      const raw = order.map(i => (i < 10 ? Math.min(P[i].mpg, 40) : 0));
+      const raw = order.map(i => (i < 10 ? Math.min(P[i].mpg, R.maxMin - 8) : 0));
       const s = raw.reduce((a, b) => a + b, 0) || 1;
-      mins = raw.map(v => Math.round(v * 240 / s));
+      mins = raw.map(v => Math.round(v * R.mins / s));
     }
     return { starters, mins, tempo: 'normal', off: 'balanced', def: 'man', auto: 'auto' };
   }
@@ -172,11 +180,12 @@
   function newGame(teams, plans, opts) {
     opts = opts || {};
     const r = opts.rng || (opts.seed != null ? mulberry32(opts.seed) : Math.random);
+    const R = opts.rules || RULES.nba;
     const G = {
-      r, teams, plans, fast: !!opts.fast,
-      q: 1, clock: 720, score: [0, 0], qs: [[], []], qStart: [0, 0],
+      r, teams, plans, R, fast: !!opts.fast,
+      q: 1, clock: R.q, score: [0, 0], qs: [[], []], qStart: [0, 0],
       poss: r() < 0.5 ? 0 : 1, firstPoss: null, over: false, ot: 0,
-      mom: [0, 0], to: [7, 7], tf: [0, 0], feed: [null, null], feedLeft: [0, 0], dbl: [null, null],
+      mom: [0, 0], to: [R.to, R.to], tf: [0, 0], feed: [null, null], feedLeft: [0, 0], dbl: [null, null],
       fb: false, putback: false, elapsed: 0, sinceSub: [0, 0], runPts: [0, 0], bo: [{ n: 0, p: 0, dp: 0 }, { n: 0, p: 0, dp: 0 }],
       log: [], st: [], en: [], form: [], tform: [0, 0], es: [1, 1], heat: [], on: [], sub: [0, 0]
     };
@@ -235,7 +244,7 @@
     const A = agg(G, o), D = agg(G, d);
 
     // trajanje poseda
-    let dur = tp.dur * (G.putback ? 0.5 : 1) * (0.6 + 0.8 * G.r());
+    let dur = tp.dur * G.R.dur * (G.putback ? 0.5 : 1) * (0.6 + 0.8 * G.r());
     // tempo diktira onaj ko je brži (delimično)
     dur *= 0.8 + 0.2 * (tpD.dur / 13.2);
     dur = clamp(dur, 3, 24);
@@ -277,7 +286,7 @@
 
     // ---- gubitak lopte ----
     const defPress = pd.def === 'press' ? T.prTov + T.prS * (D.stl - 1.13) : 0;
-    let pT = 0.128 * (1 + K.kTov * (S.tov - 1)) * (1 + (K.hndT - 1) * A.hl) * (1 + 0.45 * (D.e.stl - 1)) + defPress + tp.tov + (isFB ? -0.02 : 0)
+    let pT = 0.128 * G.R.tov * (1 + K.kTov * (S.tov - 1)) * (1 + (K.hndT - 1) * A.hl) * (1 + 0.45 * (D.e.stl - 1)) + defPress + tp.tov + (isFB ? -0.02 : 0)
       + (G.dbl[d] === pi ? 0.045 : 0) + TR.lockT * (D.tr.lockdown || 0);
     pT *= 1 - TR.maestroT * Math.min(A.tr.maestro || 0, 1.4);
     pT = clamp(pT, 0.03, 0.32);
@@ -298,7 +307,7 @@
     const r3 = clamp(S.r3 * (po.off === 'threes' ? 1.32 : po.off === 'inside' ? 0.62 : 1) * (pd.def === 'zone' ? 1.10 : 1), 0, 0.85);
     const is3 = G.r() < r3;
 
-    let pFoul = 0.082 * (1 + K.kFtr * (S.ftr - 1)) * (1 + K.kPf * (D.pf - 1)) * (po.off === 'inside' ? T.inFoul : po.off === 'threes' ? T.thFoul : 1)
+    let pFoul = 0.082 * G.R.pf * (1 + K.kFtr * (S.ftr - 1)) * (1 + K.kPf * (D.pf - 1)) * (po.off === 'inside' ? T.inFoul : po.off === 'threes' ? T.thFoul : 1)
       * (pd.def === 'press' ? T.prFoul : pd.def === 'zone' ? T.znFoul : 1) * (is3 ? 0.30 : 1) * (isFB ? 1.1 : 1) * (traitCfg.on && ST && ST.k === 'magnet' ? 1 + TR.magnet * ST.s : 1);
     pFoul = clamp(pFoul, 0, 0.45);
     const sq = tp.sq;
@@ -329,7 +338,7 @@
       if (pd.def === 'zone' && is3) p -= (T.zn3 + T.zn3S * (A.spc - 1.6)) * TR.zoneCut * Math.min(sn, 1);
       if (ST && ST.k === 'scorer') {
         p += TR.scorerP * ST.s;
-        if (G.q >= 4 && G.clock < 300 && Math.abs(G.score[o] - G.score[d]) <= 8) p += TR.scorerLate * ST.s;
+        if (G.q >= 4 && G.clock < G.R.late && Math.abs(G.score[o] - G.score[d]) <= 8) p += TR.scorerLate * ST.s;
       }
     }
     p -= 0.08 * Math.pow(1 - eo[pi] / 100, 1.4);
@@ -418,7 +427,7 @@
   function foul(G, t, pj, shooting) {
     const s = G.st[t][pj]; s.pf++; G.tf[t]++;
     ev(G, { k: 'foul', t, p: pj, sh: shooting, n: s.pf });
-    if (s.pf >= 6) forcedOut(G, t, pj);
+    if (s.pf >= G.R.fo) forcedOut(G, t, pj);
   }
   function forcedOut(G, t, pj) {
     ev(G, { k: 'out', t, p: pj });
@@ -503,9 +512,9 @@
       G.tf[t] = 0; G.to[t] = G.q === 4 ? G.to[t] : G.to[t];
     }
     G.mom = [0, 0];
-    if (G.q >= 4) { G.q++; G.ot++; G.clock = 300; G.poss = G.r() < 0.5 ? 0 : 1; }
+    if (G.q >= 4) { G.q++; G.ot++; G.clock = G.R.ot; G.poss = G.r() < 0.5 ? 0 : 1; }
     else {
-      G.q++; G.clock = 720;
+      G.q++; G.clock = G.R.q;
       G.poss = G.q === 2 ? 1 - G.firstPoss : G.q === 3 ? 1 - G.firstPoss : G.firstPoss;
     }
     G.fb = false; G.putback = false;
@@ -518,7 +527,7 @@
     const pos = on.indexOf(outIdx); if (pos < 0) return false;
     let best = -1, bv = -1e9;
     for (let i = 0; i < P.length; i++) {
-      if (on.indexOf(i) >= 0 || G.st[t][i].pf >= 6) continue;
+      if (on.indexOf(i) >= 0 || G.st[t][i].pf >= G.R.fo) continue;
       const v = P[i].ovr * (0.6 + 0.4 * G.en[t][i] / 100) + (G.plans[t].mins[i] > 0 ? 6 : -15);
       if (v > bv) { bv = v; best = i; }
     }
@@ -531,18 +540,18 @@
   function wantScore(G, t, i, mode) {
     const P = G.teams[t].players, pl = P[i], plan = G.plans[t], s = G.st[t][i];
     const e = G.en[t][i];
-    if (s.pf >= 6) return -1e9;
-    const el = G.q > 4 ? 2880 : (G.q - 1) * 720 + (720 - G.clock);
+    if (s.pf >= G.R.fo) return -1e9;
+    const TOT = 4 * G.R.q, el = G.q > 4 ? TOT : (G.q - 1) * G.R.q + (G.R.q - G.clock);
     const target = (plan.mins[i] || 0) * 60;
     if (target <= 0 && mode !== 'clutch') return -1e3;
-    const desired = target * Math.min(1, el / 2880);
+    const desired = target * Math.min(1, el / TOT);
     const deficit = (desired - s.sec) / 60;       // minuta
     let v;
     if (mode === 'clutch') v = pl.ovr * 0.9 + e * 0.12;
     else if (mode === 'garbage') v = (plan.starters.indexOf(i) >= 0 ? -25 : 18) + e * 0.15 + pl.ovr * 0.05;
     else v = deficit * 3.2 + pl.ovr * 0.30 + e * 0.30;
     // foul trouble
-    const fl = s.pf;
+    const fl = s.pf + (6 - G.R.fo);          // a five-foul league reaches trouble one foul earlier
     const lim = G.q <= 1 ? 2 : G.q === 2 ? 3 : G.q === 3 ? 4 : 5;
     if (fl > lim) v -= 14 * (fl - lim);
     if (e < 38) v -= (38 - e) * 1.1;
@@ -553,10 +562,10 @@
     if (plan.auto === 'manual' && !G.aiTeam?.[t]) { forceFix(G, t); return; }
     if (plan.auto === 'forced' && !startOfQ) { forceFix(G, t); return; }
     const P = G.teams[t].players, on = G.on[t];
-    const el = G.q > 4 ? 2880 : (G.q - 1) * 720 + (720 - G.clock);
+    const el = G.q > 4 ? 4 * G.R.q : (G.q - 1) * G.R.q + (G.R.q - G.clock);
     const margin = Math.abs(G.score[0] - G.score[1]);
     let mode = 'normal';
-    if (G.q >= 4 && G.clock <= 300 && margin <= 10) mode = 'clutch';
+    if (G.q >= 4 && G.clock <= G.R.late && margin <= 10) mode = 'clutch';
     else if (G.q === 4 && G.clock <= 400 && margin >= 22) mode = 'garbage';
     else if (G.q > 4) mode = 'clutch';
     const all = P.map((_, i) => i);
@@ -584,7 +593,7 @@
   function balanced(P, ix) { return ix.some(i => P[i].guard) && ix.some(i => P[i].big); }
   function forceFix(G, t) {
     const on = G.on[t];
-    for (let k = 0; k < 5; k++) if (G.st[t][on[k]].pf >= 6) replace(G, t, on[k], true);
+    for (let k = 0; k < 5; k++) if (G.st[t][on[k]].pf >= G.R.fo) replace(G, t, on[k], true);
   }
   function manageSubs(G) {
     for (let t = 0; t < 2; t++) {
@@ -619,7 +628,7 @@
   function setLineup(G, t, five) {
     const s = new Set(five);
     if (s.size !== 5) return false;
-    for (const i of five) if (G.st[t][i].pf >= 6) return false;
+    for (const i of five) if (G.st[t][i].pf >= G.R.fo) return false;
     const before = G.on[t].slice();
     G.on[t] = five.slice();
     five.forEach(i => { if (before.indexOf(i) < 0) { G.sub[t]++; ev(G, { k: 'sub', t, p: i, o: before.find(b => five.indexOf(b) < 0), forced: false, manual: true }); } });
@@ -629,7 +638,7 @@
   function markOut(G, t, idxs) {
     G.out = G.out || [[], []];
     const n = G.log.length, sub = G.sub[t];
-    for (const i of idxs) { G.out[t][i] = 1; G.st[t][i].pf = 6; }
+    for (const i of idxs) { G.out[t][i] = 1; G.st[t][i].pf = G.R.fo; }
     for (const i of idxs) if (G.on[t].indexOf(i) >= 0) replace(G, t, i, true);
     G.log.length = n; G.sub[t] = sub;
   }
@@ -675,7 +684,7 @@
   function boost(G, t, p, dp, n) { G.bo[t] = { n, p, dp }; }
 
   return {
-    agg, boost, K, T, TR, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
+    agg, boost, K, T, TR, RULES, TRAITS, traitOf, traitCfg, CRED, coreOf, POS, SLOTS, eligible, assign, canAdd, mulberry32, clamp, TEMPO, OFFENSE, DEFENSE,
     mkPlayer, mkTeam, userTeam, defaultPlan, bestFive, teamOvr,
     newGame, step, simQuarter, simGame, possession,
     setLineup, callTimeout, feedPlayer, doubleTeam, describe, subReview, markOut

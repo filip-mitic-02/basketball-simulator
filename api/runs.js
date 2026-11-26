@@ -4,14 +4,14 @@ import { sql } from '../lib/db.js';
 import { pgStore } from '../lib/store.js';
 import { ApiError, opSubmit } from '../lib/draftlogic.js';
 
-const shape = r => ({ ts: new Date(r.created_at).getTime(), w: r.wins, l: r.losses, res: r.result, hard: r.hard, eraLabel: r.era_label, score: r.score, champ: r.champion, verified: !!r.verified });
+const shape = r => ({ ts: new Date(r.created_at).getTime(), w: r.wins, l: r.losses, res: r.result, hard: r.hard, eraLabel: r.era_label, score: r.score, champ: r.champion, verified: !!r.verified, comp: r.comp || 'nba' });
 
 export default async function handler(req, res) {
   try {
     const id = await currentUserId(req);
     if (!id) return send(res, 401, { error: 'auth' });
     if (req.method === 'GET') {
-      const rows = await sql()`select created_at, wins, losses, result, hard, era_label, score, champion, verified
+      const rows = await sql()`select created_at, comp, wins, losses, result, hard, era_label, score, champion, verified
         from runs where user_id = ${id} order by created_at desc limit 60`;
       return send(res, 200, { runs: rows.map(shape) });
     }

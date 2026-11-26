@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-24.7';
+  const VERSION = 'sim-2026-11-25.2';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -70,10 +70,11 @@
   const cloneJ = x => JSON.parse(JSON.stringify(x));
   const planOf = p => ({ starters: p.starters.slice(), mins: p.mins.slice(), tempo: p.tempo, off: p.off, def: p.def, auto: p.auto });
   const isIdx = (v, n) => Number.isInteger(v) && v >= 0 && v < n;
-  function validPlan(pl, n) {
+  function validPlan(pl, n, R) {
+    R = R || E.RULES.nba;
     if (!pl || typeof pl !== 'object') return false;
     if (!Array.isArray(pl.starters) || pl.starters.length !== 5 || new Set(pl.starters).size !== 5 || !pl.starters.every(i => isIdx(i, n))) return false;
-    if (!Array.isArray(pl.mins) || pl.mins.length !== n || !pl.mins.every(m => Number.isInteger(m) && m >= 0 && m <= 48)) return false;
+    if (!Array.isArray(pl.mins) || pl.mins.length !== n || !pl.mins.every(m => Number.isInteger(m) && m >= 0 && m <= R.maxMin)) return false;
     return Object.prototype.hasOwnProperty.call(E.TEMPO, pl.tempo) && E.OFFENSE.includes(pl.off) && E.DEFENSE.includes(pl.def) && PLAN_AUTO.includes(pl.auto);
   }
 
@@ -81,10 +82,11 @@
   // Every action that can change a result goes through this object and is appended to `log`.
   function createSeason(o) {
     const user = E.userTeam(o.picks.slice(), o.name);
-    const plan = E.defaultPlan(user);
-    const L = LG.create(user, o.pool, { rng: E.mulberry32(o.seed >>> 0), seed: o.seed >>> 0 });
+    const R = E.RULES[o.comp || 'nba'] || E.RULES.nba;
+    const plan = E.defaultPlan(user, R);
+    const L = LG.create(user, o.pool, { rng: E.mulberry32(o.seed >>> 0), seed: o.seed >>> 0, rules: R });
     L.userPlan = plan; L.plans[0] = plan;
-    return { L, user, plan, seed: o.seed >>> 0, pool: o.pool, hard: !!o.hard, log: [], planJ: JSON.stringify(planOf(plan)), cur: null };
+    return { L, user, plan, R, comp: R.id, seed: o.seed >>> 0, pool: o.pool, hard: !!o.hard, log: [], planJ: JSON.stringify(planOf(plan)), cur: null };
   }
   const pushCmd = (SE, kind) => {
     const last = SE.log[SE.log.length - 1];
@@ -143,7 +145,8 @@
   const TRADE = { max: 2, lastGame: 55, win: [4, 6, 9], offers: 3, minMpg: 18 };
   function tradeState(SE) {
     const L = SE.L, used = L.trades.length;
-    return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= TRADE.lastGame && used < TRADE.max, left: TRADE.max - used, lastGame: TRADE.lastGame, played: L.userGames.length };
+    const last = Math.round(TRADE.lastGame * L.R.games / 82);
+    return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= last && used < TRADE.max, left: TRADE.max - used, lastGame: last, played: L.userGames.length };
   }
   function tradeOffers(SE, give) {
     const P = SE.user.players;
@@ -284,7 +287,7 @@
     const SE = createSeason(o), L = SE.L, nUser = SE.user.players.length;
     let games = 0, ops = 0;
     const setPlan = pl => {
-      if (!validPlan(pl, nUser)) bad('plan');
+      if (!validPlan(pl, nUser, L.R)) bad('plan');
       SE.plan.starters = pl.starters.slice(); SE.plan.mins = pl.mins.slice();
       SE.plan.tempo = pl.tempo; SE.plan.off = pl.off; SE.plan.def = pl.def; SE.plan.auto = pl.auto;
     };
@@ -346,20 +349,21 @@
   // ---------- results ----------
   const poWins = L => (L.poGames || []).filter(g => g.win).length;
   const poLosses = L => (L.poGames || []).filter(g => !g.win).length;
-  function resultLabel(L) { return L.phase === 'champion' ? 'Champion' : !L.userInPlayoffs ? 'Missed playoffs' : 'Eliminated: ' + LG.roundName(L.po.elimRound != null ? L.po.elimRound : L.po.round); }
+  function resultLabel(L) { return L.phase === 'champion' ? 'Champion' : !L.userInPlayoffs ? 'Missed playoffs' : 'Eliminated: ' + LG.roundName(L.po.elimRound != null ? L.po.elimRound : L.po.round, L.R); }
   function calcScore(L, hard) {
-    const w = L.rec[0].w;
-    return Math.round((w * 10 + poWins(L) * 8 + (L.phase === 'champion' ? 300 : 0) + (w === 82 ? 1000 : 0)) * (hard ? 1.5 : 1));
+    const w = L.rec[0].w, R = L.R;
+    return Math.round((w * R.winPts + poWins(L) * R.poPts + (L.phase === 'champion' ? 300 : 0) + (w === R.games ? 1000 : 0)) * (hard ? 1.5 : 1));
   }
   function achievements(L, hard) {
-    const a = [], w = L.rec[0].w, champ = L.phase === 'champion', poL = poLosses(L);
-    if (w === 82) a.push(['Undefeated', 'A perfect 82-0 regular season.']);
-    if (w === 82 && champ && poL === 0) a.push(['Perfect year', '82-0 and 16-0 in the playoffs. No loss all year.']);
+    const a = [], w = L.rec[0].w, champ = L.phase === 'champion', poL = poLosses(L), R = L.R, N = R.games, pw = poWins(L);
+    const k = N / 82, big = Math.round(70 * k), s1 = Math.round(40 * k), s2 = Math.round(25 * k);
+    if (w === N) a.push(['Undefeated', 'A perfect ' + N + '-0 regular season.']);
+    if (w === N && champ && poL === 0) a.push(['Perfect year', N + '-0 and ' + pw + '-0 in the playoffs. No loss all year.']);
     if (champ) a.push(['Champion', 'Won the title.']);
     if (champ && hard) a.push(['Blind champion', 'Won the title after a Hard mode draft.']);
-    if (w >= 70) a.push(['70 wins', 'A season of 70 or more wins.']);
-    if (L.longestW >= 40) a.push(['Streak of 40', 'At least 40 wins in a row.']); else if (L.longestW >= 25) a.push(['Streak of 25', 'At least 25 wins in a row.']);
-    if (champ && poL <= 3) a.push(['Clean sweep run', 'Won the title with 3 or fewer playoff losses.']);
+    if (w >= big) a.push([big + ' wins', 'A season of ' + big + ' or more wins.']);
+    if (L.longestW >= s1) a.push(['Streak of ' + s1, 'At least ' + s1 + ' wins in a row.']); else if (L.longestW >= s2) a.push(['Streak of ' + s2, 'At least ' + s2 + ' wins in a row.']);
+    if (champ && poL <= 3 && R.id === 'nba') a.push(['Clean sweep run', 'Won the title with 3 or fewer playoff losses.']);
     const mine = ((L.awards && L.awards.mine) || []).concat((L.poAwards && L.poAwards.mine) || []);
     mine.forEach(s => { const i = s.indexOf(': '); a.push(i > 0 ? [s.slice(0, i), s.slice(i + 2) + ' earned this honor.'] : [s, 'One of your players or you won this award.']); });
     return a;

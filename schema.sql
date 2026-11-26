@@ -53,3 +53,18 @@ alter table runs add column if not exists draft_id    uuid unique references dra
 alter table runs add column if not exists verified    boolean not null default false;
 alter table runs add column if not exists sim_version text;
 alter table runs add column if not exists log         jsonb;
+
+-- Competitions: 'nba' (82 games) and 'el' (EuroLeague, 38 games). Run once; safe to repeat.
+alter table drafts add column if not exists comp text not null default 'nba' check (comp in ('nba', 'el'));
+alter table runs   add column if not exists comp text not null default 'nba' check (comp in ('nba', 'el'));
+do $$
+declare c record;
+begin
+  for c in select conname from pg_constraint where conrelid = 'runs'::regclass and contype = 'c'
+     and (pg_get_constraintdef(oid) like '%wins%' or pg_get_constraintdef(oid) like '%losses%') and conname not like 'runs_comp%' loop
+    execute format('alter table runs drop constraint %I', c.conname);
+  end loop;
+end $$;
+alter table runs drop constraint if exists runs_games_check;
+alter table runs add constraint runs_games_check check (wins >= 0 and losses >= 0 and po_wins between 0 and 16 and wins + losses = case comp when 'el' then 38 else 82 end);
+create index if not exists runs_comp_score on runs(comp, score desc);

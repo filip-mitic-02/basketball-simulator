@@ -1,4 +1,4 @@
-/* League: sezona od 82 utakmice sa 30 timova + plej-of (best-of-7). Zavisi od Engine. */
+/* League: a season (82 games, 30 teams, best-of-7 playoffs for the NBA; 38 games, 20 teams, best-of-5 and a Final Four for the EuroLeague). Depends on Engine. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./engine.js'));
   else root.League = factory(root.Engine);
@@ -32,11 +32,11 @@
     return out;
   }
 
-  function aiPlan(team) {
-    const p = E.defaultPlan(team);
+  function aiPlan(team, R) {
+    const p = E.defaultPlan(team, R);
     const top = team.players.slice(0, 8);
     const r3 = top.reduce((a, x) => a + x.r3, 0) / top.length;
-    if (r3 > 0.30) p.off = 'threes';
+    if (r3 > (R || E.RULES.nba).threes) p.off = 'threes';
     return p;
   }
 
@@ -46,7 +46,8 @@
   function create(user, pool, opts) {
     opts = opts || {};
     const r = opts.rng || Math.random;
-    const nOpp = 29;
+    const R = opts.rules || E.RULES.nba;
+    const nOpp = R.teams - 1;
     // protivnici: nasumično, bez ponavljanja istog tima u istoj sezoni
     // protivnici: stratifikovan uzorak po snazi (elitni timovi do osrednjih), pa liga ima realan raspon rekorda
     const ranked = pool.map(t => [t, t._ovr != null ? t._ovr : (t._ovr = E.teamOvr(t))]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
@@ -63,16 +64,16 @@
     }
     for (const t of shuffle(ranked.slice(), r)) { if (opp.length >= nOpp) break; if (!seen.has(t.id) && !seenTm.has(t.tm)) take(t); }
     for (const t of shuffle(ranked.slice(), r)) { if (opp.length >= nOpp) break; if (!seen.has(t.id)) take(t); }
-    const SF = opts.stretch != null ? opts.stretch : cfg.stretch;
+    const SF = opts.stretch != null ? opts.stretch : R.id === 'nba' ? cfg.stretch : R.stretch;
     const stretched = opp.map(t => Object.assign({}, t, { players: t.players.map(p => { E.traitOf(p); const q = Object.assign({}, p, { ovr: 54 + (p.ovr - 54) * SF, ovr0: p.ovr }); ['p2', 'p3'].forEach(k => { q[k] = p[k] * SF; }); ['ast', 'orb', 'drb', 'stl', 'blk', 'tov', 'ftr', 'pf'].forEach(k => { q[k] = Math.max(0.2, 1 + (p[k] - 1) * SF); }); return q; }) }));
     opp.length = 0; stretched.forEach(t => opp.push(t));
     const teams = [user].concat(opp);
     const n = teams.length;
     const L = {
-      r, teams, n, plans: teams.map(t => aiPlan(t)),
+      r, teams, n, R, plans: teams.map(t => aiPlan(t, R)),
       injR: E.mulberry32(((opts.seed != null ? opts.seed : 1) ^ 0x5bd1e995) >>> 0), inj: null, injNew: null, injLog: [], trades: [], tradedAway: [],
-      userPlan: E.defaultPlan(user),
-      sched: buildSchedule(n, 82, r),
+      userPlan: E.defaultPlan(user, R),
+      sched: buildSchedule(n, R.games, r),
       day: 0, rec: teams.map(() => ({ w: 0, l: 0, pf: 0, pa: 0 })),
       conf: shuffle(teams.map((_, i) => i % 2), r),
       userGames: [], phase: 'season', po: null, history: [], stats: null,
@@ -82,6 +83,7 @@
     // korisnik bira konferenciju nasumično; 15/15
     const idx = shuffle([...Array(n).keys()], r);
     idx.forEach((ti, k) => L.conf[ti] = k < n / 2 ? 0 : 1);
+    if (R.po.conf === 1) L.conf = teams.map(() => 0);
     L.streak = 0; L.best = 0; L.unbeaten = true; L.longestW = 0;
     L.ps = teams.map(t => t.players.map(() => blank()));
     L.psPO = {};
@@ -116,7 +118,7 @@
   function startUserGame(L, info) {
     info = info || nextUserGame(L);
     const tms = [L.teams[info.home], L.teams[info.away]];
-    const G = E.newGame(tms, [L.plans[info.home], L.plans[info.away]], { rng: L.r });
+    const G = E.newGame(tms, [L.plans[info.home], L.plans[info.away]], { rng: L.r, rules: L.R });
     G.aiTeam = [info.home !== 0, info.away !== 0];
     G.userSide = info.userHome ? 0 : 1;
     G.info = info;
@@ -132,7 +134,7 @@
   function simOthers(L, day) {
     for (const [h, a] of L.sched[day]) {
       if (h === 0 || a === 0) continue;
-      const G = E.newGame([L.teams[h], L.teams[a]], [L.plans[h], L.plans[a]], { rng: L.r, fast: true });
+      const G = E.newGame([L.teams[h], L.teams[a]], [L.plans[h], L.plans[a]], { rng: L.r, fast: true, rules: L.R });
       G.aiTeam = [true, true]; E.simGame(G);
       recordResult(L, h, a, G.score[0], G.score[1]);
       accGame(L, h, a, G);
@@ -154,7 +156,7 @@
   function injuryTick(L, G) {
     const s = G.userSide; L.injNew = null;
     if (L.inj) { L.inj.g--; if (L.inj.g <= 0) L.inj = null; return; }
-    if (L.injR() >= (G.playoff ? INJ.ratePo : INJ.rate)) return;
+    if (L.injR() >= (G.playoff ? INJ.ratePo : INJ.rate) * (L.R.id === 'el' ? 1.5 : 1)) return;
     const secs = G.st[s].map(x => x.sec), tot = secs.reduce((a, b) => a + b, 0);
     if (tot <= 0) return;
     let x = L.injR() * tot, i = 0;
@@ -200,32 +202,33 @@
 
   // ---------- Plej-of ----------
   const HOME_PAT = [1, 1, 0, 0, 1, 0, 1];   // 1 = domaćin je bolje plasirani
-  function mkSeries(L, a, b, rank) {  // a = bolje plasirani
-    return { a, b, wa: 0, wb: 0, games: [], done: false, round: 0 };
-  }
   function startPlayoffs(L) {
-    const st = standings(L);
+    const st = standings(L), PO = L.R.po;
     const seeds = [[], []];
     st.forEach(x => seeds[x.conf].push(x.i));
     L.po = { rounds: [], round: 0, seeds, userOut: false, champ: null, finalWinner: null };
     const mk = c => {
-      const s = seeds[c].slice(0, 8);
+      const s = seeds[c].slice(0, PO.seeds);
       return [[s[0], s[7]], [s[3], s[4]], [s[1], s[6]], [s[2], s[5]]];
     };
-    const east = mk(0), west = mk(1);
-    L.po.rounds.push(east.concat(west).map(p => ({ a: p[0], b: p[1], wa: 0, wb: 0, games: [], done: false })));
-    L.userInPlayoffs = seeds[0].slice(0, 8).concat(seeds[1].slice(0, 8)).includes(0);
+    const first = (PO.conf === 2 ? mk(0).concat(mk(1)) : mk(0)).map(p => newSeries(L, p[0], p[1], 0));
+    L.po.rounds.push(first);
+    L.userInPlayoffs = seeds[0].slice(0, PO.seeds).concat(PO.conf === 2 ? seeds[1].slice(0, PO.seeds) : []).includes(0);
     L.phase = L.userInPlayoffs ? 'playoffs' : 'eliminated';
     L.po.userOut = !L.userInPlayoffs;
     advancePO(L);
   }
+  function newSeries(L, a, b, round) {
+    const def = L.R.po.rounds[round];
+    return { a, b, wa: 0, wb: 0, games: [], done: false, need: def.need, neutral: !!def.neutral };
+  }
 
-  function roundName(i) { return ['First Round', 'Conference Semifinals', 'Conference Finals', 'NBA Finals'][i] || 'Playoffs'; }
+  function roundName(i, R) { R = R || E.RULES.nba; return (R.po.rounds[i] || {}).name || 'Playoffs'; }
 
   function seriesHome(s, gameNo) { return HOME_PAT[gameNo] ? s.a : s.b; }
   function playSeriesGameFast(L, s) {
     const gn = s.games.length, h = seriesHome(s, gn), a = h === s.a ? s.b : s.a;
-    const G = E.newGame([L.teams[h], L.teams[a]], [L.plans[h], L.plans[a]], { rng: L.r, fast: true });
+    const G = E.newGame([L.teams[h], L.teams[a]], [L.plans[h], L.plans[a]], { rng: L.r, fast: true, rules: L.R });
     G.aiTeam = [true, true]; E.simGame(G);
     accPO(L, L.po.round, h, a, G);
     return finishSeriesGame(L, s, h, a, G.score[0], G.score[1]);
@@ -234,7 +237,7 @@
     const winner = sh > sa ? h : a;
     s.games.push({ h, a, sh, sa, winner });
     if (winner === s.a) s.wa++; else s.wb++;
-    if (s.wa === 4 || s.wb === 4) { s.done = true; s.winner = s.wa === 4 ? s.a : s.b; }
+    if (s.wa === s.need || s.wb === s.need) { s.done = true; s.winner = s.wa === s.need ? s.a : s.b; }
     return winner;
   }
   function seriesOfUser(L) { const R = L.po.rounds[L.po.round]; return R && R.find(s => s.a === 0 || s.b === 0); }
@@ -253,28 +256,19 @@
       if (us && us.done && us.winner !== 0 && !po.userOut) { po.userOut = true; po.elimRound = po.round; po.elimSeries = us; }
       if (us && us.done && us.winner !== 0) { L.phase = 'eliminated'; }
       if (!R.every(s => s.done)) return;
-      // sledeće kolo
-      if (po.round === 3) { po.champ = R[0].winner; L.phase = po.champ === 0 ? 'champion' : (po.userOut ? 'eliminated' : 'done'); return; }
+      // next round: adjacent winners meet (1v8 with 4v5, 2v7 with 3v6, ...)
+      if (po.round === L.R.po.rounds.length - 1) { po.champ = R[0].winner; L.phase = po.champ === 0 ? 'champion' : (po.userOut ? 'eliminated' : 'done'); return; }
       const W = R.map(s => s.winner), next = [];
-      if (po.round === 0) {           // reseed po konferenciji: 8 pobednika -> 4 para
-        // east: indeksi 0..3, west: 4..7; parovi: [0v1],[2v3] jer su (1v8,4v5) i (2v7,3v6)
-        const pairs = [[W[0], W[1]], [W[2], W[3]], [W[4], W[5]], [W[6], W[7]]];
-        pairs.forEach(p => next.push(orderPair(L, p)));
-      } else if (po.round === 1) {
-        const pairs = [[W[0], W[1]], [W[2], W[3]]];
-        pairs.forEach(p => next.push(orderPair(L, p)));
-      } else {
-        next.push(orderPair(L, [W[0], W[1]]));
-      }
+      for (let i = 0; i < W.length; i += 2) next.push(orderPair(L, [W[i], W[i + 1]], po.round + 1));
       po.rounds.push(next); po.round++;
       L.history.push({ round: po.round });
     }
   }
-  function orderPair(L, p) {
+  function orderPair(L, p, round) {
     const [x, y] = p;
     const bx = L.rec[x].w, by = L.rec[y].w;
     const [a, b] = (bx > by || (bx === by && (L.rec[x].pf - L.rec[x].pa) >= (L.rec[y].pf - L.rec[y].pa))) ? [x, y] : [y, x];
-    return { a, b, wa: 0, wb: 0, games: [], done: false };
+    return newSeries(L, a, b, round);
   }
 
   function nextPlayoffGame(L) {
@@ -285,7 +279,7 @@
   }
   function startPlayoffGame(L) {
     const info = nextPlayoffGame(L);
-    const G = E.newGame([L.teams[info.home], L.teams[info.away]], [L.plans[info.home], L.plans[info.away]], { rng: L.r });
+    const G = E.newGame([L.teams[info.home], L.teams[info.away]], [L.plans[info.home], L.plans[info.away]], { rng: L.r, rules: L.R });
     G.aiTeam = [info.home !== 0, info.away !== 0]; G.userSide = info.userHome ? 0 : 1; G.info = info; G.playoff = true;
     if (L.inj) E.markOut(G, G.userSide, [L.inj.i]);
     return G;
@@ -321,8 +315,8 @@
     L.teams.forEach((t, ti) => {
       const rec = L.rec[ti], gp = Math.max(1, rec.w + rec.l), wp = rec.w / gp, pa = rec.pa / gp;
       t.players.forEach((p, pi) => {
-        const a = L.ps[ti][pi]; if (a.g < Math.min(40, gp * 0.5)) return;
-        const mpg = a.sec / 60 / a.g; if (mpg < 15) return;
+        const a = L.ps[ti][pi]; if (a.g < Math.min(40 * L.R.games / 82, gp * 0.5)) return;
+        const mpg = a.sec / 60 / a.g; if (mpg < 15 * L.R.mins / 240) return;
         const g = a.g, gs = gsOf(a) / g;
         const isStarter = (L.plans[ti].starters || []).includes(pi);
         rows.push({
@@ -330,13 +324,13 @@
           ppg: a.pts / g, rpg: a.reb / g, apg: a.ast / g, spg: a.stl / g, bpg: a.blk / g,
           fg: a.fga ? a.fgm / a.fga : 0, tp: a.tpa ? a.tpm / a.tpa : 0,
           mvp: gs * (0.55 + wp * 1.0),
-          def: (a.stl * 1.7 + a.blk * 1.5 + (a.reb - a.oreb) * 0.25) / g + (112 - pa) * 0.12
+          def: (a.stl * 1.7 + a.blk * 1.5 + (a.reb - a.oreb) * 0.25) / g + (L.R.avgPts - pa) * 0.12
         });
       });
     });
     const best = (arr, key) => arr.slice().sort((x, y) => y[key] - x[key])[0];
     const line = r => r ? { ti: r.ti, pi: r.pi, name: r.p.name, team: r.team.label, tm: r.team.tm, isUser: r.isUser, ppg: r.ppg, rpg: r.rpg, apg: r.apg, spg: r.spg, bpg: r.bpg, fg: r.fg, g: r.g, grp: r.grp, wp: r.wp, season: r.team.season } : null;
-    const topRows = rows.filter(r => r.mpg >= 25);
+    const mf = L.R.mins / 240, topRows = rows.filter(r => r.mpg >= 25 * mf);
     function allTeams(key, count) {   // count timova po 5 (2 G, 2 F, 1 C), puni se po vrednosti
       const pool = rows.slice().sort((x, y) => y[key] - x[key]), used = new Set(), out = [];
       for (let t = 0; t < count; t++) {
@@ -351,8 +345,8 @@
     const coachTeam = L.teams[st[0].i];
     const awards = {
       mvp: line(best(topRows.length ? topRows : rows, 'mvp')),
-      dpoy: line(best(rows.filter(r => r.mpg >= 22), 'def')),
-      sixth: line(best(rows.filter(r => !r.isStarter && r.mpg >= 18), 'gs')),
+      dpoy: line(best(rows.filter(r => r.mpg >= 22 * mf), 'def')),
+      sixth: line(best(rows.filter(r => !r.isStarter && r.mpg >= 18 * mf), 'gs')),
       coach: { ti: st[0].i, team: coachTeam.label, tm: coachTeam.tm, isUser: st[0].i === 0, w: st[0].w, l: st[0].l },
       leaders: {
         pts: line(best(rows, 'ppg')), reb: line(best(rows, 'rpg')), ast: line(best(rows, 'apg')), stl: line(best(rows, 'spg')), blk: line(best(rows, 'bpg'))
@@ -385,9 +379,9 @@
       const a = B[ti][bi], p = L.teams[ti].players[bi], g = a.g;
       return { ti, pi: bi, name: p.name, team: L.teams[ti].label, tm: L.teams[ti].tm, isUser: ti === 0, ppg: a.pts / g, rpg: a.reb / g, apg: a.ast / g, g };
     }
-    const fin = po.rounds[3] && po.rounds[3][0];
-    const confs = (po.rounds[2] || []).map(s => ({ series: s, mvp: mvpOf(2, s.winner) }));
-    const out = { champ: po.champ, finals: fin ? { series: fin, mvp: mvpOf(3, po.champ) } : null, confs };
+    const last = L.R.po.rounds.length - 1, fin = po.rounds[last] && po.rounds[last][0];
+    const confs = L.R.po.confMvp ? (po.rounds[last - 1] || []).map(s => ({ series: s, mvp: mvpOf(last - 1, s.winner) })) : [];
+    const out = { champ: po.champ, finals: fin ? { series: fin, mvp: mvpOf(last, po.champ) } : null, confs };
     out.mine = [];
     if (out.finals && out.finals.mvp && out.finals.mvp.isUser) out.mine.push('Finals MVP');
     confs.forEach(c => { if (c.mvp && c.mvp.isUser) out.mine.push('Conference Finals MVP'); });
@@ -399,7 +393,7 @@
     const w = L.rec[0].w, l = L.rec[0].l;
     let res = 'Season';
     if (L.phase === 'champion') res = 'Champion';
-    else if (L.phase === 'eliminated' && L.po) res = L.userInPlayoffs ? 'Eliminated: ' + roundName(L.po.elimRound != null ? L.po.elimRound : L.po.round) : 'Missed playoffs';
+    else if (L.phase === 'eliminated' && L.po) res = L.userInPlayoffs ? 'Eliminated: ' + roundName(L.po.elimRound != null ? L.po.elimRound : L.po.round, L.R) : 'Missed playoffs';
     return { w, l, res, playoffs: L.po && L.po.round };
   }
 

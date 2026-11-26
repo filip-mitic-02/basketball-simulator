@@ -141,3 +141,24 @@ test('trades: three comparable offers, deterministic, verified by the replay, li
   const bad = JSON.parse(JSON.stringify(SE2.log)); bad.push(['tr', 0, 0]);
   assert.throws(() => C.replay(o, bad), /trade/);
 });
+test('EuroLeague: 20 teams, 38 games, best-of-5 quarterfinals and a Final Four, five fouls, replay verified', () => {
+  const S2 = loadSim('el'), C2 = S2.Core, pool2 = C2.poolOf(S2.teams, 2016, 2026);
+  assert.ok(pool2.length > 150);
+  const picks = []; let s = 11; const rnd = n => Math.floor(((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296) * n);
+  for (let k = 0; k < 10; k++) { const t = C2.rollTeam(pool2, picks, rnd); let bi = -1, bv = -1e9; t.players.forEach((p, i) => { if (p.ovr > bv && C2.makePick(picks, t, i, null)) { bv = p.ovr; bi = i; } }); picks.push(C2.makePick(picks, t, bi, null)); }
+  const o = { picks, pool: pool2, seed: 21, hard: false, name: 'T', comp: 'el' }, SE = C2.createSeason(o), L = SE.L;
+  assert.equal(L.teams.length, 20); assert.equal(L.sched.length, 38);
+  const G = C2.beginLive(SE, false); assert.equal(G.R.fo, 5); assert.equal(G.clock, 600);
+  while (!G.over) C2.step(SE, G);
+  assert.ok(G.score[0] > 40 && G.score[0] < 130 && G.score[1] > 40 && G.score[1] < 130);
+  C2.finishLive(SE, G);
+  while (L.phase === 'season') C2.quick(SE);
+  assert.equal(L.rec[0].w + L.rec[0].l, 38);
+  C2.startPlayoffs(SE);
+  assert.deepEqual(L.po.rounds[0].map(x => x.need), [3, 3, 3, 3]);
+  while (!['eliminated', 'champion', 'done'].includes(L.phase)) C2.quickPo(SE);
+  if (L.po.rounds.length > 1) assert.equal(L.po.rounds[1][0].need, 1);
+  const R2 = C2.replay(o, JSON.parse(JSON.stringify(SE.log)));
+  assert.equal(R2.L.rec[0].w, L.rec[0].w); assert.equal(R2.L.phase, L.phase);
+  assert.ok(C2.calcScore(L, false) > 0); assert.match(C2.resultLabel(L), /Champion|Eliminated|Missed/);
+});

@@ -4,10 +4,11 @@ import { sql } from '../lib/db.js';
 export default async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { error: 'method' });
   try {
+    const comp = new URL(req.url, 'http://x').searchParams.get('comp') === 'el' ? 'el' : 'nba';
     const rows = await sql()`select * from (
         select distinct on (r.user_id) u.name, r.wins, r.losses, r.result, r.hard, r.era_label, r.score
         from runs r join users u on u.id = r.user_id
-        where r.verified
+        where r.verified and r.comp = ${comp}
         order by r.user_id, r.score desc
       ) t order by score desc limit 20`;
     res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
