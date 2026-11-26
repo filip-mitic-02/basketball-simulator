@@ -15,6 +15,8 @@
   // Projected wins from the minute-weighted rating of the roster (quadratic fit on ~670 simulated seasons with rating 58+,
   // residual sd about 5.5 wins; the opposition, injuries of form and coaching make up the rest).
   const projWins = r => -151.8 + 4.886 * r - 0.027 * r * r;
+  // EuroLeague (38 games), same method: ~150 simulated seasons of random-to-best drafts, residual sd about 3 wins.
+  const projWinsEL = r => -114.77 + 3.638 * r - 0.02243 * r * r;
   const TG = [34, 33, 32, 30, 29, 24, 20, 16, 12, 10];
 
   // Each category: the part of the rating it stands for (ovr points, relative to an average player).
@@ -68,7 +70,7 @@
   const pctOf = (arr, v) => { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; } return Math.max(0, Math.min(99, Math.round(lo / arr.length * 100))); };
   const median = arr => arr[arr.length >> 1];
   const tier = v => v >= 80 ? 'elite' : v >= 55 ? 'good' : v >= 20 ? 'mid' : 'low';
-  const scoreTier = w => w >= 66 ? 'elite' : w >= 56 ? 'good' : w >= 40 ? 'mid' : 'low';
+  const scoreTier = (w, el) => el ? (w >= 30 ? 'elite' : w >= 26 ? 'good' : w >= 18 ? 'mid' : 'low') : (w >= 66 ? 'elite' : w >= 56 ? 'good' : w >= 40 ? 'mid' : 'low');
   const f1 = v => N(v).toFixed(1);
 
   // Team-level synergies the engine models, from the starting five.
@@ -95,12 +97,13 @@
     const syn = synergy(players), synPts = syn.reduce((a, s) => a + s.pts, 0);
     const cats = Object.fromEntries(list.map(c => [c.k, c]));
     const rating = teamVal(p => N(p.ovr), players);
-    const wins = complete ? Math.max(8, Math.min(78, Math.round(projWins(rating) + WINS_PER_PPG * synPts))) : null;
+    const isEL = String(key).slice(0, 3) === 'el:';
+    const wins = complete ? (isEL ? Math.max(3, Math.min(36, Math.round(projWinsEL(rating) + 2.0 * synPts))) : Math.max(8, Math.min(78, Math.round(projWins(rating) + WINS_PER_PPG * synPts)))) : null;
     const holes = list.filter(c => c.pts <= -0.9 && c.pct < 25).sort((a, b) => a.pts - b.pts);
     const cost = holes.reduce((a, c) => a + c.pts, 0) + synPts;
     const verdict = (cost > -0.9 ? 'No real weakness' : holes.length + syn.filter(s => s.pts <= -0.8).length >= 2 ? 'Unbalanced roster' : 'One big hole');
     const need = list.slice().sort((a, b) => a.pts - b.pts)[0];
-    return { n, cats, list, syn, wins, score: wins, tier: wins == null ? 'mid' : scoreTier(wins), verdict, holes, need: need.k, notes: insights(players, cats, list, holes, syn), partial: !complete, count: players.length };
+    return { n, rating, synPts, cats, list, syn, wins, score: wins, tier: wins == null ? 'mid' : scoreTier(wins, isEL), verdict, holes, need: need.k, notes: insights(players, cats, list, holes, syn), partial: !complete, count: players.length };
   }
 
   const pts1 = v => Math.abs(v).toFixed(1);

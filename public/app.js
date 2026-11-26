@@ -32,6 +32,7 @@
   // the season, and averaging a triple-double), applied once at load so the simulation and the number on screen
   // agree. The display adds a stretch at the top so MVP-level seasons reach the mid and high 90s.
   function dispRating(raw) {
+    if (S.comp === 'el') raw += 6;     // EuroLeague players are rated against EuroLeague, not NBA, statistics
     let t = 55 + (raw - 30) * 0.62 + 0.30 * Math.max(0, raw - 78);
     if (t > 92) t = 92 + 8 * (1 - Math.exp(-(t - 92) / 9));
     return Math.max(0, Math.min(99, Math.round(t)));
@@ -59,6 +60,19 @@
     UTA: ['#3E2680', '#F9A01B'], WAS: ['#002B5C', '#E31837'], WSB: ['#CE1141', '#002B5C'], BAL: ['#C8102E', '#002B5C'], CAP: ['#C8102E', '#002B5C'],
     BLB: ['#8E1A2D', '#E5B73B'], CHP: ['#005EB8', '#C8102E'], CHZ: ['#005EB8', '#C8102E'], STL: ['#C8102E', '#1D428A']
   };
+  // Real EuroLeague club colours [primary, secondary]. Colours only: no logos.
+  const CLUB_EL = {
+    AEK: ['#FFD500', '#111111'], ARI: ['#FFD200', '#111111'], ASV: ['#00A651', '#FFFFFF'], AVE: ['#0B6B3A', '#FFFFFF'], BAM: ['#C8102E', '#FFFFFF'],
+    BAR: ['#A50044', '#004D98'], BAS: ['#0A2A6C', '#C8102E'], BER: ['#FFD500', '#0D2C6C'], BES: ['#2A2A2A', '#FFFFFF'], BIL: ['#0057A8', '#FFFFFF'],
+    BUD: ['#0060AA', '#FFFFFF'], CAN: ['#FFD100', '#003A8F'], CED: ['#F58220', '#1A1A1A'], LJU: ['#00873E', '#FFFFFF'], CIB: ['#0A4DA2', '#FFFFFF'],
+    CSK: ['#D5002B', '#003C7F'], DAR: ['#003A70', '#FFFFFF'], DYR: ['#00A3E0', '#1C2A5A'], FOR: ['#0A3D91', '#FFFFFF'], GAL: ['#A90432', '#FDB913'],
+    HTA: ['#D71920', '#FFFFFF'], JER: ['#D71920', '#FFFFFF'], IST: ['#1B3F94', '#FFFFFF'], MAD: ['#F5F5F5', '#00529F'], MAL: ['#00843D', '#1F3A93'],
+    MCO: ['#D6001C', '#FFFFFF'], MIL: ['#D6001C', '#FFFFFF'], MUN: ['#DC052D', '#0066B2'], OLY: ['#E2001A', '#FFFFFF'], PAM: ['#FF6A00', '#111111'],
+    PAN: ['#0B6B3A', '#FFFFFF'], PAO: ['#2A2A2A', '#FFFFFF'], PAR: ['#2A2A2A', '#FFFFFF'], PRS: ['#0A2A5C', '#E30613'], RED: ['#E4002B', '#FFFFFF'],
+    ROM: ['#2A2A2A', '#FFFFFF'], VIR: ['#2A2A2A', '#FFFFFF'], SIE: ['#0A7A3C', '#FFFFFF'], TEL: ['#FFD100', '#0057B8'], TRE: ['#00843D', '#FFFFFF'],
+    ULK: ['#FFD100', '#0A2A6C'], UNK: ['#0B6B3A', '#FFFFFF'], ZAL: ['#00843D', '#FFFFFF'], SAS: ['#0A4DA2', '#FFFFFF'], PES: ['#C8102E', '#FFFFFF'],
+    DYN: ['#0057B8', '#FFFFFF'], KHI: ['#0A3C7D', '#F9A01B']
+  };
   const hashOf = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   function hexHsl(hex) {
     const n = parseInt(hex.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
@@ -72,13 +86,14 @@
   const _cc = {};
   function clubCols(tm) {
     tm = String(tm || '?');
-    if (_cc[tm]) return _cc[tm];
+    const ck = S.comp + ':' + tm, TAB = S.comp === 'el' ? CLUB_EL : CLUB;
+    if (_cc[ck]) return _cc[ck];
     let pri, sec;
-    if (CLUB[tm]) { pri = hexHsl(CLUB[tm][0]); sec = hexHsl(CLUB[tm][1]); }
+    if (TAB[tm]) { pri = hexHsl(TAB[tm][0]); sec = hexHsl(TAB[tm][1]); }
     else { const h = hashOf(tm) % 360; pri = [h, 60, 40]; sec = [(h + 40) % 360, 75, 62]; }
-    const L = Math.max(pri[2], 30), S2 = pri[1] < 10 ? pri[1] : Math.max(pri[1], 38);
+    const L = Math.min(Math.max(pri[2], 30), 70), S2 = pri[1] < 10 ? pri[1] : Math.max(pri[1], 38);
     const o = { h: pri[0], a: hslS(pri[0], S2, L), d: hslS(pri[0], S2, Math.max(16, L - 14)), b: hslS(sec[0], sec[1], Math.max(sec[2], 34)), l: pri[2] };
-    return (_cc[tm] = o);
+    return (_cc[ck] = o);
   }
   const hueOf = key => clubCols(key).h;
   const clubStyle = tm => { const c = clubCols(tm); return `--c1:${c.a};--c2:${c.b};--c0:${c.d}`; };
@@ -615,7 +630,7 @@
     const L = S.L, r = L.rec[0];
     if (L.phase === 'seasonDone') {
       return `<div class="panel" style="text-align:center;padding:40px 16px"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Regular season complete</div>
-        <div class="rec led num">${r.w}&ndash;${r.l}</div>${r.l === 0 ? '<h2 style="color:var(--good)">Undefeated. ${L.R.games}-0.</h2>' : ''}
+        <div class="rec led num">${r.w}&ndash;${r.l}</div>${r.l === 0 ? '<h2 style="color:var(--good)">Undefeated. ' + L.R.games + '-0.</h2>' : ''}
         <p class="note">Conference seed: ${LG.standings(L).filter(x => x.conf === L.conf[0]).findIndex(x => x.i === 0) + 1}</p>${pipsHtml()}
         <div style="margin-top:20px"><button class="btn pri" data-a="startpo">Start playoffs</button></div></div>
         ${trophyCase(L)}<div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
@@ -626,7 +641,7 @@
       <div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-end">
         <div><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">${esc(S.teamName)} &middot; game ${L.day + 1} of ${L.R.games}</div><div class="rec led num">${r.w}&ndash;${r.l}</div></div>
         <div style="text-align:right"><div class="muted">Win streak</div><div class="led num" style="font-size:46px">${L.streak}</div></div></div>${pipsHtml()}
-        <p class="note" style="margin-top:12px">${r.l > 0 ? 'The undefeated run is over. Keep winning for seeding and the playoffs.' : 'Still undefeated. One loss ends the ${L.R.games}-0 chase.'}</p></div>
+        <p class="note" style="margin-top:12px">${r.l > 0 ? 'The undefeated run is over. Keep winning for seeding and the playoffs.' : 'Still undefeated. One loss ends the ' + L.R.games + '-0 chase.'}</p></div>
       <div class="panel opp"><div class="vs">${g.userHome ? 'Home vs' : 'Away at'}</div>
         <div class="row" style="flex-wrap:nowrap">${crest(o.t.tm, 44)}<div class="t">${esc(o.t.label)}</div></div>
         <div class="note">${o.top.map(p => esc(p.name) + ' (' + dp(p) + ')').join(' &middot; ')}</div>
@@ -649,7 +664,7 @@
     return `${injBar()}<div class="grid2"><div class="panel"><div class="muted" style="font-family:var(--display);letter-spacing:.14em;text-transform:uppercase">Playoffs &middot; ${LG.roundName(po.round, L.R)}</div>
       <div class="rec led num">${us ? (us.a === 0 ? us.wa : us.wb) + '&ndash;' + (us.a === 0 ? us.wb : us.wa) : ''}</div>
       <div class="note">Playoff record ${pw}-${pl} &middot; regular season ${L.rec[0].w}-${L.rec[0].l}</div></div>
-      <div class="panel opp"><div class="vs">${ng ? 'Game ' + (ng.gameNo + 1) + ' &middot; ' + (ng.userHome ? 'home vs' : 'away at') : ''}</div>
+      <div class="panel opp"><div class="vs">${ng ? 'Game ' + (ng.gameNo + 1) + ' &middot; ' + (ng.series && ng.series.neutral ? 'neutral court vs' : ng.userHome ? 'home vs' : 'away at') : ''}</div>
       <div class="row" style="flex-wrap:nowrap">${ng ? crest(L.teams[ng.opp].tm, 44) : ''}<div class="t">${ng ? esc(L.teams[ng.opp].label) : ''}</div></div>
       <div class="ctrl"><button class="btn pri" data-a="playpo">Coach this game</button><button class="btn" data-a="quickpo">Quick sim</button><button class="btn sm" data-a="simseries">Sim series</button><button class="btn sm" data-a="gocoach">Tactics</button></div></div></div>
       <div class="panel" style="margin-top:16px"><div class="bracket">${cols}</div></div>`;
@@ -813,7 +828,7 @@
   function checkAlerts() {
     const G = S.G, live = S.live, side = mySide();
     if (live.run.t === 1 - side && live.run.pts >= 10 && !live.runAlerted && G.to[side] > 0 && !(G.mo && G.mo.n < Core.MO.max)) { live.runAlerted = true; live.alert = 'The opponent is on a ' + live.run.pts + '-0 run. Call a timeout to stop it and make changes.'; return true; }
-    for (const i of G.on[side]) { if (G.st[side][i].pf === 5 && !live.foulAlerted[i]) { live.foulAlerted[i] = 1; live.alert = G.teams[side].players[i].name + ' has 5 fouls. Call a timeout to sub him out, or leave it to the auto-subs.'; return true; } }
+    for (const i of G.on[side]) { if (G.st[side][i].pf === G.R.fo - 1 && !live.foulAlerted[i]) { live.foulAlerted[i] = 1; live.alert = G.teams[side].players[i].name + ' has ' + (G.R.fo - 1) + ' fouls. Call a timeout to sub him out, or leave it to the auto-subs.'; return true; } }
     return false;
   }
   function stepOnce() { const G = S.G, b = G.log.length; Core.step(S.SE, G); runTrack(G.log.slice(b)); }

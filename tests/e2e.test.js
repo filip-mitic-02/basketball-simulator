@@ -51,7 +51,9 @@ async function run(signedIn, comp = 'nba') {
     click('[data-a=confirm]');
     if (k < 9) await until(() => /pick (\d+) of 10/.exec(doc.getElementById('app').innerHTML) && +/pick (\d+) of 10/.exec(doc.getElementById('app').innerHTML)[1] === k + 2, 'next pick ' + k);
   }
+  if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/eldraft.html', '<!doctype html>' + doc.documentElement.outerHTML);
   await until(() => doc.querySelector('[data-a=beginSeason]'), 'prep screen');
+  if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elprep.html', '<!doctype html>' + doc.documentElement.outerHTML);
   assert.ok(doc.querySelector('.recbar'), 'tactic recommendations are shown on the prep screen');
   if (doc.querySelector('[data-a=applyrec]:not([disabled])')) { click('[data-a=applyrec]'); assert.ok(doc.querySelector('.tile.best.on'), 'applying selects the framed tactics'); }
   click('[data-a=beginSeason]');
