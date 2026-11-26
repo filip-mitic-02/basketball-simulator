@@ -58,6 +58,7 @@ async function run(signedIn, comp = 'nba') {
   if (doc.querySelector('[data-a=applyrec]:not([disabled])')) { click('[data-a=applyrec]'); assert.ok(doc.querySelector('.tile.best.on'), 'applying selects the framed tactics'); }
   click('[data-a=beginSeason]');
   await until(() => doc.querySelector('[data-a=play]'), 'hub');
+  if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elhub.html', '<!doctype html>' + doc.documentElement.outerHTML);
   // one coached game with a timeout, a substitution window and a feed, then the rest of the season
   click('[data-a=play]');
   await until(() => doc.querySelector('[data-a=timeout]'), 'game screen');
@@ -94,6 +95,7 @@ async function run(signedIn, comp = 'nba') {
   await until(() => doc.querySelector('[data-a=startpo]') || /Playoffs|Season over/.test(doc.getElementById('app').innerHTML), 'season done');
   if (doc.querySelector('[data-a=startpo]')) click('[data-a=startpo]');
   for (let n = 0; n < 40 && !doc.querySelector('[data-a=newgame]'); n++) {
+    if (process.env.DUMP && comp === 'el' && doc.querySelector('[data-a=simseries]') && !globalThis.__po) { globalThis.__po = 1; require_fs.writeFileSync('/tmp/elpo.html', '<!doctype html>' + doc.documentElement.outerHTML); }
     if (doc.querySelector('[data-a=simseries]')) click('[data-a=simseries]');
     await tick(5);
   }

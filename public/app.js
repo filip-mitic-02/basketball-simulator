@@ -558,15 +558,26 @@
     return `<div class="tw"><table><tr><th>Player</th><th class="r">G</th><th class="r">MIN</th><th class="r">PTS</th><th class="r">REB</th><th class="r">AST</th><th class="r">FG%</th></tr>` +
       P.map((p, i) => { const a = L.agg[i], g = a.g || 1; return `<tr><td>${esc(p.name)}</td><td class="r num">${a.g}</td><td class="r num">${(a.sec / 60 / g).toFixed(1)}</td><td class="r num">${(a.pts / g).toFixed(1)}</td><td class="r num">${(a.reb / g).toFixed(1)}</td><td class="r num">${(a.ast / g).toFixed(1)}</td><td class="r num">${a.fga ? (100 * a.fgm / a.fga).toFixed(1) : '--'}</td></tr>`; }).join('') + '</table></div>';
   }
+  const IC = {
+    tact: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/></svg>',
+    trade: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>',
+    ten: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l7 7-7 7M13 5l7 7-7 7"/></svg>',
+    end: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5l7 7-7 7M13 5v14M18 5v14"/></svg>'
+  };
+  // Season form strip: one cell per game, grouped in tens so the progress is easy to read
   function pipsHtml() {
-    const L = S.L; let h = '';
-    for (let i = 0; i < L.R.games; i++) { const g = L.userGames[i]; h += `<i class="${g ? (g.win ? 'w' : 'l') : (i === L.userGames.length ? 'n' : '')}" title="Game ${i + 1}"></i>`; }
-    return `<div class="pips">${h}</div>`;
+    const L = S.L, N = L.R.games, cur = L.userGames.length; let h = '';
+    for (let g0 = 0; g0 < N; g0 += 10) {
+      let c = '';
+      for (let i = g0; i < Math.min(N, g0 + 10); i++) { const g = L.userGames[i]; c += `<i class="${g ? (g.win ? 'w' : 'l') : (i === cur ? 'n' : '')}" title="${g ? 'Game ' + (i + 1) + ': ' + (g.win ? 'W' : 'L') + ' ' + g.us + '-' + g.them : 'Game ' + (i + 1)}"></i>`; }
+      h += `<div class="fgrp"><div class="fgl">${g0 + 1}&ndash;${Math.min(N, g0 + 10)}</div><div class="fg">${c}</div></div>`;
+    }
+    return `<div class="strip">${h}</div>`;
   }
   function lastGames() {
-    const L = S.L, gs = L.userGames.slice(-8).reverse();
+    const L = S.L, gs = L.userGames.slice().reverse();
     if (!gs.length) return '<p class="note">No games played yet.</p>';
-    return '<div class="tw"><table>' + gs.map(g => `<tr><td class="num">${g.day + 1}</td><td><span class="res ${g.win ? 'W' : 'L'}">${g.win ? 'W' : 'L'}</span></td><td class="num">${g.us}-${g.them}${g.ot ? ' (OT)' : ''}</td><td>${g.home ? 'vs' : '@'} ${esc(L.teams[g.opp].label)}</td></tr>`).join('') + '</table></div>';
+    return '<div class="tw hist"><table>' + gs.map(g => `<tr><td class="num">${g.day + 1}</td><td><span class="res ${g.win ? 'W' : 'L'}">${g.win ? 'W' : 'L'}</span></td><td class="num">${g.us}-${g.them}${g.ot ? ' (OT)' : ''}</td><td>${g.home ? 'vs' : '@'} ${esc(L.teams[g.opp].label)}</td></tr>`).join('') + '</table></div>';
   }
 
   // ---------- awards ----------
@@ -606,28 +617,40 @@
   };
   const tradeBtn = () => {
     const st = Core.tradeState(S.SE);
-    return st.open ? `<button class="btn sm" data-a="gotrade">Trade &middot; ${st.left} left</button>` : '';
+    return st.open ? `<button data-a="gotrade">${IC.trade}Trade <em>${st.left} left</em></button>` : '';
   };
+  // Trade screen: every player shows his season averages, and each offer shows how it compares with the man going out.
+  const TST = [['PTS', 'ppg', 1], ['REB', 'rpg', 1], ['AST', 'apg', 1], ['STL', 'spg', 1], ['BLK', 'bpg', 1], ['FG%', 'fg', 100], ['MIN', 'mpg', 1]];
+  const sval = (p, k, m) => { const v = p[k]; return v == null ? '--' : (v * m).toFixed(1); };
   function tradeCard(p, i, out) {
-    const vis = !S.hard || S.revealed, hue = hueOf(p.fromTm), st = (l, v) => `<div>${l}<b>${vis ? v : '&nbsp;'}</b></div>`;
-    return `<button class="pcard" style="--h:${hue};${clubStyle(p.fromTm)}" data-a="toffer" data-i="${i}">
-      <div class="hd">${crest(p.fromTm, 20)}<span>${p.fromSeason} ${esc(p.fromTm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:24px">${vis ? dp(p) : '??'}</span></div>
-      <div class="bd"><div class="who">${avatar(p.name, p.fromTm, 46, vis ? dp(p) : null, p.pos, p.fromSeason)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
+    const vis = !S.hard || S.revealed, hue = hueOf(p.fromTm);
+    const cell = ([l, k, m]) => {
+      const a = (p[k] || 0) * m, b = (out[k] || 0) * m, d = a - b, c = Math.abs(d) < 0.05 ? 'eq' : d > 0 ? 'up' : 'dn';
+      return `<div class="tcs"><span>${l}</span><b class="num">${vis ? sval(p, k, m) : '&nbsp;'}</b>${vis ? `<em class="${c}">${c === 'eq' ? '=' : (d > 0 ? '+' : '') + d.toFixed(1)}</em>` : ''}</div>`;
+    };
+    const dOvr = dp(p) - dp(out);
+    return `<button class="tcard" style="--h:${hue};${clubStyle(p.fromTm)}" data-a="toffer" data-i="${i}">
+      <div class="tch">${crest(p.fromTm, 22)}<span>${p.fromSeason} ${esc(p.fromTm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}">${vis ? dp(p) : '??'}</span></div>
+      <div class="tcb"><div class="who">${avatar(p.name, p.fromTm, 46, vis ? dp(p) : null, p.pos, p.fromSeason)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
         ${vis ? `<div class="trow">${traitBadge(p, true)}</div>` : ''}
-        <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
-      </div><div class="fit tk">Replaces ${esc(out.name)}</div></button>`;
+        <div class="tcg">${TST.map(cell).join('')}</div></div>
+      <div class="tcf"><span>Replaces ${esc(out.name)}</span>${vis ? `<em class="${dOvr > 0 ? 'up' : dOvr < 0 ? 'dn' : 'eq'}">OVR ${dOvr > 0 ? '+' : ''}${dOvr}</em>` : ''}</div></button>`;
   }
   SCREENS.trade = () => {
     const st = Core.tradeState(S.SE), P = S.user.players, T = S.tr || (S.tr = { give: null }), vis = !S.hard || S.revealed;
-    const rows = P.map((p, i) => `<button class="trrow ${T.give === i ? 'on' : ''}" data-a="tgive" data-i="${i}">${crest(p.fromTm, 24)}<div class="trn"><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)} &middot; ${esc(p.slot)}${injOf(i) ? ' &middot; out ' + injOf(i) : ''}</span>${traitBadge(p)}</div><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:20px">${vis ? dp(p) : '??'}</span></button>`).join('');
+    const head = `<div class="trh"><span></span><span>Player</span>${['PTS', 'REB', 'AST', 'FG%', 'MIN'].map(x => `<span class="r">${x}</span>`).join('')}<span class="r">OVR</span></div>`;
+    const rows = P.map((p, i) => `<button class="trrow2 ${T.give === i ? 'on' : ''}" data-a="tgive" data-i="${i}">${crest(p.fromTm, 24)}
+      <div class="trn"><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)} &middot; ${esc(p.slot)}${injOf(i) ? ' &middot; out ' + injOf(i) : ''}</span>${traitBadge(p)}</div>
+      ${[['ppg', 1], ['rpg', 1], ['apg', 1], ['fg', 100], ['mpg', 1]].map(([k, m]) => `<span class="num r st">${vis ? sval(p, k, m) : ''}</span>`).join('')}
+      <span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}">${vis ? dp(p) : '??'}</span></button>`).join('');
     let offers = '';
     if (T.give != null) {
       const out = P[T.give], offs = Core.tradeOffers(S.SE, T.give);
-      offers = offs.length ? `<div class="eyebrow" style="margin-top:20px">Offers for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. Look for what your team is missing.</p><div class="cards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`;
+      offers = offs.length ? `<div class="eyebrow" style="margin-top:22px">Offers for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. The small numbers show the difference from ${esc(out.name.split(' ').slice(-1)[0])}: green is better, red is worse.</p><div class="tcards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`;
     }
     return `<div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="font-size:36px">Trade</h2><button class="btn pri" data-a="tback">Back</button></div>
       <p class="note" style="margin-bottom:14px">Trades left: <b>${st.left}</b> &middot; deadline: game ${st.lastGame} (you have played ${st.played}). Pick the player to give up, then choose one of three offers. A trade cannot be undone.</p>
-      <div class="panel"><div class="eyebrow">Who goes?</div><div class="trlist">${rows}</div></div>${offers}`;
+      <div class="panel"><div class="eyebrow">Who goes?</div><div class="trtab">${head}${rows}</div></div>${offers}`;
   };
   SCREENS.hub = () => {
     const L = S.L, r = L.rec[0];
@@ -649,8 +672,8 @@
         <div class="row" style="flex-wrap:nowrap">${crest(o.t.tm, 44)}<div class="t">${esc(o.t.label)}</div></div>
         <div class="note">${o.top.map(p => esc(p.name) + ' (' + dp(p) + ')').join(' &middot; ')}</div>
         <div class="note">Roster strength <b>${od(o.ovr).toFixed(0)}</b> &middot; yours <b>${od(E.teamOvr(S.user, S.plan)).toFixed(0)}</b></div>
-        <div class="ctrl" style="margin-top:4px"><button class="btn pri" data-a="play">Coach this game</button><button class="btn" data-a="quick">Quick sim</button></div>
-        <div class="ctrl" style="margin-top:0"><button class="btn sm" data-a="sim10">Sim 10 games</button><button class="btn sm" data-a="simall">Sim to end of season</button><button class="btn sm" data-a="gocoach">Tactics</button>${tradeBtn()}</div></div></div>
+        <div class="acts"><div class="arow"><button class="abtn main" data-a="play"><b>Coach this game</b><span>Play it possession by possession</span></button><button class="abtn" data-a="quick"><b>Quick sim</b><span>Get the result now</span></button></div>
+        <div class="arow2"><div class="segb"><button data-a="sim10">${IC.ten}Next 10 games</button><button data-a="simall">${IC.end}Rest of season</button></div><div class="segb"><button data-a="gocoach">${IC.tact}Tactics</button>${tradeBtn()}</div></div></div></div></div>
       <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Recent games</div>${lastGames()}</div><div class="panel"><div class="eyebrow">${S.L.R.po.conf < 2 ? 'Standings' : 'Conference standings'}</div>${standingsHtml()}</div></div>
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Season stats</div>${statsHtml()}</div>
       ${teamReport(S.user.players, 'Team report')}`;
@@ -669,7 +692,8 @@
       <div class="note">Playoff record ${pw}-${pl} &middot; regular season ${L.rec[0].w}-${L.rec[0].l}</div></div>
       <div class="panel opp"><div class="vs">${ng ? 'Game ' + (ng.gameNo + 1) + ' &middot; ' + (ng.series && ng.series.neutral ? 'neutral court vs' : ng.userHome ? 'home vs' : 'away at') : ''}</div>
       <div class="row" style="flex-wrap:nowrap">${ng ? crest(L.teams[ng.opp].tm, 44) : ''}<div class="t">${ng ? esc(L.teams[ng.opp].label) : ''}</div></div>
-      <div class="ctrl"><button class="btn pri" data-a="playpo">Coach this game</button><button class="btn" data-a="quickpo">Quick sim</button><button class="btn sm" data-a="simseries">Sim series</button><button class="btn sm" data-a="gocoach">Tactics</button></div></div></div>
+      <div class="acts"><div class="arow"><button class="abtn main" data-a="playpo"><b>Coach this game</b><span>Play it possession by possession</span></button><button class="abtn" data-a="quickpo"><b>Quick sim</b><span>Get the result now</span></button></div>
+      <div class="arow2"><div class="segb"><button data-a="simseries">${IC.ten}Sim the series</button><button data-a="gocoach">${IC.tact}Tactics</button></div></div></div></div></div>
       <div class="panel" style="margin-top:16px"><div class="bracket">${cols}</div></div>`;
   };
 
@@ -685,6 +709,24 @@
       const state = !s.done ? 'na' : us > them ? 'win' : 'loss';
       return `<div class="step ${state}"><div class="sn">${LG.roundName(ri, L.R)}</div><div class="sv num">${state === 'win' ? 'Won' : state === 'loss' ? 'Lost' : ''} ${us}-${them}</div><div class="so">vs ${esc(L.teams[opp].label)}</div></div>`;
     }).join('') + '</div>';
+  }
+  // Milestones: the achievements that are not already a trophy (those are shown in the trophy case)
+  function milestonesHtml(L, ach) {
+    const A = ((L.awards && L.awards.mine) || []).concat((L.poAwards && L.poAwards.mine) || []).map(x => { const i = x.indexOf(': '); return i > 0 ? x.slice(0, i) : x; });
+    const m = ach.filter(x => x[0] !== 'Champion' && !A.includes(x[0]));
+    if (!m.length) return '';
+    return `<div class="panel" style="margin-top:16px"><div class="eyebrow">Milestones</div><div class="mstones">${m.map(x => `<div class="ms"><b>${x[0]}</b><span>${x[1]}</span></div>`).join('')}</div></div>`;
+  }
+  // Every playoff game with its final score, grouped by round
+  function poGamesHtml(L) {
+    const g = L.poGames || []; if (!g.length) return '<p class="note">No playoff games were played.</p>';
+    const out = []; let last = -1, n = 0;
+    g.forEach(x => {
+      if (x.round !== last) { last = x.round; n = 0; out.push(`<div class="pgh">${LG.roundName(x.round, L.R)}</div>`); }
+      n++;
+      out.push(`<div class="pgr"><span class="res ${x.win ? 'W' : 'L'}">${x.win ? 'W' : 'L'}</span><span class="pgg">Game ${n}</span><span class="pgo">${x.home ? 'vs' : '@'} ${esc(L.teams[x.opp].label)}</span><b class="num">${x.us}&ndash;${x.them}</b></div>`);
+    });
+    return `<div class="pglist">${out.join('')}</div>`;
   }
   SCREENS.end = () => {
     const L = S.L; if (!L.awards) LG.computeAwards(L); if (L.po && L.po.champ != null && !L.poAwards) LG.poAwards(L);
@@ -714,8 +756,9 @@
         ${tile('Playoff record', pw + '-' + pl, L.userInPlayoffs ? (L.R.id === 'el' ? 'playoffs and Final Four' : 'best of 7 series') : 'did not qualify')}
       </div>
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff run</div>${pathHtml(L)}</div>
-      <div class="two" style="margin-top:16px"><div class="panel"><div class="eyebrow">Achievements</div>${ach.length ? ach.map(x => `<div class="ach"><div><b>${x[0]}</b><div class="note">${x[1]}</div></div></div>`).join('') : '<p class="note">No achievements this time. Try a tighter rotation.</p>'}</div>
-      <div class="panel"><div class="eyebrow">Season stats</div>${statsHtml()}</div></div>
+      ${milestonesHtml(L, ach)}
+      <div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff games</div>${poGamesHtml(L)}</div>
+      <div class="panel" style="margin-top:16px"><div class="eyebrow">Season stats</div>${statsHtml()}</div>
       ${trophyCase(L)}
       ${L.po && L.po.champ != null ? `<div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff awards</div>${poAwardsHtml(L)}</div>` : ''}
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
