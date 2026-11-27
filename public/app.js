@@ -769,7 +769,7 @@
   };
 
   // ---------- GAME ----------
-  function stopLive() { if (S.live && S.live.timer) clearTimeout(S.live.timer); if (S.live && S.live.defer) clearTimeout(S.live.defer); }
+  function stopLive() { if (S.live && S.live.timer) clearTimeout(S.live.timer); if (S.live && S.live.defer) clearTimeout(S.live.defer); if (S.live) { clearInterval(S.live.cint); S.live.cl = null; } }
   function beginGame(G) {
     S.G = G;
     S.live = { timer: null, playing: false, speed: 1, tab: 'rot', sel: null, fed: 0, run: { t: -1, pts: 0 }, alert: '', window: true, winLabel: 'Pre-game', runAlerted: false, foulAlerted: {} };
@@ -799,7 +799,7 @@
     const sb = document.getElementById('sb'); if (!sb) return;
     const T = G.teams;
     const tm = (t, align) => `<div class="tm ${t === side ? 'me' : 'opp'} ${align}"><div class="tn">${t === side ? esc(S.teamName) : esc(T[t].label)}</div><div class="sc led num">${G.score[t]}</div><div class="qs num">${(G.qs[t] || []).join(' &middot; ')}&nbsp;</div><div class="qs">Timeouts ${G.to[t]} &middot; Team fouls ${G.tf[t]}</div></div>`;
-    sb.innerHTML = tm(1, '') + `<div class="mid"><div class="qn">${G.over ? 'Final' : (G.q > 4 ? 'Overtime ' + (G.q - 4) : 'Quarter ' + G.q)}</div><div class="clk led num">${mmss(Math.max(0, Math.round(G.clock)))}</div><div class="qs">${G.playoff ? 'Playoffs' : 'Regular season'} &middot; away @ home</div></div>` + tm(0, 'r');
+    sb.innerHTML = tm(1, '') + `<div class="mid"><div class="qn">${G.over ? 'Final' : (G.q > 4 ? 'Overtime ' + (G.q - 4) : 'Quarter ' + G.q)}</div><div class="clk led num" id="clk">${mmss(Math.max(0, Math.round(shownClock())))}</div><div class="qs">${G.playoff ? 'Playoffs' : 'Regular season'} &middot; away @ home</div></div>` + tm(0, 'r');
     const feed = document.getElementById('feed');
     if (full) feed.innerHTML = '';
     const log = G.log; let h = '';
@@ -882,9 +882,9 @@
       return `<rect x="${m ? CT.W - 190 : 0}" y="170" width="190" height="160" ${ln}/><circle cx="${X(190)}" cy="250" r="60" ${ln}/><path d="M${X(0)} 30H${X(141.5)}A237.5 237.5 0 0 ${sw} ${X(141.5)} 470H${X(0)}" ${ln}/><path d="M${X(52)} 210A40 40 0 0 ${sw} ${X(52)} 290" ${ln}/><path d="M${X(40)} 220V280" stroke="#9fb2d1" stroke-width="5"/><circle cx="${X(52)}" cy="250" r="8" fill="none" stroke="#f97316" stroke-width="4"/>`; };
     return `<svg viewBox="0 0 ${CT.W} ${CT.H}" role="img" aria-label="Court"><rect x="1.5" y="1.5" width="${CT.W - 3}" height="${CT.H - 3}" rx="10" fill="#111827" stroke="#3a4a66" stroke-width="3"/><path d="M470 0V500" ${ln}/><circle cx="470" cy="250" r="60" ${ln}/>${half(0)}${half(1)}<g id="ctShots"></g><g id="ctTrail"></g><g id="ctDots"></g><g id="ctBall"><circle r="9" fill="#f59e0b" stroke="#fff" stroke-width="2"/><path d="M-9 0H9M0 -9V9" stroke="#7c3a05" stroke-width="1.4"/></g><g id="ctTxt"></g></svg>`;
   }
+  const ctOrd = (G, t) => G.on[t].slice().sort((a, b) => E.POS.indexOf(G.teams[t].players[a].slot) - E.POS.indexOf(G.teams[t].players[b].slot));
   const ctLay = (G, off) => {
-    const out = {}, d = 1 - off, srt = t => G.on[t].slice().sort((a, b) => E.POS.indexOf(G.teams[t].players[a].slot) - E.POS.indexOf(G.teams[t].players[b].slot));
-    const A = srt(off), D = srt(d), h = ctHoop(off);
+    const out = {}, d = 1 - off, A = ctOrd(G, off), D = ctOrd(G, d), h = ctHoop(off);
     A.forEach((i, k) => { const q = OFFP[k] || OFFP[4]; out[off * 100 + i] = ctReal(off, q[0], q[1]); });
     D.forEach((i, k) => { const a = out[off * 100 + (A[k] != null ? A[k] : A[0])] || [470, 250]; out[d * 100 + i] = [a[0] + (h[0] - a[0]) * 0.28, a[1] + (h[1] - a[1]) * 0.28]; });
     return out;
@@ -922,18 +922,18 @@
       g.style.transform = 'translate(470px,-30px)'; ct.els[k] = g; ct.pos[k] = [470, -30];
     }
   }
-  function ctApply(pos, ms, actor) {
+  function ctApply(pos, ms, actor, ease) {
     const ct = S.live.ct;
     for (const k of Object.keys(pos)) {
       const g = ct.els[k]; if (!g) continue;
-      g.style.transition = ms ? 'transform ' + ms + 'ms cubic-bezier(.3,.7,.3,1)' : 'none';
+      g.style.transition = ms ? 'transform ' + ms + 'ms ' + (ease || 'cubic-bezier(.3,.7,.3,1)') : 'none';
       g.style.transform = 'translate(' + Math.round(pos[k][0]) + 'px,' + Math.round(pos[k][1]) + 'px)'; ct.pos[k] = pos[k];
       g.classList.toggle('act', String(k) === String(actor));
     }
   }
-  function ctBall(xy, ms) {
+  function ctBall(xy, ms, ease) {
     const ct = S.live.ct, b = document.getElementById('ctBall'); if (!b) return;
-    b.style.transition = ms ? 'transform ' + ms + 'ms cubic-bezier(.35,.1,.3,1)' : 'none';
+    b.style.transition = ms ? 'transform ' + ms + 'ms ' + (ease || 'cubic-bezier(.35,.1,.3,1)') : 'none';
     b.style.transform = 'translate(' + Math.round(xy[0]) + 'px,' + Math.round(xy[1]) + 'px)'; ct.ball = xy;
   }
   function ctPop(txt, xy, cls) {
@@ -953,24 +953,55 @@
     const l = svgEl('line', { x1: Math.round(a[0]), y1: Math.round(a[1]), x2: Math.round(b[0]), y2: Math.round(b[1]), class: 'cttr' }, layer);
     setTimeout(() => l.remove(), 1200);
   }
-  // one list of stages per play: { f: share of the time, dots: moves, ball, pop, trail, mark, rim }
-  function ctPlan(e, idx) {
-    const G = S.G, ct = S.live.ct, nm = (t, i) => (i != null && i >= 0 && G.teams[t].players[i]) ? G.teams[t].players[i].name.split(' ').slice(-1)[0] : '';
-    const key = (t, i) => t * 100 + i, st = [];
+  // One list of stages per play: { f: ms at 1x, dots: moves, ball, pop, trail, mark, rim, lin: constant speed, bms: ball pass time }.
+  // `D` is the game time (in ms at 1x) the play has to fill, so the players keep moving all possession long and the shot lands at its end.
+  function ctPlan(e, idx, D) {
+    const G = S.G, ct = S.live.ct, key = (t, i) => t * 100 + i, st = [];
     const off = e.k === 'qend' || e.k === 'sub' ? (e.k === 'qend' ? mySide() : ct.off) : e.k === 'foul' || e.k === 'out' ? 1 - e.t : e.t, lay = ctLay(G, off), h = ctHoop(off);
-        const gap = ct.off !== off && (e.k === 'make' || e.k === 'miss' || e.k === 'block') ? 1300 : 0;
+    const shotK = e.k === 'make' || e.k === 'miss' || e.k === 'block' || e.k === 'tov';
+    const changed = ct.off !== off && shotK;
     ct.off = off;
+    const dir = ctDir(off), A = ctOrd(G, off), Df = ctOrd(G, 1 - off), lerp = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+    const front = x => dir === 1 ? Math.max(520, Math.min(900, x)) : Math.min(420, Math.max(40, x));
+    const handBall = (pos, k) => [pos[key(off, A[k])][0] + 9 * dir, pos[key(off, A[k])][1] + 7];
+    // the build-up: bring the ball up, then pass and cut around the defence until it is time to shoot
+    let cur = lay, hb = 0;
+    function buildUp(R) {
+      const from = ct.pos;
+      if (changed) {
+        const tr = Math.min(4200, Math.max(900, R * 0.4));
+        st.push({ f: tr, dots: lay, ball: handBall(lay, 0), lin: true, act: key(off, A[0]) }); R -= tr;
+      }
+      const nw = Math.floor(R / 1500);
+      if (nw < 1) { if (R > 150) st.push({ f: R, dots: cur, ball: handBall(cur, hb), lin: true }); return; }
+      let prev = cur;
+      for (let w = 0; w < nw; w++) {
+        const pos = {}, f = R / nw;
+        A.forEach((i, k) => {
+          const b = lay[key(off, i)] || [470, 250], cut = (w % 3 === 2 && k === (w + idx) % 5);
+          const q = cut ? ctReal(off, CT.hx - 90 - ctHash(idx, 400 + w) * 40, CT.hy + (ctHash(idx, 410 + w) - 0.5) * 120) : [front(b[0] + (ctHash(idx, 200 + w * 13 + k) - 0.5) * 80), Math.max(40, Math.min(460, b[1] + (ctHash(idx, 300 + w * 17 + k) - 0.5) * 100))];
+          pos[key(off, i)] = q;
+        });
+        Df.forEach((i, k) => { const o = prev[key(off, A[k] != null ? A[k] : A[0])] || [470, 250]; pos[key(1 - off, i)] = lerp(o, h, 0.3); });
+        const nb = (hb + 1 + Math.floor(ctHash(idx, 500 + w) * 4)) % 5, pass = nb !== hb;
+        hb = nb; cur = pos; prev = pos;
+        st.push({ f, dots: pos, ball: handBall(pos, hb), lin: true, bms: pass ? 420 : undefined, act: key(off, A[hb]) });
+      }
+    }
     switch (e.k) {
       case 'make': case 'miss': case 'block': {
-        const spot = ctSpot(e.t, e, idx), me = key(e.t, e.p), mv = Object.assign({}, lay);
+        const spot = ctSpot(e.t, e, idx), me = key(e.t, e.p), assist = e.k === 'make' && e.a >= 0 && lay[key(e.t, e.a)];
+        const fin = (assist ? 600 : 0) + 700 + (e.k === 'block' ? 500 + 800 : 900 + (e.k === 'make' ? 600 : 800));
+        buildUp((D > 0 ? D : fin + (changed ? 1800 : 600)) - fin);
+        const mv = Object.assign({}, cur);
         if (mv[me]) mv[me] = spot;
         let dk = null, bd = 1e9; for (const k of Object.keys(mv)) if (Math.floor(k / 100) === 1 - e.t) { const dd = Math.hypot(mv[k][0] - spot[0], mv[k][1] - spot[1]); if (dd < bd) { bd = dd; dk = k; } }
         if (dk) mv[dk] = [spot[0] + (h[0] - spot[0]) * 0.1, spot[1] + (h[1] - spot[1]) * 0.1 - 16];
-        if (e.k === 'make' && e.a >= 0 && lay[key(e.t, e.a)]) {
-          const ap = lay[key(e.t, e.a)];
-          st.push({ f: 700 + gap, dots: lay, ball: ap, act: key(e.t, e.a) });
-          st.push({ f: 800, dots: mv, ball: spot, act: me, trail: [ap, spot] });
-        } else st.push({ f: 1200 + gap, dots: mv, ball: spot, act: me });
+        if (assist) {
+          const ap = cur[key(e.t, e.a)] || lay[key(e.t, e.a)];
+          st.push({ f: 600, dots: cur, ball: ap, bms: 450, act: key(e.t, e.a) });
+          st.push({ f: 700, dots: mv, ball: spot, bms: 500, act: me, trail: [ap, spot] });
+        } else st.push({ f: 700, dots: mv, ball: spot, act: me });
         if (e.k === 'block') {
           const bk = key(1 - e.t, e.b), bp = mv[bk] ? [spot[0] + (h[0] - spot[0]) * 0.12, spot[1]] : spot, away = ctReal(e.t, CT.hx - 340, 250 + (ctHash(idx, 3) - 0.5) * 300);
           if (mv[bk]) mv[bk] = bp;
@@ -981,7 +1012,7 @@
           st.push({ f: 600, dots: mv, ball: [h[0], h[1] + 16], act: me, rim: 'swish', mark: [spot, true, e.t], pop: [e.is3 ? '3 PT' : e.and1 ? '+2 AND ONE' : '+2', spot, 'mk'] });
         } else {
           st.push({ f: 900, dots: mv, ball: h, act: me, trail: [spot, h] });
-          const rb = [h[0] + (ctDir(off) > 0 ? -1 : 1) * (40 + ctHash(idx, 4) * 40), h[1] + (ctHash(idx, 5) - 0.5) * 110];
+          const rb = [h[0] + (dir > 0 ? -1 : 1) * (40 + ctHash(idx, 4) * 40), h[1] + (ctHash(idx, 5) - 0.5) * 110];
           st.push({ f: 800, dots: mv, ball: rb, act: me, rim: 'clank', mark: [spot, false, e.t] });
         }
         ct.basket = h; break;
@@ -989,15 +1020,15 @@
       case 'reb': {
         const mv = Object.assign({}, lay), bk = ct.basket || h, k = key(e.t, e.p), px = [bk[0] + (bk[0] > CT.W / 2 ? -1 : 1) * (34 + ctHash(idx, 6) * 30), bk[1] + (ctHash(idx, 7) - 0.5) * 90];
         if (mv[k]) mv[k] = px;
-        const keys = Object.keys(lay).filter(x => x !== String(k));
-        // keep the others near the basket they were fighting under for a moment
-        for (const x of keys) { const c = ct.pos[x]; if (c) mv[x] = [c[0] + (bk[0] - c[0]) * 0.18, c[1] + (bk[1] - c[1]) * 0.18]; }
-        st.push({ f: 1000, dots: mv, ball: px, act: k, pop: [e.off ? 'OFF. REBOUND' : 'REBOUND', px, 'rb'] }); break;
+        for (const x of Object.keys(lay)) { if (x === String(k)) continue; const c = ct.pos[x]; if (c) mv[x] = [c[0] + (bk[0] - c[0]) * 0.18, c[1] + (bk[1] - c[1]) * 0.18]; }
+        st.push({ f: Math.max(700, D || 1000), dots: mv, ball: px, act: k, pop: [e.off ? 'OFF. REBOUND' : 'REBOUND', px, 'rb'] }); break;
       }
       case 'tov': {
-        const mv = Object.assign({}, lay), me = key(e.t, e.p), bp = lay[me] || [470, 250];
-        if (e.s >= 0 && mv[key(1 - e.t, e.s)]) { const sp = [bp[0] + (h[0] - bp[0]) * -0.06, bp[1] + 12]; mv[key(1 - e.t, e.s)] = sp; st.push({ f: 900, dots: mv, ball: sp, act: key(1 - e.t, e.s), pop: ['STEAL', sp, 'stl'] }); }
-        else st.push({ f: 800, dots: mv, ball: [bp[0], bp[1] < 250 ? -10 : 510], act: me, pop: ['TURNOVER', bp, 'stl'] });
+        const me = key(e.t, e.p), stl = e.s >= 0 && lay[key(1 - e.t, e.s)];
+        buildUp((D > 0 ? D : 2000) - 900);
+        const mv = Object.assign({}, cur), bp = cur[me] || lay[me] || [470, 250];
+        if (stl) { const sp = [bp[0] + (h[0] - bp[0]) * -0.06, bp[1] + 12]; mv[key(1 - e.t, e.s)] = sp; st.push({ f: 900, dots: mv, ball: sp, act: key(1 - e.t, e.s), pop: ['STEAL', sp, 'stl'] }); }
+        else st.push({ f: 900, dots: mv, ball: [bp[0], bp[1] < 250 ? -10 : 510], act: me, pop: ['TURNOVER', bp, 'stl'] });
         break;
       }
       case 'foul': case 'out': {
@@ -1012,35 +1043,46 @@
   function ctNet(kind) { const b = document.getElementById('court'); if (!b) return; b.classList.remove('swish', 'clank'); void b.offsetWidth; b.classList.add(kind); }
   // Free throws: a side view of the shooter, the rim and the net. Each shot lasts 2 s at 1x (the clock is stopped, so this is extra time).
   const FT_MS = 2000, ftMs = () => Math.max(240, Math.round(FT_MS / S.live.speed));
-  function ftSvg(col, txt) {
-    const xt = [256, 270, 284, 298, 312], xb = [268, 277, 284, 291, 300];
-    const net = xt.map((x, k) => `M${x} 102 ${xb[k]} 168`).join('') + [120, 138, 156].map(y => { const f = (y - 102) / 66; return `M${256 + 12 * f} ${y}H${312 - 12 * f}`; }).join('');
-    return `<svg class="ftsc" viewBox="0 0 360 250" role="img" aria-label="Free throw"><defs><linearGradient id="ftfl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2a18"/><stop offset="1" stop-color="#241810"/></linearGradient><linearGradient id="ftgl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe3ff" stop-opacity=".5"/><stop offset="1" stop-color="#7d9bc9" stop-opacity=".25"/></linearGradient><radialGradient id="ftbl" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#c2410c"/></radialGradient></defs>
-      <rect x="0" y="206" width="360" height="44" fill="url(#ftfl)"/><path d="M0 206H360" stroke="#6b4a2a" stroke-width="3"/><path d="M62 206V250" stroke="#d8c9a8" stroke-width="3" opacity=".6"/>
-      <rect x="326" y="24" width="8" height="182" rx="3" fill="#202a3d"/><rect x="316" y="26" width="10" height="92" rx="2" fill="url(#ftgl)" stroke="#9fb2d1" stroke-width="2.5"/><rect x="312" y="84" width="6" height="24" fill="none" stroke="#e5edf9" stroke-width="2"/>
-      <g class="ftrim"><path d="M254 102H314" stroke="#f97316" stroke-width="6" stroke-linecap="round"/><ellipse cx="284" cy="102" rx="30" ry="5.5" fill="none" stroke="#f97316" stroke-width="3" opacity=".75"/></g>
-      <g class="ftnet"><path d="${net}" stroke="#eef4ff" stroke-width="1.7" fill="none" opacity=".85"/></g>
-      <g class="ftpl"><ellipse cx="72" cy="206" rx="26" ry="5" fill="#000" opacity=".35"/><path d="M62 206 66 168M82 206 78 168" stroke="#e8c9a0" stroke-width="7" stroke-linecap="round"/><path d="M56 168H88L84 112H62Z" fill="${col}" stroke="#0b1220" stroke-width="2.5" stroke-linejoin="round"/><text x="73" y="146" text-anchor="middle" fill="#0b1220" font-size="15" font-weight="800">${esc(txt)}</text><circle cx="73" cy="96" r="12" fill="#e8c9a0" stroke="#0b1220" stroke-width="2.5"/><g class="ftarm"><path d="M80 118 94 112" stroke="#e8c9a0" stroke-width="7" stroke-linecap="round"/></g></g>
-      <g transform="translate(100,112)"><g class="ftx"><g class="fty"><g class="fts"><circle r="13" fill="url(#ftbl)" stroke="#7c2d05" stroke-width="1.8"/><path d="M-13 0H13M0 -13V13M-9 -9Q0 0 -9 9M9 -9Q0 0 9 9" stroke="#5b1f04" stroke-width="1.3" fill="none"/></g></g></g></g></svg>`;
+  function ftSvg(col) {
+    const xt = [176, 184, 192, 200, 208, 216, 224], xb = [187, 192, 196, 200, 204, 208, 213];
+    const net = xt.map((x, k) => `M${x} 128 ${xb[k]} 192`).join('') + [144, 160, 176].map(y => { const f = (y - 128) / 64, a = 24 - 11 * f; return `M${200 - a} ${y}Q200 ${y + 5} ${200 + a} ${y}`; }).join('') + xt.slice(0, -1).map((x, k) => `M${x} 128 ${xb[k + 1]} 192`).join('') + xt.slice(1).map((x, k) => `M${x} 128 ${xb[k]} 192`).join('');
+    const ball = `<g transform="translate(200,292)"><g class="ftx"><g class="fty"><g class="ftz"><g class="fts"><circle r="17" fill="url(#ftbl)" stroke="#6d2a05" stroke-width="1.6"/><path d="M-17 0H17M0 -17V17M-12 -12Q0 0 -12 12M12 -12Q0 0 12 12" stroke="#4d1c04" stroke-width="1.4" fill="none"/><ellipse cx="-6" cy="-7" rx="5" ry="3" fill="#fff" opacity=".28" transform="rotate(-30)"/></g></g></g></g></g>`;
+    const bokeh = [[40, 40, 14], [90, 150, 9], [330, 60, 16], [360, 160, 10], [20, 230, 12], [380, 250, 14], [70, 270, 8], [320, 210, 9]].map(([x, y, r], k) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${k % 3 ? '#8fb2ff' : '#ffcf7a'}"/>`).join('');
+    return `<svg class="ftsc" viewBox="0 0 400 300" role="img" aria-label="Free throw"><defs>
+      <linearGradient id="ftbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b16"/><stop offset="1" stop-color="#152036"/></linearGradient>
+      <radialGradient id="ftsp" cx=".5" cy=".38" r=".55"><stop offset="0" stop-color="#7ea2e6" stop-opacity=".38"/><stop offset="1" stop-color="#7ea2e6" stop-opacity="0"/></radialGradient>
+      <linearGradient id="ftgl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d5e6ff" stop-opacity=".34"/><stop offset=".5" stop-color="#9db8e6" stop-opacity=".14"/><stop offset="1" stop-color="#d5e6ff" stop-opacity=".26"/></linearGradient>
+      <linearGradient id="ftpo" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#121a2b"/><stop offset=".5" stop-color="#2a3a58"/><stop offset="1" stop-color="#121a2b"/></linearGradient>
+      <radialGradient id="ftbl" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#ffc472"/><stop offset=".55" stop-color="#e2731c"/><stop offset="1" stop-color="#8f3607"/></radialGradient>
+      <filter id="ftblur"><feGaussianBlur stdDeviation="7"/></filter></defs>
+      <rect width="400" height="300" fill="url(#ftbg)"/><g filter="url(#ftblur)" opacity=".42">${bokeh}</g><rect width="400" height="300" fill="url(#ftsp)"/>
+      <rect x="188" y="128" width="24" height="180" fill="url(#ftpo)"/>
+      <rect x="100" y="14" width="200" height="117" rx="6" fill="url(#ftgl)" stroke="#c4d3ee" stroke-width="4"/><path d="M112 22 150 22 112 62Z" fill="#fff" opacity=".1"/><path d="M258 120 288 120 288 90Z" fill="#fff" opacity=".07"/>
+      <rect x="168" y="64" width="64" height="50" fill="none" stroke="#f2f6ff" stroke-width="3.5"/>
+      <rect x="193" y="116" width="14" height="12" fill="#f97316"/>
+      <g class="ftrim"><path d="M176 126A24 6.5 0 0 1 224 126" fill="none" stroke="#b3470d" stroke-width="4.5"/></g>
+      <g class="bB">${ball}</g>
+      <g class="ftnet"><path d="${net}" stroke="#f3f7ff" stroke-width="1.5" fill="none" opacity=".8"/></g>
+      <g class="ftrim ftfront"><path d="M176 126A24 6.5 0 0 0 224 126" fill="none" stroke="#f97316" stroke-width="5" stroke-linecap="round"/><path d="M177 127A23 5.6 0 0 0 223 127" fill="none" stroke="#ffb066" stroke-width="1.4" opacity=".7"/></g><g class="bF">${ball}</g></svg>`;
   }
   function ctFT(e, idx) {
     const box = document.getElementById('ctft'), ct = S.live.ct, G = S.G; if (!box || !e.n) return 0;
-    const u = ftMs(), pl = G.teams[e.t].players[e.p], nm = pl ? pl.name : '', ini = nm.split(' ').map(x => x[0] || '').join('').slice(0, 2).toUpperCase(), col = ctColor(e.t).f;
+    const u = ftMs(), pl = G.teams[e.t].players[e.p], nm = pl ? pl.name : '', col = ctColor(e.t).f;
     const order = Array.from({ length: e.n }, (_, k) => k < e.m);
     for (let k = e.n - 1; k > 0; k--) { const j = Math.floor(ctHash(idx, k + 50) * (k + 1)); const x = order[k]; order[k] = order[j]; order[j] = x; }
     box.className = 'ctft on';
-    box.innerHTML = `<div class="ftw"><div class="ftl"></div>${ftSvg(col, ini)}<div class="ftdots">${order.map(() => '<i></i>').join('')}</div><div class="ftbig"></div></div>`;
-    const lab = box.querySelector('.ftl'), sc = box.querySelector('.ftsc'), dots = box.querySelectorAll('.ftdots i'), big = box.querySelector('.ftbig'), net = box.querySelector('.ftnet'), rim = box.querySelector('.ftrim');
+    box.innerHTML = `<div class="ftw"><div class="ftl"></div>${ftSvg(col)}<div class="ftdots">${order.map(() => '<i></i>').join('')}</div><div class="ftbig"></div></div>`;
+    const lab = box.querySelector('.ftl'), sc = box.querySelector('.ftsc'), dots = box.querySelectorAll('.ftdots i'), big = box.querySelector('.ftbig'), net = box.querySelector('.ftnet'), rims = box.querySelectorAll('.ftrim');
     sc.style.setProperty('--ftd', Math.round(u * 0.8) + 'ms');
     order.forEach((mk, k) => {
       const kind = mk ? 'make' : (ctHash(idx, k + 70) < 0.5 ? 'miss' : 'miss2');
       ct.tm.push(setTimeout(() => {
         lab.textContent = nm + ' · free throw ' + (k + 1) + ' of ' + e.n;
-        sc.setAttribute('class', 'ftsc'); net.setAttribute('class', 'ftnet'); rim.setAttribute('class', 'ftrim'); big.textContent = ''; big.className = 'ftbig'; void sc.getBoundingClientRect();
+        sc.setAttribute('class', 'ftsc'); net.setAttribute('class', 'ftnet'); rims.forEach(r => r.setAttribute('class', 'ftrim' + (r.classList.contains('ftfront') ? ' ftfront' : ''))); big.textContent = ''; big.className = 'ftbig'; void sc.getBoundingClientRect();
         sc.setAttribute('class', 'ftsc go ' + kind);
       }, k * u + 60));
       ct.tm.push(setTimeout(() => {
-        if (mk) net.setAttribute('class', 'ftnet swish'); else rim.setAttribute('class', 'ftrim shake');
+        if (mk) { net.setAttribute('class', 'ftnet swish'); box.classList.add('good'); setTimeout(() => box.classList.remove('good'), 450); } else rims.forEach(r => r.setAttribute('class', 'ftrim shake' + (r.classList.contains('ftfront') ? ' ftfront' : '')));
         dots[k].className = mk ? 'ok' : 'no'; big.textContent = mk ? 'Good' : 'No good'; big.className = 'ftbig ' + (mk ? 'ok' : 'no');
       }, k * u + Math.round(u * 0.62)));
     });
@@ -1049,7 +1091,7 @@
     return total;
   }
   // Draws the new events and returns { total, lead } in ms: how long the animation takes, and when the result (score, feed) should show.
-  function courtFeed(evs, base, full) {
+  function courtFeed(evs, base, full, dtMs) {
     const live = S.live, ct = live.ct, none = { total: 0, lead: 0 }; if (!ct || !ct.on || !document.getElementById('ctDots')) return none;
     if (!evs.length) { ctSync(); return none; }
     ct.tm.forEach(clearTimeout); ct.tm = [];
@@ -1059,8 +1101,12 @@
     evs.forEach((e, n) => {
       if (n < skip) return;
       if (e.k === 'ft') { list.push({ ft: e, idx: base + n }); return; }
-      if (relevant.includes(e.k)) list.push({ plan: ctPlan(e, base + n), e });
+      if (relevant.includes(e.k)) list.push({ e, idx: base + n });
     });
+    // the game time of the step is shared out between its plays; shots and turnovers get most of it
+    const WT = { make: 1, miss: 1, block: 1, tov: 1, reb: 0.2, foul: 0.08, out: 0.08, sub: 0.03, qend: 0.05 };
+    const wsum = list.reduce((a, it) => a + (it.e ? WT[it.e.k] || 0 : 0), 0);
+    for (const it of list) if (it.e) it.plan = ctPlan(it.e, it.idx, !batch && dtMs > 0 && wsum > 0 ? dtMs * (WT[it.e.k] || 0) / wsum : 0);
     if (batch) {
       let lastDots = null, lastBall = null;
       for (const it of list) { if (!it.plan) continue; for (const s of it.plan) { if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]); if (s.dots) lastDots = s.dots; if (s.ball) lastBall = s.ball; } }
@@ -1075,7 +1121,7 @@
         const ms = Math.max(60, Math.round(s.f / spd)), t0 = Math.round(at);
         ct.tm.push(setTimeout(() => {
           if (!S.live || S.live.ct !== ct) return;
-          ctSync(); ctApply(s.dots, ms, s.act); ctBall(s.ball, ms);
+          ctSync(); ctApply(s.dots, ms, s.act, s.lin ? 'linear' : null); ctBall(s.ball, s.bms ? Math.min(ms, Math.round(s.bms / spd)) : ms, s.lin && !s.bms ? 'linear' : null);
           if (s.trail) ctTrail(s.trail[0], s.trail[1]);
           if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]);
           if (s.pop) ctPop(s.pop[0], s.pop[1], s.pop[2]);
@@ -1086,6 +1132,22 @@
       }
     }
     return { total: Math.round(at), lead: list.some(x => x.ft || (x.e && ['make', 'miss', 'block', 'tov', 'reb'].includes(x.e.k))) ? Math.round(lead) : 0 };
+  }
+
+  // The game clock runs down second by second while a play is drawn (at 2x, 4x and 8x it runs that much faster).
+  function shownClock() {
+    const live = S.live, c = live && live.cl; if (!c) return S.G.clock;
+    return Math.max(c.to, c.from - (Date.now() - c.t0) / 1000 * c.sp);
+  }
+  function startClock(from, to, dt) {
+    const live = S.live; clearInterval(live.cint);
+    live.cl = { from, to: dt > 0 ? from - dt : to, t0: Date.now(), sp: live.speed || 1 };
+    live.cint = setInterval(() => {
+      if (S.live !== live || S.screen !== 'game') { clearInterval(live.cint); return; }
+      const v = shownClock(), el = document.getElementById('clk');
+      if (el) el.textContent = mmss(Math.max(0, Math.round(v)));
+      if (live.cl && v <= live.cl.to) { clearInterval(live.cint); live.cl = null; }
+    }, Math.max(50, Math.round(500 / (live.speed || 1))));
   }
 
   // live loop
@@ -1116,7 +1178,7 @@
     if (G.q !== q) { live.playing = false; openWindow('end of ' + (q <= 4 ? 'Q' + q : 'overtime')); updateGame(); return; }
     if (G.mo && G.mo.pending) { live.playing = false; updateGame(); showMoment(); return; }
     if (checkAlerts()) { live.playing = false; updateGame(); return; }
-    const info = courtFeed(G.log.slice(b0), b0, false); live.cd = G.log.length;
+    startClock(c0, G.clock, dt); const info = courtFeed(G.log.slice(b0), b0, false, dt * 1000); live.cd = G.log.length;
     if (info.lead > 0) { clearTimeout(live.defer); live.defer = setTimeout(() => { live.defer = null; if (S.live === live && S.screen === 'game') updateGame(); }, info.lead); } else updateGame();
     live.timer = setTimeout(loop, Math.max(Math.round(dt * 1000 / (live.speed || 1)), info.total + 80));
   }

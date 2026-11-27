@@ -686,28 +686,32 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .ftdots i.ok{background:#34d399;border-color:#34d399}.ftdots i.no{background:#f87171;border-color:#f87171}
 .ftbig{font:800 20px var(--display);letter-spacing:.08em;text-transform:uppercase;min-height:26px;margin-top:2px}
 .ftbig.ok{color:#34d399}.ftbig.no{color:#f87171}
-.ftsc .ftx,.ftsc .fty,.ftsc .fts,.ftsc .ftarm,.ftsc .ftpl{animation-duration:var(--ftd,1.6s);animation-fill-mode:forwards;animation-timing-function:linear}
-.ftsc .ftnet,.ftsc .ftrim{transform-origin:284px 102px}
-.ftsc .ftarm{transform-origin:80px 118px}
-.ftsc.go .fts{animation-name:ftspin;animation-timing-function:linear}
-@keyframes ftspin{to{transform:rotate(-620deg)}}
-.ftsc.go .ftarm{animation-name:ftarm}
-@keyframes ftarm{0%{transform:rotate(30deg)}25%{transform:rotate(-40deg)}60%{transform:rotate(-70deg)}100%{transform:rotate(-20deg)}}
-.ftsc.go .ftpl{animation-name:ftbob}
-@keyframes ftbob{0%{transform:translateY(0)}25%{transform:translateY(3px)}45%{transform:translateY(-5px)}100%{transform:translateY(0)}}
-.ftsc.go.make .ftx{animation-name:ftxm}.ftsc.go.make .fty{animation-name:ftym}
-.ftsc.go.miss .ftx{animation-name:ftx1}.ftsc.go.miss .fty{animation-name:fty1}
-.ftsc.go.miss2 .ftx{animation-name:ftx2}.ftsc.go.miss2 .fty{animation-name:fty2}
-@keyframes ftxm{0%{transform:translateX(0)}86%{transform:translateX(184px)}100%{transform:translateX(184px)}}
-@keyframes ftym{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.25,.7,.4,1)}42%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.5,0,.9,.6)}86%{transform:translateY(-10px);animation-timing-function:cubic-bezier(.4,0,1,1)}100%{transform:translateY(58px)}}
-@keyframes ftx1{0%{transform:translateX(0)}80%{transform:translateX(158px)}100%{transform:translateX(104px)}}
-@keyframes fty1{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.25,.7,.4,1)}42%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.5,0,.9,.6)}80%{transform:translateY(-14px);animation-timing-function:cubic-bezier(.2,.6,.4,1)}90%{transform:translateY(-62px);animation-timing-function:cubic-bezier(.5,0,1,.6)}100%{transform:translateY(92px)}}
-@keyframes ftx2{0%{transform:translateX(0)}88%{transform:translateX(206px)}100%{transform:translateX(150px)}}
-@keyframes fty2{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.25,.7,.4,1)}42%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.5,0,.9,.6)}88%{transform:translateY(-6px);animation-timing-function:cubic-bezier(.2,.6,.4,1)}94%{transform:translateY(-40px);animation-timing-function:cubic-bezier(.5,0,1,.6)}100%{transform:translateY(96px)}}
+.ftsc .ftx,.ftsc .fty,.ftsc .ftz,.ftsc .fts{animation-duration:var(--ftd,1.6s);animation-fill-mode:forwards;animation-timing-function:linear}
+.ftsc .ftz,.ftsc .fts{transform-origin:0 0}
+.ftsc .bB{opacity:0}
+.ftsc.go.make .bF{animation:visf var(--ftd,1.6s) forwards}.ftsc.go.make .bB{animation:visb var(--ftd,1.6s) forwards}
+@keyframes visf{0%,76%{opacity:1}76.01%,100%{opacity:0}}
+@keyframes visb{0%,76%{opacity:0}76.01%,100%{opacity:1}}
+.ftsc .ftnet,.ftsc .ftrim{transform-origin:200px 126px}
+.ftsc.go .fts{animation-name:ftspin}
+@keyframes ftspin{to{transform:rotate(-520deg)}}
+.ftsc.go.make .ftx{animation-name:ftxm}.ftsc.go.make .fty{animation-name:ftym}.ftsc.go.make .ftz{animation-name:ftzm}
+.ftsc.go.miss .ftx{animation-name:ftx1}.ftsc.go.miss .fty{animation-name:fty1}.ftsc.go.miss .ftz{animation-name:ftz1}
+.ftsc.go.miss2 .ftx{animation-name:ftx2}.ftsc.go.miss2 .fty{animation-name:fty2}.ftsc.go.miss2 .ftz{animation-name:ftz2}
+@keyframes ftxm{0%{transform:translateX(0)}45%{transform:translateX(3px)}100%{transform:translateX(0)}}
+@keyframes ftym{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.65,.4,1)}45%{transform:translateY(-252px);animation-timing-function:cubic-bezier(.5,0,.9,.55)}82%{transform:translateY(-166px);animation-timing-function:cubic-bezier(.4,0,1,1)}100%{transform:translateY(-100px)}}
+@keyframes ftzm{0%{transform:scale(1.7);animation-timing-function:cubic-bezier(.2,.65,.4,1)}45%{transform:scale(1);animation-timing-function:cubic-bezier(.5,0,.9,.55)}82%{transform:scale(.62)}100%{transform:scale(.58)}}
+@keyframes ftx1{0%{transform:translateX(0)}80%{transform:translateX(2px)}90%{transform:translateX(36px)}100%{transform:translateX(80px)}}
+@keyframes fty1{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.65,.4,1)}45%{transform:translateY(-252px);animation-timing-function:cubic-bezier(.5,0,.9,.55)}80%{transform:translateY(-158px);animation-timing-function:cubic-bezier(.2,.6,.4,1)}90%{transform:translateY(-192px);animation-timing-function:cubic-bezier(.5,0,1,.6)}100%{transform:translateY(-26px)}}
+@keyframes ftz1{0%{transform:scale(1.7);animation-timing-function:cubic-bezier(.2,.65,.4,1)}45%{transform:scale(1);animation-timing-function:cubic-bezier(.5,0,.9,.55)}80%{transform:scale(.62)}90%{transform:scale(.8)}100%{transform:scale(1.2)}}
+@keyframes ftx2{0%{transform:translateX(0)}82%{transform:translateX(4px)}92%{transform:translateX(-24px)}100%{transform:translateX(-70px)}}
+@keyframes fty2{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.65,.4,1)}45%{transform:translateY(-252px);animation-timing-function:cubic-bezier(.5,0,.9,.55)}82%{transform:translateY(-170px);animation-timing-function:cubic-bezier(.2,.6,.4,1)}92%{transform:translateY(-250px);animation-timing-function:cubic-bezier(.5,0,1,.6)}100%{transform:translateY(-56px)}}
+@keyframes ftz2{0%{transform:scale(1.7);animation-timing-function:cubic-bezier(.2,.65,.4,1)}45%{transform:scale(1);animation-timing-function:cubic-bezier(.5,0,.9,.55)}82%{transform:scale(.6)}92%{transform:scale(.55)}100%{transform:scale(.95)}}
 .ftnet.swish{animation:netw .6s}
-@keyframes netw{25%{transform:scale(.86,1.2)}55%{transform:scale(1.07,.94)}80%{transform:scale(.98,1.04)}}
+@keyframes netw{25%{transform:scale(.84,1.16)}55%{transform:scale(1.06,.95)}80%{transform:scale(.98,1.03)}}
 .ftrim.shake{animation:rimk .45s}
-@keyframes rimk{20%{transform:translateY(3px)}45%{transform:translateY(-2px)}70%{transform:translateY(1px)}}
+@keyframes rimk{20%{transform:translateY(2.5px)}45%{transform:translateY(-1.5px)}70%{transform:translateY(1px)}}
+.ctft.good .ftfront path:first-child{stroke:#34d399}
 @media(max-width:600px){.ctcourt:has(.ctft.on){min-height:340px}.ctcourt:has(.ctft.on)>svg{height:340px}}
 </style>
 </head>

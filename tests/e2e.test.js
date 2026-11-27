@@ -64,7 +64,12 @@ async function run(signedIn, comp = 'nba') {
   await until(() => doc.querySelector('[data-a=timeout]'), 'game screen');
   click('[data-a=timeout]');
   // the live loop at 8x: it keeps real-time pacing (about 1.5 s of wall clock per possession) and must advance without errors
-  { const n0 = w.__S.G.log.length; click('[data-a=speed][data-v="8"]'); click('[data-a=resume]'); await until(() => w.__S.G.log.length >= n0 + 3, 'live loop advances', 15000); click('[data-a=pause]'); }
+  { const n0 = w.__S.G.log.length, clk = new Set(), tr = new Set(); let moves = 0;
+    const sample = setInterval(() => { const c = doc.getElementById('clk'); if (c) clk.add(c.textContent); doc.querySelectorAll('#ctDots .ctd').forEach((g, i) => { const v = g.style.transform; if (!tr.has(i + v)) { tr.add(i + v); moves++; } }); }, 15);
+    const realST = w.setTimeout; w.setTimeout = (f, ms) => setTimeout(f, ms);   // this block runs with the real pacing
+    click('[data-a=speed][data-v="8"]'); click('[data-a=resume]'); await until(() => w.__S.G.log.length >= n0 + 10, 'live loop advances', 30000); click('[data-a=pause]'); clearInterval(sample); w.setTimeout = realST;
+    assert.ok(clk.size >= 6, 'the clock ticks while a play is drawn (saw ' + clk.size + ' values)');
+    assert.ok(moves >= 30, 'the players keep moving during the possession (' + moves + ' position changes)'); }
   click('[data-a=skipq]'); await tick(30);
   if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elgame.html', '<!doctype html>' + doc.documentElement.outerHTML);
   click('[data-a=skipg]');
