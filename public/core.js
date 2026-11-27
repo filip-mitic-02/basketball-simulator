@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-26.3';
+  const VERSION = 'sim-2026-11-27.1';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -148,9 +148,11 @@
     const last = Math.round(TRADE.lastGame * L.R.games / 82);
     return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= last && used < TRADE.max, left: TRADE.max - used, lastGame: last, played: L.userGames.length };
   }
-  function tradeOffers(SE, give) {
+  // `pos` (optional) is the position the incoming player must play; the roster must still fill every slot (two per position).
+  function tradeOffers(SE, give, pos) {
     const P = SE.user.players;
     if (!isIdx(give, P.length)) return [];
+    if (pos != null && !E.POS.includes(pos)) return [];
     const out = P[give], rest = P.filter((_, i) => i !== give), have = new Set(P.map(p => p.name));
     let cands = [];
     for (const w of TRADE.win) {
@@ -158,18 +160,25 @@
       for (const t of SE.pool) for (const p of t.players) {
         if (have.has(p.name) || seen.has(p.name) || p.mpg < TRADE.minMpg || Math.abs(p.ovr - out.ovr) > w) continue;
         const np = Object.assign({}, p, { fromLabel: t.label, fromSeason: t.season, fromTm: t.tm });
+        if (pos != null) {
+          if (!E.eligible(p).includes(pos)) continue;
+          np._el = [pos];
+        }
         if (!E.canAdd(rest, np)) continue;
         seen.add(p.name); cands.push(np);
       }
       if (cands.length >= 12) break;
     }
-    const rng = E.mulberry32((SE.seed ^ Math.imul(SE.L.trades.length + 1, 0x9e3779b1) ^ Math.imul(give + 7, 0x85ebca6b)) >>> 0), res = [];
+    const rng = E.mulberry32((SE.seed ^ Math.imul(SE.L.trades.length + 1, 0x9e3779b1) ^ Math.imul(give + 7, 0x85ebca6b) ^ (pos == null ? 0 : Math.imul(E.POS.indexOf(pos) + 11, 0xc2b2ae35))) >>> 0), res = [];
     while (res.length < TRADE.offers && cands.length) res.push(cands.splice(Math.floor(rng() * cands.length), 1)[0]);
     return res;
   }
-  function doTrade(SE, give, idx) {
+  function tradePositions(SE, give) {
+    return E.POS.filter(pos => tradeOffers(SE, give, pos).length > 0);
+  }
+  function doTrade(SE, give, idx, pos) {
     if (!tradeState(SE).open) return false;
-    const offs = tradeOffers(SE, give), np = offs[idx];
+    const offs = tradeOffers(SE, give, pos), np = offs[idx];
     if (!np) return false;
     const U = SE.user, L = SE.L, old = U.players[give];
     U.players[give] = np;
@@ -179,7 +188,7 @@
     L.tradedAway.push({ name: old.name, agg: L.agg[give] });
     L.agg[give] = { g: 0, sec: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0 };
     L.trades.push({ day: L.userGames.length, out: old.name, in: np.name });
-    SE.log.push(['tr', give, idx]);
+    SE.log.push(pos == null ? ['tr', give, idx] : ['tr', give, idx, pos]);
     return true;
   }
 
@@ -353,7 +362,7 @@
           }
           break;
         }
-        case 'tr': if (!Number.isInteger(c[1]) || !Number.isInteger(c[2]) || !doTrade(SE, c[1], c[2])) bad('trade'); break;
+        case 'tr': if (!Number.isInteger(c[1]) || !Number.isInteger(c[2]) || !(c[3] == null || typeof c[3] === 'string') || !doTrade(SE, c[1], c[2], c[3])) bad('trade'); break;
         case 'sp': if (L.phase !== 'seasonDone') bad('phase'); LG.startPlayoffs(L); break;
         case 'lg': case 'lp': {
           const po = c[0] === 'lp';
@@ -431,7 +440,7 @@
   return {
     VERSION, DRAFT_ROUNDS, MAX_SKIPS, MIN_Y, MAX_Y, MIN_POOL, Invalid,
     prepData, mkTeams, poolOf, validEra, fitPositions, pickable, rollTeam, makePick,
-    createSeason, tradeState, tradeOffers, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
+    createSeason, tradeState, tradeOffers, tradePositions, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
     replay, resultLabel, calcScore, achievements, summarize, poWins, poLosses
   };
 });

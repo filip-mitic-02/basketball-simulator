@@ -64,6 +64,7 @@ async function run(signedIn, comp = 'nba') {
   await until(() => doc.querySelector('[data-a=timeout]'), 'game screen');
   click('[data-a=timeout]');
   click('[data-a=skipq]'); await tick(30);
+  if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elgame.html', '<!doctype html>' + doc.documentElement.outerHTML);
   click('[data-a=skipg]');
   await until(() => doc.querySelector('[data-a=finish]'), 'game over');
   click('[data-a=finish]');
@@ -72,6 +73,8 @@ async function run(signedIn, comp = 'nba') {
   click('[data-a=gotrade]');
   await until(() => doc.querySelector('[data-a=tgive]'), 'trade screen');
   click('[data-a=tgive][data-i="4"]');
+  await until(() => doc.querySelector('[data-a=tpos]:not([disabled])'), 'positions');
+  click('[data-a=tpos]:not([disabled])');
   await until(() => doc.querySelectorAll('[data-a=toffer]').length === 3, 'three offers');
   if (process.env.DUMP) require_fs.writeFileSync('/tmp/trade.html', '<!doctype html>' + doc.documentElement.outerHTML);
   const gone = w.__S.user.players[4].name;

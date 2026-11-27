@@ -645,11 +645,14 @@
       <span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}">${vis ? dp(p) : '??'}</span></button>`).join('');
     let offers = '';
     if (T.give != null) {
-      const out = P[T.give], offs = Core.tradeOffers(S.SE, T.give);
-      offers = offs.length ? `<div class="eyebrow" style="margin-top:22px">Offers for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. The small numbers show the difference from ${esc(out.name.split(' ').slice(-1)[0])}: green is better, red is worse.</p><div class="tcards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`;
+      const out = P[T.give], poss = Core.tradePositions(S.SE, T.give);
+      if (T.pos != null && !poss.includes(T.pos)) T.pos = null;
+      const offs = T.pos != null ? Core.tradeOffers(S.SE, T.give, T.pos) : [];
+      const pbar = `<div class="eyebrow" style="margin-top:22px">Which position do you want back?</div><p class="note" style="margin-bottom:10px">Your roster always keeps two players at each position, so someone else shifts if you change positions. Greyed out: nobody suitable is available.</p><div class="posbar">${['PG', 'SG', 'SF', 'PF', 'C'].map(x => `<button class="posb ${T.pos === x ? 'on' : ''}" data-a="tpos" data-p="${x}" ${poss.includes(x) ? '' : 'disabled'}>${x}</button>`).join('')}</div>`;
+      offers = T.pos == null ? pbar : pbar + (offs.length ? `<div class="eyebrow" style="margin-top:22px">Offers at ${T.pos} for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. The small numbers show the difference from ${esc(out.name.split(' ').slice(-1)[0])}: green is better, red is worse.</p><div class="tcards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`);
     }
     return `<div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="font-size:36px">Trade</h2><button class="btn pri" data-a="tback">Back</button></div>
-      <p class="note" style="margin-bottom:14px">Trades left: <b>${st.left}</b> &middot; deadline: game ${st.lastGame} (you have played ${st.played}). Pick the player to give up, then choose one of three offers. A trade cannot be undone.</p>
+      <p class="note" style="margin-bottom:14px">Trades left: <b>${st.left}</b> &middot; deadline: game ${st.lastGame} (you have played ${st.played}). Pick the player to give up, the position you want back, then one of three offers. A trade cannot be undone.</p>
       <div class="panel"><div class="eyebrow">Who goes?</div><div class="trtab">${head}${rows}</div></div>${offers}`;
   };
   SCREENS.hub = () => {
@@ -775,9 +778,9 @@
   const mySide = () => S.G.userSide;
   const canCoach = () => S.live.window && S.G.coachOpen && !S.G.over;
   SCREENS.game = () => `<div id="alerts"></div><div id="sb" class="sb"></div>
-    <div class="gm"><div class="panel"><div class="eyebrow">Play by play</div><div class="feed" id="feed"></div><div class="ctrl" id="ctrl"></div></div>
+    <div class="gm"><div class="panel"><div class="eyebrow">Court <button class="chip" data-a="ctoggle" style="margin-left:auto">Show / hide</button></div><div class="court" id="court">${courtSvg()}<div class="ctft" id="ctft"></div></div><div class="eyebrow" style="margin-top:14px">Play by play</div><div class="feed" id="feed"></div><div class="ctrl" id="ctrl"></div></div>
     <div class="panel"><div id="sidetabs"></div><div id="sidebody"></div><div class="ctrl" id="sidectl"></div></div></div>`;
-  AFTER.game = () => { S.live.fed = 0; updateGame(true); };
+  AFTER.game = () => { S.live.fed = 0; ctInit(); updateGame(true); };
 
   function evHtml(G, e) {
     const side = mySide();
@@ -800,9 +803,11 @@
     const feed = document.getElementById('feed');
     if (full) feed.innerHTML = '';
     const log = G.log; let h = '';
+    const fresh = log.slice(live.fed), base0 = live.fed;
     for (let i = live.fed; i < log.length; i++) h = evHtml(G, log[i]) + h;
     if (h) feed.insertAdjacentHTML('afterbegin', h);
     live.fed = log.length;
+    courtFeed(fresh, base0, full);
     const spd = [1, 2, 4, 8].map(s => `<button class="chip ${live.speed === s ? 'on' : ''}" data-a="speed" data-v="${s}">${s}x</button>`).join('');
     setHTML('ctrl', G.over ? '<button class="btn pri" data-a="finish">Continue</button>' :
       `${live.playing ? '<button class="btn pri" data-a="pause">Pause</button>' : '<button class="btn pri" data-a="resume">' + (live.window ? 'Resume game' : 'Resume') + '</button>'}${spd}
@@ -861,6 +866,212 @@
     setHTML('sidectl', G.over ? '' : `<button class="btn amb" data-a="timeout" ${G.to[side] <= 0 ? 'disabled' : ''}>Call timeout (${G.to[side]} left)</button> <span class="note">Space pauses / resumes</span>`);
   }
 
+
+  // ---------- COURT (cosmetic only: drawn from the play-by-play, it never touches the simulation) ----------
+  // The engine only records the outcome of each possession, so positions are illustrative: shot spots come from a hash of the event index.
+  const CT = { W: 940, H: 500, hx: 888, hy: 250 }, CTNS = 'http://www.w3.org/2000/svg';
+  const OFFP = [[590, 250], [690, 110], [690, 390], [800, 165], [835, 330]];
+  function ctHash(a, b) { let h = (Math.imul(a + 1, 2654435761) ^ Math.imul(b + 7, 40503) ^ 0x9e3779b9) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; }
+  function svgEl(tag, at, parent) { const e = document.createElementNS(CTNS, tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.appendChild(e); return e; }
+  const ctDir = t => (t === mySide() ? 1 : -1);
+  const ctReal = (t, x, y) => ctDir(t) === 1 ? [x, y] : [CT.W - x, CT.H - y];
+  const ctHoop = t => ctReal(t, CT.hx, CT.hy);
+  function courtSvg() {
+    const ln = 'fill="none" stroke="#3a4a66" stroke-width="3"';
+    const half = (m) => { const X = x => m ? CT.W - x : x, sw = m ? 0 : 1;
+      return `<rect x="${m ? CT.W - 190 : 0}" y="170" width="190" height="160" ${ln}/><circle cx="${X(190)}" cy="250" r="60" ${ln}/><path d="M${X(0)} 30H${X(141.5)}A237.5 237.5 0 0 ${sw} ${X(141.5)} 470H${X(0)}" ${ln}/><path d="M${X(52)} 210A40 40 0 0 ${sw} ${X(52)} 290" ${ln}/><path d="M${X(40)} 220V280" stroke="#9fb2d1" stroke-width="5"/><circle cx="${X(52)}" cy="250" r="8" fill="none" stroke="#f97316" stroke-width="4"/>`; };
+    return `<svg viewBox="0 0 ${CT.W} ${CT.H}" role="img" aria-label="Court"><rect x="1.5" y="1.5" width="${CT.W - 3}" height="${CT.H - 3}" rx="10" fill="#111827" stroke="#3a4a66" stroke-width="3"/><path d="M470 0V500" ${ln}/><circle cx="470" cy="250" r="60" ${ln}/>${half(0)}${half(1)}<g id="ctShots"></g><g id="ctTrail"></g><g id="ctDots"></g><g id="ctBall"><circle r="9" fill="#f59e0b" stroke="#fff" stroke-width="2"/><path d="M-9 0H9M0 -9V9" stroke="#7c3a05" stroke-width="1.4"/></g><g id="ctTxt"></g></svg>`;
+  }
+  const ctLay = (G, off) => {
+    const out = {}, d = 1 - off, srt = t => G.on[t].slice().sort((a, b) => E.POS.indexOf(G.teams[t].players[a].slot) - E.POS.indexOf(G.teams[t].players[b].slot));
+    const A = srt(off), D = srt(d), h = ctHoop(off);
+    A.forEach((i, k) => { const q = OFFP[k] || OFFP[4]; out[off * 100 + i] = ctReal(off, q[0], q[1]); });
+    D.forEach((i, k) => { const a = out[off * 100 + (A[k] != null ? A[k] : A[0])] || [470, 250]; out[d * 100 + i] = [a[0] + (h[0] - a[0]) * 0.28, a[1] + (h[1] - a[1]) * 0.28]; });
+    return out;
+  };
+  function ctSpot(t, e, idx) {
+    const r1 = ctHash(idx, 1), r2 = ctHash(idx, 2), th = (r1 - 0.5) * 2 * (e.is3 ? 1.25 : 1.4), near = !e.is3 && r2 < 0.38;
+    const rad = e.is3 ? 246 : near ? 30 + r2 * 90 : 75 + r2 * 120;
+    return ctReal(t, CT.hx - rad * Math.cos(th), Math.max(28, Math.min(472, CT.hy + rad * Math.sin(th))));
+  }
+  function ctColor(t) {
+    const G = S.G;
+    if (t === mySide()) return { f: '#fbbf24', t: '#1a1100' };
+    const c = clubCols(G.teams[t].tm), hue = c.h;
+    return { f: hue > 30 && hue < 64 ? c.d : c.a, t: '#fff' };
+  }
+  function ctInit() {
+    const live = S.live; let on = true; try { on = localStorage.getItem('ps_court') !== '0'; } catch (e) { }
+    live.ct = { on, off: mySide(), els: {}, pos: {}, ball: [CT.W / 2, CT.H / 2], basket: ctHoop(mySide()), shots: 0, tm: [] };
+    const box = document.getElementById('court'); if (!box) return;
+    box.classList.toggle('off', !on);
+    const svg = document.getElementById('ctDots'); if (!svg) return;
+    ctSync(); ctApply(ctLay(S.G, live.ct.off), 0, null);
+  }
+  function ctSync() {
+    const G = S.G, ct = S.live.ct, layer = document.getElementById('ctDots'); if (!layer) return;
+    const want = {};
+    for (const t of [0, 1]) for (const i of G.on[t]) want[t * 100 + i] = [t, i];
+    for (const k of Object.keys(ct.els)) if (!want[k]) { ct.els[k].remove(); delete ct.els[k]; delete ct.pos[k]; }
+    for (const k of Object.keys(want)) {
+      if (ct.els[k]) continue;
+      const [t, i] = want[k], col = ctColor(t), nm = G.teams[t].players[i].name.split(' ');
+      const g = svgEl('g', { class: 'ctd' }, layer);
+      svgEl('circle', { r: 25, class: 'ring' }, g); svgEl('circle', { r: 18, fill: col.f, stroke: '#0b1220', 'stroke-width': 3 }, g);
+      const tx = svgEl('text', { 'text-anchor': 'middle', dy: '.35em', fill: col.t, 'font-size': 14, 'font-weight': 700 }, g); tx.textContent = (nm[0][0] + (nm[nm.length - 1][0] || '')).toUpperCase();
+      g.style.transform = 'translate(470px,-30px)'; ct.els[k] = g; ct.pos[k] = [470, -30];
+    }
+  }
+  function ctApply(pos, ms, actor) {
+    const ct = S.live.ct;
+    for (const k of Object.keys(pos)) {
+      const g = ct.els[k]; if (!g) continue;
+      g.style.transition = ms ? 'transform ' + ms + 'ms cubic-bezier(.3,.7,.3,1)' : 'none';
+      g.style.transform = 'translate(' + Math.round(pos[k][0]) + 'px,' + Math.round(pos[k][1]) + 'px)'; ct.pos[k] = pos[k];
+      g.classList.toggle('act', String(k) === String(actor));
+    }
+  }
+  function ctBall(xy, ms) {
+    const ct = S.live.ct, b = document.getElementById('ctBall'); if (!b) return;
+    b.style.transition = ms ? 'transform ' + ms + 'ms cubic-bezier(.35,.1,.3,1)' : 'none';
+    b.style.transform = 'translate(' + Math.round(xy[0]) + 'px,' + Math.round(xy[1]) + 'px)'; ct.ball = xy;
+  }
+  function ctPop(txt, xy, cls) {
+    const layer = document.getElementById('ctTxt'); if (!layer) return;
+    const t = svgEl('text', { x: Math.round(xy[0]), y: Math.round(xy[1] - 30), 'text-anchor': 'middle', class: 'ctpop ' + (cls || '') }, layer); t.textContent = txt;
+    setTimeout(() => t.remove(), 1400);
+  }
+  function ctMark(xy, made, t) {
+    const layer = document.getElementById('ctShots'), ct = S.live.ct; if (!layer) return;
+    const c = ctColor(t).f;
+    if (made) svgEl('circle', { cx: Math.round(xy[0]), cy: Math.round(xy[1]), r: 7, fill: c, stroke: '#fff', 'stroke-width': 1.5, opacity: .9 }, layer);
+    else svgEl('path', { d: `M${Math.round(xy[0]) - 6} ${Math.round(xy[1]) - 6}l12 12m0 -12l-12 12`, stroke: c, 'stroke-width': 3, opacity: .75, fill: 'none' }, layer);
+    if (++ct.shots > 140) { layer.firstChild.remove(); ct.shots--; }
+  }
+  function ctTrail(a, b) {
+    const layer = document.getElementById('ctTrail'); if (!layer) return;
+    const l = svgEl('line', { x1: Math.round(a[0]), y1: Math.round(a[1]), x2: Math.round(b[0]), y2: Math.round(b[1]), class: 'cttr' }, layer);
+    setTimeout(() => l.remove(), 1200);
+  }
+  // one list of stages per play: { f: share of the time, dots: moves, ball, pop, trail, mark, rim }
+  function ctPlan(e, idx) {
+    const G = S.G, ct = S.live.ct, nm = (t, i) => (i != null && i >= 0 && G.teams[t].players[i]) ? G.teams[t].players[i].name.split(' ').slice(-1)[0] : '';
+    const key = (t, i) => t * 100 + i, st = [];
+    const off = e.k === 'qend' || e.k === 'sub' ? (e.k === 'qend' ? mySide() : ct.off) : e.k === 'foul' || e.k === 'out' ? 1 - e.t : e.t, lay = ctLay(G, off), h = ctHoop(off);
+    const near = (xy, away) => [xy[0] + (h[0] - xy[0]) * 0.1, xy[1] + (h[1] - xy[1]) * 0.1 + (away || 0)];
+    ct.off = off;
+    switch (e.k) {
+      case 'make': case 'miss': case 'block': {
+        const spot = ctSpot(e.t, e, idx), me = key(e.t, e.p), mv = Object.assign({}, lay);
+        if (mv[me]) mv[me] = spot;
+        let dk = null, bd = 1e9; for (const k of Object.keys(mv)) if (Math.floor(k / 100) === 1 - e.t) { const dd = Math.hypot(mv[k][0] - spot[0], mv[k][1] - spot[1]); if (dd < bd) { bd = dd; dk = k; } }
+        if (dk) mv[dk] = [spot[0] + (h[0] - spot[0]) * 0.1, spot[1] + (h[1] - spot[1]) * 0.1 - 16];
+        if (e.k === 'make' && e.a >= 0 && lay[key(e.t, e.a)]) {
+          const ap = lay[key(e.t, e.a)];
+          st.push({ f: 0.2, dots: lay, ball: ap, act: key(e.t, e.a) });
+          st.push({ f: 0.28, dots: mv, ball: spot, act: me, trail: [ap, spot] });
+        } else st.push({ f: 0.45, dots: mv, ball: spot, act: me });
+        if (e.k === 'block') {
+          const bk = key(1 - e.t, e.b), bp = mv[bk] ? [spot[0] + (h[0] - spot[0]) * 0.12, spot[1]] : spot, away = ctReal(e.t, CT.hx - 340, 250 + (ctHash(idx, 3) - 0.5) * 300);
+          if (mv[bk]) mv[bk] = bp;
+          st.push({ f: 0.2, dots: mv, ball: bp, act: bk, pop: ['BLOCK', bp, 'blk'] });
+          st.push({ f: 0.25, dots: mv, ball: away, mark: [spot, false, e.t] });
+        } else if (e.k === 'make') {
+          st.push({ f: 0.17, dots: mv, ball: h, act: me, trail: [spot, h] });
+          st.push({ f: 0.2, dots: mv, ball: [h[0], h[1] + 16], act: me, rim: 'swish', mark: [spot, true, e.t], pop: [e.is3 ? '3 PT' : e.and1 ? '+2 AND ONE' : '+2', spot, 'mk'] });
+        } else {
+          st.push({ f: 0.17, dots: mv, ball: h, act: me, trail: [spot, h] });
+          const rb = [h[0] + (ctDir(off) > 0 ? -1 : 1) * (40 + ctHash(idx, 4) * 40), h[1] + (ctHash(idx, 5) - 0.5) * 110];
+          st.push({ f: 0.2, dots: mv, ball: rb, act: me, rim: 'clank', mark: [spot, false, e.t] });
+        }
+        ct.basket = h; break;
+      }
+      case 'reb': {
+        const mv = Object.assign({}, lay), bk = ct.basket || h, k = key(e.t, e.p), px = [bk[0] + (bk[0] > CT.W / 2 ? -1 : 1) * (34 + ctHash(idx, 6) * 30), bk[1] + (ctHash(idx, 7) - 0.5) * 90];
+        if (mv[k]) mv[k] = px;
+        const keys = Object.keys(lay).filter(x => x !== String(k));
+        // keep the others near the basket they were fighting under for a moment
+        for (const x of keys) { const c = ct.pos[x]; if (c) mv[x] = [c[0] + (bk[0] - c[0]) * 0.18, c[1] + (bk[1] - c[1]) * 0.18]; }
+        st.push({ f: 0.6, dots: mv, ball: px, act: k, pop: [e.off ? 'OFF. REBOUND' : 'REBOUND', px, 'rb'] }); break;
+      }
+      case 'tov': {
+        const mv = Object.assign({}, lay), me = key(e.t, e.p), bp = lay[me] || [470, 250];
+        if (e.s >= 0 && mv[key(1 - e.t, e.s)]) { const sp = [bp[0] + (h[0] - bp[0]) * -0.06, bp[1] + 12]; mv[key(1 - e.t, e.s)] = sp; st.push({ f: 0.5, dots: mv, ball: sp, act: key(1 - e.t, e.s), pop: ['STEAL', sp, 'stl'] }); }
+        else st.push({ f: 0.5, dots: mv, ball: [bp[0], bp[1] < 250 ? -10 : 510], act: me, pop: ['TURNOVER', bp, 'stl'] });
+        break;
+      }
+      case 'foul': case 'out': {
+        const k = key(e.t, e.p), c = ct.pos[k] || lay[k] || [470, 250]; st.push({ f: 0.4, dots: lay, ball: lay[key(off, G.on[off][0])] || c, act: k, pop: [e.k === 'out' ? 'FOULED OUT' : 'FOUL', c, 'fl'] }); break;
+      }
+      case 'sub': st.push({ f: 0.5, dots: lay, ball: ct.ball, act: null }); break;
+      case 'qend': st.push({ f: 0.5, dots: ctLay(G, mySide()), ball: [CT.W / 2, CT.H / 2], act: null }); break;
+      default: break;
+    }
+    return st;
+  }
+  function ctNet(kind) { const b = document.getElementById('court'); if (!b) return; b.classList.remove('swish', 'clank'); void b.offsetWidth; b.classList.add(kind); }
+  function ctFT(e, idx) {
+    const box = document.getElementById('ctft'), ct = S.live.ct, G = S.G; if (!box) return 0;
+    const u = ({ 1: 900, 2: 560, 4: 330 })[S.live.speed]; if (!u || !e.n) return 0;
+    const order = Array.from({ length: e.n }, (_, k) => k < e.m);
+    for (let k = e.n - 1; k > 0; k--) { const j = Math.floor(ctHash(idx, k + 50) * (k + 1)); const x = order[k]; order[k] = order[j]; order[j] = x; }
+    const nm = G.teams[e.t].players[e.p] ? G.teams[e.t].players[e.p].name : '', col = ctColor(e.t).f;
+    box.className = 'ctft on';
+    box.innerHTML = `<div class="ftw"><div class="ftl"></div><svg viewBox="0 0 300 270"><rect x="85" y="8" width="130" height="78" rx="4" fill="#1a2438" stroke="#9fb2d1" stroke-width="3"/><rect x="123" y="44" width="54" height="40" fill="none" stroke="#9fb2d1" stroke-width="2.5"/><g class="ftb"><circle cx="150" cy="248" r="15" fill="${col}" stroke="#fff" stroke-width="2"/><path d="M135 248H165M150 233V263" stroke="#0b1220" stroke-width="1.5"/></g><g class="ftnet"><path d="M118 120 132 178M182 120 168 178M134 120 141 178M166 120 159 178M150 120V178M123 140H177M128 160H172" stroke="#e5edf9" stroke-width="1.6" fill="none" opacity=".85"/></g><ellipse cx="150" cy="118" rx="34" ry="8" fill="none" stroke="#f97316" stroke-width="5"/></svg><div class="ftr"></div></div>`;
+    const lab = box.querySelector('.ftl'), ball = box.querySelector('.ftb'), net = box.querySelector('.ftnet'), res = box.querySelector('.ftr');
+    order.forEach((mk, k) => {
+      ct.tm.push(setTimeout(() => {
+        lab.textContent = nm + ' · free throw ' + (k + 1) + ' of ' + e.n;
+        ball.setAttribute('class', 'ftb'); net.setAttribute('class', 'ftnet'); void box.offsetWidth;
+        ball.style.animationDuration = Math.round(u * 0.78) + 'ms'; ball.setAttribute('class', 'ftb ' + (mk ? 'make' : 'miss'));
+        if (mk) { ct.tm.push(setTimeout(() => net.setAttribute('class', 'ftnet swish'), Math.round(u * 0.5))); }
+      }, k * u));
+      ct.tm.push(setTimeout(() => { res.insertAdjacentHTML('beforeend', `<span class="${mk ? 'ok' : 'no'}">${mk ? 'Made' : 'Missed'}</span>`); }, k * u + Math.round(u * 0.8)));
+    });
+    ct.tm.push(setTimeout(() => { box.className = 'ctft'; }, e.n * u + 260));
+    return e.n * u + 260;
+  }
+  function courtFeed(evs, base, full) {
+    const live = S.live, ct = live.ct; if (!ct || !ct.on || !document.getElementById('ctDots')) return;
+    if (!evs.length) { ctSync(); return; }
+    ct.tm.forEach(clearTimeout); ct.tm = [];
+    document.getElementById('ctft') && (document.getElementById('ctft').className = 'ctft');
+    ctSync();
+    const T = Math.max(0, delay() * 0.85), batch = full || evs.length > 4 || T < 150, relevant = ['make', 'miss', 'block', 'reb', 'tov', 'foul', 'out', 'sub', 'qend'];
+    let extra = 0;
+    const list = [], skip = Math.max(0, evs.length - 70);
+    evs.forEach((e, n) => {
+      if (n < skip) return;
+      if (e.k === 'ft') { list.push({ ft: e, idx: base + n }); return; }
+      if (relevant.includes(e.k)) list.push({ plan: ctPlan(e, base + n), e });
+    });
+    if (batch) {
+      let lastDots = null, lastBall = null;
+      for (const it of list) { if (!it.plan) continue; for (const s of it.plan) { if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]); if (s.dots) lastDots = s.dots; if (s.ball) lastBall = s.ball; } }
+      if (lastDots) ctApply(lastDots, T > 40 ? Math.round(T * 0.8) : 0, null);
+      if (lastBall) ctBall(lastBall, T > 40 ? Math.round(T * 0.8) : 0);
+      return;
+    }
+    const per = T / Math.max(1, list.filter(x => x.plan).length || 1); let at = 0;
+    for (const it of list) {
+      if (it.ft) { extra += ctFT(it.ft, it.idx); continue; }
+      const tot = it.plan.reduce((a, s) => a + s.f, 0) || 1;
+      for (const s of it.plan) {
+        const ms = Math.round(per * s.f / tot * 0.95), t0 = Math.round(at);
+        ct.tm.push(setTimeout(() => {
+          if (!S.live || S.live.ct !== ct) return;
+          ctSync(); ctApply(s.dots, ms, s.act); ctBall(s.ball, ms);
+          if (s.trail) ctTrail(s.trail[0], s.trail[1]);
+          if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]);
+          if (s.pop) ctPop(s.pop[0], s.pop[1], s.pop[2]);
+          if (s.rim) ctNet(s.rim);
+        }, t0));
+        at += per * s.f / tot;
+      }
+    }
+    live.extra = (live.extra || 0) + extra;
+  }
+
   // live loop
   const delay = () => ({ 1: 900, 2: 450, 4: 200, 8: 70 }[S.live.speed] || 600);
   function runTrack(evs) {
@@ -889,7 +1100,8 @@
     if (G.mo && G.mo.pending) { live.playing = false; updateGame(); showMoment(); return; }
     if (checkAlerts()) { live.playing = false; updateGame(); return; }
     updateGame();
-    live.timer = setTimeout(loop, delay());
+    const ex = live.extra || 0; live.extra = 0;
+    live.timer = setTimeout(loop, delay() + ex);
   }
   function simUntil(cond) {
     const G = S.G, live = S.live; let n = 0; const q = G.q;
@@ -1145,14 +1357,16 @@
     },
     gotrade() { S.tr = { give: null }; go('trade'); },
     tback() { S.tr = null; go('hub'); },
-    tgive(d) { S.tr = { give: +d.i }; render(); },
+    tgive(d) { S.tr = { give: +d.i, pos: null }; render(); },
+    tpos(d) { S.tr.pos = d.p; render(); },
     toffer(d) {
-      const out = S.user.players[S.tr.give], np = Core.tradeOffers(S.SE, S.tr.give)[+d.i], vis = !S.hard || S.revealed;
+      const out = S.user.players[S.tr.give], np = Core.tradeOffers(S.SE, S.tr.give, S.tr.pos)[+d.i], vis = !S.hard || S.revealed;
       if (!np) return;
-      document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box"><h2>Confirm trade</h2><p>You give <b>${esc(out.name)}</b>${vis ? ' (' + dp(out) + ')' : ''} and get <b>${esc(np.name)}</b>${vis ? ' (' + dp(np) + ')' : ''}, ${np.fromSeason} ${esc(np.fromTm)}.</p><p class="note">${esc(np.name)} takes over the minutes and the spot in the rotation of ${esc(out.name)}. This cannot be undone.</p>
+      document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box"><h2>Confirm trade</h2><p>You give <b>${esc(out.name)}</b>${vis ? ' (' + dp(out) + ')' : ''} and get <b>${esc(np.name)}</b>${vis ? ' (' + dp(np) + ')' : ''}, ${np.fromSeason} ${esc(np.fromTm)}.</p><p class="note">${esc(np.name)} joins at ${esc(S.tr.pos)} and takes over the minutes of ${esc(out.name)} or of whoever shifts. This cannot be undone.</p>
         <div class="ctrl"><button class="btn pri" data-a="tconfirm" data-i="${d.i}">Make the trade</button><button class="btn" data-a="closemodal">Cancel</button></div></div></div>`);
     },
-    tconfirm(d) { closeModal(); if (Core.doTrade(S.SE, S.tr.give, +d.i)) { S.tr = null; go('hub'); } },
+    tconfirm(d) { closeModal(); if (Core.doTrade(S.SE, S.tr.give, +d.i, S.tr.pos)) { S.tr = null; go('hub'); } },
+    ctoggle() { const ct = S.live && S.live.ct; if (!ct) return; ct.on = !ct.on; try { localStorage.setItem('ps_court', ct.on ? '1' : '0'); } catch (e) { } const b = document.getElementById('court'); if (b) b.classList.toggle('off', !ct.on); if (ct.on) { ctSync(); ctApply(ctLay(S.G, ct.off), 0, null); } },
     gocoach() { S.coachBack = S.screen; go('coach'); },
     coachBack() { go(S.coachBack || 'hub'); },
     play() { beginGame(Core.beginLive(S.SE, false)); },
