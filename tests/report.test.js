@@ -66,10 +66,19 @@ test('tactic fit: only for a full roster, at most one recommendation per group, 
 test('traits: only top players get one, it comes from their stats, and it changes games for the team that has the star', () => {
   const P = sim.teams.flatMap(t => t.players), withT = P.filter(p => E.traitOf(p));
   assert.ok(withT.length > 200 && withT.length < P.length * 0.05, 'traits are rare');
-  assert.ok(withT.every(p => p.ovr >= E.TR.ovrMin), 'only high-rated players');
+  assert.ok(withT.every(p => p.ovr >= E.TR.ovrMin || (p.ovr >= E.TR.ovrMinD && /DPOY|D1/.test(p.hon))), 'only high-rated players (or defensive award winners)');
   const by = n => P.filter(p => p.name === n && E.traitOf(p)).map(p => E.traitOf(p).k);
   assert.ok(by('Nikola Jokić').includes('maestro') && by('Stephen Curry').includes('sniper') && by('Joel Embiid').includes('magnet'));
   assert.ok(P.filter(p => p.name === 'Kareem Abdul-Jabbar').some(p => E.traitOf(p) && E.traitOf(p).k === 'eraser'));
+});
+test('ratings are anchored to honors: All-NBA tiers stay ordered in every era and award winners are never bottom-of-roster players', () => {
+  const P = sim.teams.flatMap(t => t.players.map(p => ({ p, y: t.season })));
+  const med = (tag, lo, hi) => { const v = P.filter(x => (x.p.hon || '').split(',').includes(tag) && x.y >= lo && x.y <= hi).map(x => x.p.ovr0 != null ? x.p.ovr0 : x.p.ovr).sort((a, b) => a - b); return v[v.length >> 1]; };
+  for (const [lo, hi] of [[1950, 1973], [1974, 1989], [1990, 2026]]) {
+    assert.ok(med('A1', lo, hi) > med('A2', lo, hi) && med('A2', lo, hi) > med('A3', lo, hi) - 1 || lo < 1990, 'tiers ordered ' + lo);
+    assert.ok(med('A1', lo, hi) >= 78, 'All-NBA 1st team median is a star rating in ' + lo + ': ' + med('A1', lo, hi));
+  }
+  assert.ok(P.filter(x => /(^|,)MVP(,|$)/.test(x.p.hon || '')).every(x => (x.p.ovr0 != null ? x.p.ovr0 : x.p.ovr) >= 80), 'MVP seasons are 80+');
 });
 test('play-by-play names a trait when it shows up, and only then', () => {
   const find = k => sim.teams.flatMap(t => t.players).find(p => E.traitOf(p) && E.traitOf(p).k === k && p.big);

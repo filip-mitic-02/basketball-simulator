@@ -1,0 +1,116 @@
+2025-26|1|Victor Wembanyama; Chet Holmgren; Ausar Thompson; Rudy Gobert; Derrick White
+2025-26|2|Scottie Barnes; Cason Wallace; Bam Adebayo; OG Anunoby; Dyson Daniels
+2024-25|1|Dyson Daniels; Luguentz Dort; Draymond Green; Evan Mobley; Amen Thompson
+2024-25|2|Toumani Camara; Rudy Gobert; Jaren Jackson; Jalen Williams; Ivica Zubac
+2023-24|1|Rudy Gobert; Victor Wembanyama; Bam Adebayo; Herbert Jones; Anthony Davis
+2023-24|2|Alex Caruso; Jalen Suggs; Derrick White; Jaden McDaniels; Jrue Holiday
+2022-23|1|Alex Caruso; Jrue Holiday; Jaren Jackson; Brook Lopez; Evan Mobley
+2022-23|2|Bam Adebayo; OG Anunoby; Dillon Brooks; Draymond Green; Derrick White
+2021-22|1|Giannis Antetokounmpo; Mikal Bridges; Rudy Gobert; Jaren Jackson; Marcus Smart
+2021-22|2|Bam Adebayo; Draymond Green; Jrue Holiday; Matisse Thybulle; Robert Williams
+2020-21|1|Rudy Gobert; Ben Simmons; Draymond Green; Jrue Holiday; Giannis Antetokounmpo
+2020-21|2|Bam Adebayo; Jimmy Butler; Joel Embiid; Matisse Thybulle; Kawhi Leonard
+2019-20|1|Giannis Antetokounmpo; Anthony Davis; Ben Simmons; Rudy Gobert; Marcus Smart
+2019-20|2|Kawhi Leonard; Brook Lopez; Bam Adebayo; Patrick Beverley; Eric Bledsoe
+2018-19|1|Rudy Gobert; Paul George; Giannis Antetokounmpo; Marcus Smart; Eric Bledsoe
+2018-19|2|Jrue Holiday; Klay Thompson; Joel Embiid; Draymond Green; Kawhi Leonard
+2017-18|1|Rudy Gobert; Anthony Davis; Victor Oladipo; Robert Covington; Jrue Holiday
+2017-18|2|Joel Embiid; Draymond Green; Al Horford; Dejounte Murray; Jimmy Butler
+2016-17|1|Kawhi Leonard; Draymond Green; Rudy Gobert; Patrick Beverley; Chris Paul
+2016-17|2|Tony Allen; Danny Green; Andre Roberson; Anthony Davis; Giannis Antetokounmpo
+2015-16|1|Kawhi Leonard; Draymond Green; DeAndre Jordan; Avery Bradley; Chris Paul
+2015-16|2|Paul Millsap; Paul George; Hassan Whiteside; Tony Allen; Jimmy Butler
+2014-15|1|Kawhi Leonard; Draymond Green; Tony Allen; DeAndre Jordan; Chris Paul
+2014-15|2|Anthony Davis; Jimmy Butler; Andrew Bogut; John Wall; Tim Duncan
+2013-14|1|Joakim Noah; Paul George; Chris Paul; Serge Ibaka; Andre Iguodala
+2013-14|2|LeBron James; Patrick Beverley; Jimmy Butler; Kawhi Leonard; Roy Hibbert
+2012-13|1|Tony Allen; Serge Ibaka; LeBron James; Chris Paul; Tyson Chandler; Joakim Noah
+2012-13|2|Avery Bradley; Mike Conley; Tim Duncan; Marc Gasol; Paul George
+2011-12|1|Tony Allen; Dwight Howard; Serge Ibaka; LeBron James; Chris Paul
+2011-12|2|Kobe Bryant; Tyson Chandler; Luol Deng; Kevin Garnett; Rajon Rondo
+2010-11|1|Kobe Bryant; Kevin Garnett; Dwight Howard; LeBron James; Rajon Rondo
+2010-11|2|Tony Allen; Tyson Chandler; Andre Iguodala; Joakim Noah; Chris Paul
+2009-10|1|Kobe Bryant; Dwight Howard; LeBron James; Rajon Rondo; Gerald Wallace
+2009-10|2|Tim Duncan; Thabo Sefolosha; Josh Smith; Anderson Varejão; Dwyane Wade
+2008-09|1|Kobe Bryant; Kevin Garnett; Dwight Howard; LeBron James; Chris Paul
+2008-09|2|Metta World Peace; Shane Battier; Tim Duncan; Rajon Rondo; Dwyane Wade
+2007-08|1|Bruce Bowen; Kobe Bryant; Marcus Camby; Tim Duncan; Kevin Garnett
+2007-08|2|Shane Battier; Raja Bell; Dwight Howard; Chris Paul; Tayshaun Prince
+2006-07|1|Raja Bell; Bruce Bowen; Kobe Bryant; Marcus Camby; Tim Duncan
+2006-07|2|Kevin Garnett; Kirk Hinrich; Jason Kidd; Tayshaun Prince; Ben Wallace
+2005-06|1|Metta World Peace; Bruce Bowen; Andrei Kirilenko; Ben Wallace; Kobe Bryant; Jason Kidd
+2005-06|2|Chauncey Billups; Marcus Camby; Tim Duncan; Kevin Garnett; Tayshaun Prince
+2004-05|1|Bruce Bowen; Tim Duncan; Kevin Garnett; Larry Hughes; Ben Wallace
+2004-05|2|Chauncey Billups; Marcus Camby; Andrei Kirilenko; Tayshaun Prince; Jason Kidd; Dwyane Wade
+2003-04|1|Metta World Peace; Bruce Bowen; Kobe Bryant; Kevin Garnett; Ben Wallace
+2003-04|2|Doug Christie; Tim Duncan; Jason Kidd; Andrei Kirilenko; Theo Ratliff
+2002-03|1|Kobe Bryant; Doug Christie; Tim Duncan; Kevin Garnett; Ben Wallace
+2002-03|2|Metta World Peace; Bruce Bowen; Jason Kidd; Shaquille O'Neal; Eric Snow
+2001-02|1|Tim Duncan; Kevin Garnett; Jason Kidd; Gary Payton; Ben Wallace
+2001-02|2|Bruce Bowen; Kobe Bryant; Doug Christie; Dikembe Mutombo; Clifford Robinson
+2000-01|1|Tim Duncan; Kevin Garnett; Jason Kidd; Dikembe Mutombo; Gary Payton
+2000-01|2|Bruce Bowen; P.J. Brown; Kobe Bryant; Doug Christie; Shaquille O'Neal
+1999-00|1|Kobe Bryant; Tim Duncan; Kevin Garnett; Alonzo Mourning; Gary Payton
+1999-00|2|Eddie Jones; Jason Kidd; Shaquille O'Neal; Scottie Pippen; Clifford Robinson
+1998-99|1|Tim Duncan; Jason Kidd; Alonzo Mourning; Gary Payton; Karl Malone; Scottie Pippen
+1998-99|2|Mookie Blaylock; P.J. Brown; Eddie Jones; Dikembe Mutombo; Theo Ratliff
+1997-98|1|Michael Jordan; Karl Malone; Dikembe Mutombo; Gary Payton; Scottie Pippen
+1997-98|2|Mookie Blaylock; Tim Duncan; Eddie Jones; Charles Oakley; David Robinson
+1996-97|1|Michael Jordan; Karl Malone; Dikembe Mutombo; Gary Payton; Scottie Pippen
+1996-97|2|Mookie Blaylock; P.J. Brown; Anthony Mason; Hakeem Olajuwon; John Stockton
+1995-96|1|Michael Jordan; Gary Payton; Scottie Pippen; David Robinson; Dennis Rodman
+1995-96|2|Mookie Blaylock; Horace Grant; Derrick McKey; Hakeem Olajuwon; Bobby Phills
+1994-95|1|Mookie Blaylock; Gary Payton; Scottie Pippen; David Robinson; Dennis Rodman
+1994-95|2|Horace Grant; Derrick McKey; Nate McMillan; Dikembe Mutombo; John Stockton
+1993-94|1|Mookie Blaylock; Charles Oakley; Hakeem Olajuwon; Gary Payton; Scottie Pippen
+1993-94|2|Horace Grant; Nate McMillan; David Robinson; Dennis Rodman; Latrell Sprewell
+1992-93|1|Joe Dumars; Michael Jordan; Hakeem Olajuwon; Scottie Pippen; Dennis Rodman
+1992-93|2|Horace Grant; Dan Majerle; Larry Nance; David Robinson; John Starks
+1991-92|1|Joe Dumars; Michael Jordan; Scottie Pippen; David Robinson; Dennis Rodman
+1991-92|2|Patrick Ewing; Larry Nance; John Stockton; Buck Williams; Micheal Williams
+1990-91|1|Michael Jordan; Alvin Robertson; David Robinson; Dennis Rodman; Buck Williams
+1990-91|2|Joe Dumars; Dan Majerle; Hakeem Olajuwon; Scottie Pippen; John Stockton
+1989-90|1|Joe Dumars; Michael Jordan; Hakeem Olajuwon; Dennis Rodman; Buck Williams
+1989-90|2|Derek Harper; Rick Mahorn; Kevin McHale; Alvin Robertson; David Robinson
+1988-89|1|Joe Dumars; Mark Eaton; Michael Jordan; Larry Nance; Dennis Rodman
+1988-89|2|Patrick Ewing; A.C. Green; Kevin McHale; Alvin Robertson; John Stockton
+1987-88|1|Michael Cooper; Michael Jordan; Rodney McCray; Kevin McHale; Hakeem Olajuwon
+1987-88|2|Fat Lever; Karl Malone; Alvin Robertson; Buck Williams; Mark Eaton; Patrick Ewing
+1986-87|1|Michael Cooper; Dennis Johnson; Kevin McHale; Hakeem Olajuwon; Alvin Robertson
+1986-87|2|Maurice Cheeks; Mark Eaton; Derek Harper; Rodney McCray; Paul Pressey
+1985-86|1|Maurice Cheeks; Mark Eaton; Kevin McHale; Sidney Moncrief; Paul Pressey
+1985-86|2|Manute Bol; Michael Cooper; Bill Hanzlik; Dennis Johnson; Alvin Robertson
+1984-85|1|Maurice Cheeks; Michael Cooper; Mark Eaton; Sidney Moncrief; Paul Pressey
+1984-85|2|T.R. Dunn; Dennis Johnson; Bobby Jones; Hakeem Olajuwon; Danny Vranes
+1983-84|1|Maurice Cheeks; Michael Cooper; Bobby Jones; Sidney Moncrief; Tree Rollins
+1983-84|2|Kareem Abdul-Jabbar; Larry Bird; T.R. Dunn; Dennis Johnson; Dan Roundfield
+1982-83|1|Bobby Jones; Moses Malone; Sidney Moncrief; Dan Roundfield; Maurice Cheeks; Dennis Johnson
+1982-83|2|Larry Bird; Michael Cooper; T.R. Dunn; Kevin McHale; Tree Rollins
+1981-82|1|Michael Cooper; Dennis Johnson; Bobby Jones; Caldwell Jones; Dan Roundfield
+1981-82|2|Larry Bird; Quinn Buckner; Sidney Moncrief; Lonnie Shelton; Jack Sikma
+1980-81|1|Kareem Abdul-Jabbar; Dennis Johnson; Bobby Jones; Caldwell Jones; Michael Ray Richardson
+1980-81|2|Quinn Buckner; George Johnson; Dan Roundfield; Kermit Washington; Dudley Bradley; Michael Cooper
+1979-80|1|Kareem Abdul-Jabbar; Dennis Johnson; Bobby Jones; Dan Roundfield; Don Buse; Michael Ray Richardson
+1979-80|2|Quinn Buckner; Dave Cowens; Eddie Johnson; Kermit Washington; Scott Wedman
+1978-79|1|Kareem Abdul-Jabbar; Don Buse; Bob Dandridge; Dennis Johnson; Bobby Jones
+1978-79|2|M.L. Carr; Lionel Hollins; Eddie Johnson; Maurice Lucas; Moses Malone
+1977-78|1|Don Buse; Lionel Hollins; Bobby Jones; Maurice Lucas; Bill Walton
+1977-78|2|Quinn Buckner; E.C. Coleman; Bob Gross; Norm Van Lier; Kareem Abdul-Jabbar; Artis Gilmore
+1976-77|1|Don Buse; E.C. Coleman; Bobby Jones; Norm Van Lier; Bill Walton
+1976-77|2|Kareem Abdul-Jabbar; Jim Brewer; Don Chaney; Brian Taylor; Jamaal Wilkes
+1975-76|1|Dave Cowens; John Havlicek; Paul Silas; Norm Van Lier; Slick Watts
+1975-76|2|Kareem Abdul-Jabbar; Jim Brewer; Jim Cleamons; Phil Smith; Jamaal Wilkes
+1974-75|1|Kareem Abdul-Jabbar; Walt Frazier; John Havlicek; Paul Silas; Jerry Sloan
+1974-75|2|Don Chaney; Dave Cowens; Elvin Hayes; Bob Love; Norm Van Lier
+1973-74|1|Kareem Abdul-Jabbar; Dave DeBusschere; John Havlicek; Norm Van Lier; Walt Frazier; Jerry Sloan
+1973-74|2|Don Chaney; Elvin Hayes; Bob Love; Nate Thurmond; Jim Price; Dick Van Arsdale
+1972-73|1|Wilt Chamberlain; Dave DeBusschere; Walt Frazier; John Havlicek; Jerry West
+1972-73|2|Don Chaney; Mike Riordan; Paul Silas; Nate Thurmond; Norm Van Lier
+1971-72|1|Wilt Chamberlain; Dave DeBusschere; John Havlicek; Jerry West; Walt Frazier; Jerry Sloan
+1971-72|2|Don Chaney; Bob Love; Paul Silas; Nate Thurmond; Norm Van Lier
+1970-71|1|Dave DeBusschere; Walt Frazier; Gus Johnson; Nate Thurmond; Jerry West
+1970-71|2|Kareem Abdul-Jabbar; John Havlicek; Paul Silas; Jerry Sloan; Norm Van Lier
+1969-70|1|Dave DeBusschere; Walt Frazier; Gus Johnson; Willis Reed; Jerry West
+1969-70|2|Kareem Abdul-Jabbar; Bill Bridges; Joe Caldwell; John Havlicek; Jerry Sloan
+1968-69|1|Dave DeBusschere; Walt Frazier; Bill Russell; Jerry Sloan; Nate Thurmond
+1968-69|2|Bill Bridges; John Havlicek; Rudy LaRusso; Tom Sanders; Jerry West

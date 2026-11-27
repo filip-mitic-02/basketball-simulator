@@ -1,0 +1,72 @@
+# season-end-year|tier|player ; tier: 1=All-EuroLeague 1st, 2=2nd, MVP
+2001|1|Louis Bullock; Alphonso Ford; Derrick Hamilton; Gregor Fučka; Dejan Tomašević
+2001|2|Jemeil Rich; Panagiotis Liadelis; Pau Gasol; Ioannis Giannoulis; Rashard Griffith
+2002|1|Tyus Edney; Manu Ginóbili; Marko Jarić; Dejan Bodiroga; Dejan Tomašević
+2002|2|Ariel McDonald; Alphonso Ford; Marcelo Nicola; Mirsad Türkcan; Joseph Blair
+2003|1|Tyus Edney; Alphonso Ford; Dejan Bodiroga; Jorge Garbajosa; Victor Alexander
+2003|2|Miloš Vujanić; Marcus Brown; Andrés Nocioni; Mirsad Türkcan; Nikola Vujčić
+2004|1|Šarūnas Jasikevičius; Marcus Brown; Dejan Bodiroga; Mirsad Türkcan; Arvydas Sabonis
+2004|2|Miloš Vujanić; Lynn Greer; David Vanterpool; Andrés Nocioni; Nikola Vujčić
+2005|1|Šarūnas Jasikevičius; Arvydas Macijauskas; Anthony Parker; David Andersen; Nikola Vujčić
+2005|2|Jaka Lakovič; Marcus Brown; Charles Smith; Luis Scola; Tanoka Beard
+2006|1|Theo Papaloukas; Juan Carlos Navarro; Anthony Parker; Luis Scola; Nikola Vujčić
+2006|2|Pablo Prigioni; Vassilis Spanoulis; Trajan Langdon; Jorge Garbajosa; Darjuš Lavrinovič
+2007|1|Theo Papaloukas; Dimitris Diamantidis; Juan Carlos Navarro; Trajan Langdon; Luis Scola; Nikola Vujčić
+2007|2|Pablo Prigioni; Igor Rakočević; Ramūnas Šiškauskas; Matjaž Smodiš; Lazaros Papadopoulos
+2008|1|Terrell McIntyre; Trajan Langdon; Ramūnas Šiškauskas; Terence Morris; Tiago Splitter
+2008|2|Theo Papaloukas; Bootsy Thornton; Yotam Halperin; Kšyštof Lavrinovič; Nikola Peković
+2009|1|Terrell McIntyre; Juan Carlos Navarro; Igor Rakočević; Ioannis Bourousis; Nikola Peković
+2009|2|Theo Papaloukas; Vassilis Spanoulis; Ramūnas Šiškauskas; Erazem Lorbek; Tiago Splitter
+2010|1|Miloš Teodosić; Juan Carlos Navarro; Linas Kleiza; Victor Khryapa; Aleks Marić
+2010|2|Bo McCalebb; Josh Childress; Ramūnas Šiškauskas; Erazem Lorbek; Tiago Splitter
+2011|1|Dimitris Diamantidis; Juan Carlos Navarro; Fernando San Emeterio; Mike Batiste; Sofoklis Schortsanitis
+2011|2|Jeremy Pargo; Vassilis Spanoulis; Sergio Llull; Duško Savanović; Kšyštof Lavrinovič
+2012|1|Dimitris Diamantidis; Vassilis Spanoulis; Andrei Kirilenko; Erazem Lorbek; Nenad Krstić
+2012|2|Miloš Teodosić; Bo McCalebb; Juan Carlos Navarro; Henry Domercant; Mike Batiste
+2013|1|Dimitris Diamantidis; Vassilis Spanoulis; Rudy Fernández; Nenad Krstić; Ante Tomić
+2013|2|Miloš Teodosić; Juan Carlos Navarro; Victor Khryapa; Nikola Mirotić; Shawn James
+2014|1|Sergio Rodríguez; Keith Langford; Rudy Fernández; Sonny Weems; Ante Tomić
+2014|2|Vassilis Spanoulis; Ricky Hickman; Victor Khryapa; Nikola Mirotić; Stéphane Lasme
+2015|1|Miloš Teodosić; Vassilis Spanoulis; Nemanja Bjelica; Felipe Reyes; Boban Marjanović
+2015|2|Nando de Colo; Andrew Goudelock; Rudy Fernández; Devin Smith; Ante Tomić
+2016|1|Miloš Teodosić; Malcolm Delaney; Nando de Colo; Jan Veselý; Ioannis Bourousis
+2016|2|Luigi Datome; Quincy Miller; Anthony Randolph; Ekpe Udoh; Gustavo Ayón
+2017|1|Sergio Llull; Nando de Colo; Bogdan Bogdanović; Georgios Printezis; Ekpe Udoh
+2017|2|Miloš Teodosić; Brad Wanamaker; Nicolò Melli; Bryant Dunston; Gustavo Ayón
+2018|1|Nick Calathes; Nando de Colo; Luka Dončić; Tornike Shengelia; Jan Veselý
+2018|2|Kevin Pangos; Sergio Rodríguez; Vassilis Spanoulis; Alexey Shved; Paulius Jankūnas
+2019|1|Nick Calathes; Kostas Sloukas; Will Clyburn; Brandon Davies; Jan Veselý
+2019|2|Nando de Colo; Mike James; Vasilije Micić; Vincent Poirier; Edy Tavares
+2021|1|Kevin Pangos; Vasilije Micić; Vladimir Lučić; Nikola Mirotić; Edy Tavares
+2021|2|Shane Larkin; Nando De Colo; Will Clyburn; Shavon Shields; Brandon Davies
+2022|1|Mike James; Shane Larkin; Sasha Vezenkov; Nikola Mirotić; Edy Tavares
+2022|2|Kostas Sloukas; Vasilije Micić; Vladimir Lučić; Shavon Shields; Georgios Papagiannis
+2023|1|Lorenzo Brown; Džanan Musa; Sasha Vezenkov; Mathias Lessort; Edy Tavares
+2023|2|Mike James; Darius Thompson; Wade Baldwin IV; Kevin Punter; Nikola Mirotić
+2024|1|Facundo Campazzo; Mike James; Kendrick Nunn; Nigel Hayes-Davis; Mathias Lessort
+2024|2|Lorenzo Brown; Kostas Sloukas; Wade Baldwin IV; Mario Hezonja; Edy Tavares
+2025|1|T. J. Shorts; Carsen Edwards; Kendrick Nunn; Sasha Vezenkov; Nigel Hayes-Davis
+2025|2|Mike James; Théo Maledon; Evan Fournier; Juancho Hernangómez; Edy Tavares
+2026|1|Sylvain Francisco; Jean Montero; Elijah Bryant; Sasha Vezenkov; Nikola Milutinov
+2026|2|Wade Baldwin IV; Tyler Dorsey; Kendrick Nunn; Talen Horton-Tucker; Edy Tavares
+2005|MVP|Anthony Parker
+2006|MVP|Anthony Parker
+2007|MVP|Theo Papaloukas
+2008|MVP|Ramūnas Šiškauskas
+2009|MVP|Juan Carlos Navarro
+2010|MVP|Miloš Teodosić
+2011|MVP|Dimitris Diamantidis
+2012|MVP|Andrei Kirilenko
+2013|MVP|Vassilis Spanoulis
+2014|MVP|Sergio Rodríguez
+2015|MVP|Nemanja Bjelica
+2016|MVP|Nando de Colo
+2017|MVP|Sergio Llull
+2018|MVP|Luka Dončić
+2019|MVP|Jan Veselý
+2021|MVP|Vasilije Micić
+2022|MVP|Nikola Mirotić
+2023|MVP|Sasha Vezenkov
+2024|MVP|Mike James
+2025|MVP|Kendrick Nunn
+2026|MVP|Sasha Vezenkov

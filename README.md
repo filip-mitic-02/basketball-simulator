@@ -83,3 +83,16 @@ Trades: until game 55, at most two per season, from the hub. `Core.tradeOffers` 
 ## EuroLeague
 
 A second competition, chosen on the menu. Rules live in `Engine.RULES.{nba,el}` (40-minute games, five fouls, 20 clubs, 38 games, top eight to best-of-five quarterfinals, then a neutral-court Final Four). Players come from `public/data-el.json`, built by `scripts/prep_el.py` from `data/euroleague/players.csv`, which `scripts/fetch-euroleague.mjs` downloads from the public EuroLeague API (run it locally; seasons 2000-2026). Runs, drafts and the leaderboard carry a `comp` column. After changing sim files, bump `Core.VERSION` and run `node scripts/update-sim-lock.mjs`.
+
+## Player ratings and honors
+
+Player data is **static, versioned JSON** (`public/data.json`, `public/data-el.json`), not a database table: the server verifies every run by
+replaying the decision log through the same engine, so the data must be byte-identical on client and server and hash-locked
+(`tests/sim.lock.json`). The database only holds users, runs and drafts.
+
+Rating pipeline: `scripts/prep.py` / `scripts/prep_el.py` (box-score Game Score per 36, shrunk by minutes) -> `scripts/apply_honors.py`
+(anchors each player-season to independent awards in `data/honors/`: All-NBA, All-Defensive, MVP, DPOY; All-EuroLeague, EL MVP).
+A player below the floor of his best honor is pulled up to `floor - keep * deficit` (order inside a tier is kept); an unrecognised
+season above 82 (NBA) / 80 (EL) is halved above that line. The raw rating is kept in `data/honors/base_ovr_*.json`, so the script is
+idempotent. Honors are stored per player-season in the `hon` field and used by `traitOf` (DPOY / All-Defensive 1st Team players get
+defensive traits at a lower rating). After any change: `node scripts/update-sim-lock.mjs`, bump `Core.VERSION`, wipe `runs`/`drafts`.

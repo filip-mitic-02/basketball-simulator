@@ -37,13 +37,16 @@
     glass:    { name: 'Glass Cleaner', desc: 'Dominates the boards at both ends while he is on the floor.' },
     scorer:   { name: 'Go-To Scorer', desc: 'Takes over late in games and shrugs off double teams.' }
   };
-  const TR = { ovrMin: 72, magnet: 3.6, maestroP: 0.012, maestroT: 0.10, eraserP: 0.016, eraserB: 0.35, lockT: 0.016, lockP: 0.005, sniper3: 0.04, sniper2: 0.008, zoneCut: 0.4, glass: 0.22, scorerP: 0.055, scorerLate: 0.06, scorerU: 0.5, scorerDbl: 0.030 };
+  const TR = { ovrMin: 72, ovrMinD: 66, magnet: 3.6, maestroP: 0.012, maestroT: 0.10, eraserP: 0.016, eraserB: 0.35, lockT: 0.016, lockP: 0.005, sniper3: 0.04, sniper2: 0.008, zoneCut: 0.4, glass: 0.22, scorerP: 0.055, scorerLate: 0.06, scorerU: 0.5, scorerDbl: 0.030 };
   const traitCfg = { on: true };
   function traitOf(p) {
     if (p._tr !== undefined) return p._tr;
     let best = null, bv = 0;
-    if (p.ovr >= TR.ovrMin) {
-      const c = [['magnet', p.ftr / 1.7], ['maestro', p.big ? p.ast / 1.3 : p.ast / 2.4], ['eraser', p.blk / 2.6], ['lockdown', p.stl / 1.8],
+    // p.hon: awards the season earned (data/honors). Defensive awards cannot show in a box score, so DPOY / All-Defensive 1st Team
+    // players qualify at a lower rating and their defensive trait counts for more.
+    const dh = typeof p.hon === 'string' && /(^|,)(DPOY|D1)(,|$)/.test(p.hon);
+    if (p.ovr >= (dh ? TR.ovrMinD : TR.ovrMin)) {
+      const c = [['magnet', p.ftr / 1.7], ['maestro', p.big ? p.ast / 1.3 : p.ast / 2.4], ['eraser', p.blk / 2.6 * (dh ? 1.5 : 1)], ['lockdown', p.stl / 1.8 * (dh ? 1.5 : 1)],
         ['sniper', p.p3 >= 0.02 && p.r3 >= 0.4 ? p.r3 / 0.4 : 0], ['glass', (p.orb + p.drb) / 2 / 1.8], ['scorer', p.ovr >= 85 ? 0.9 * p.usg / 1.5 : 0]];
       for (const [k, v] of c) if (v >= 1 && v > bv) { bv = v; best = k; }
     }

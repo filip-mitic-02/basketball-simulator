@@ -1,8 +1,8 @@
 const REPO = process.env.REPO || new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const { loadSim } = await import(REPO + '/lib/sim.js');
-const sim = loadSim(), C = sim.Core, E = sim.Engine, LG = sim.League;
+const sim = loadSim(process.env.COMP || 'nba'), C = sim.Core, E = sim.Engine, LG = sim.League;
 if (process.env.KOV) { const o = JSON.parse(process.env.KOV); if (o.stretch) { LG.cfg.stretch = o.stretch; delete o.stretch; } Object.assign(E.K, o); }
-const N = +process.argv[2] || 80, from = +(process.env.FROM || 1950), to = +(process.env.TO || 2026);
+const N = +process.argv[2] || 80, from = +(process.env.FROM || (process.env.COMP === 'el' ? 2000 : 1950)), to = +(process.env.TO || (process.env.COMP === 'el' ? 2025 : 2026));
 const pool = C.poolOf(sim.teams, from, to);
 const dp = raw => { let t = 55 + (raw - 30) * 0.62 + 0.3 * Math.max(0, raw - 78); if (t > 92) t = 92 + 8 * (1 - Math.exp(-(t - 92) / 9)); return Math.max(0, Math.min(99, Math.round(t))); };
 const rows = [];
