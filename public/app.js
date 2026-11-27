@@ -374,6 +374,14 @@
     const T = E.TRAITS[t.k];
     return `<span class="trait ${TRAIT_SIDE[t.k]}" title="${esc(T.desc)}"><i class="ti">${TRAIT_IC[t.k]}</i>${T.name}</span>${long ? `<span class="tdesc">${esc(T.desc)}</span>` : ''}`;
   }
+  // Awards the player-season earned (data/honors): shown as small gold chips, never in Hard mode before the stats are revealed.
+  const HON = { MVP: ['MVP', 'top'], DPOY: ['DPOY', 'top'], A1: ['All-NBA 1st', 'a'], A2: ['All-NBA 2nd', 'b'], A3: ['All-NBA 3rd', 'c'], D1: ['All-Def 1st', 'd'], D2: ['All-Def 2nd', 'd'], E1: ['All-EL 1st', 'a'], E2: ['All-EL 2nd', 'b'] };
+  const HON_ORD = ['MVP', 'DPOY', 'A1', 'E1', 'A2', 'E2', 'A3', 'D1', 'D2'];
+  function honBadges(p, max) {
+    const h = typeof p.hon === 'string' && p.hon ? p.hon.split(',') : []; if (!h.length) return '';
+    const l = HON_ORD.filter(k => h.includes(k)).slice(0, max || 3);
+    return l.length ? `<span class="hons">${l.map(k => `<i class="hon ${HON[k][1]}">${HON[k][0]}</i>`).join('')}</span>` : '';
+  }
   function playerCard(p, i) {
     const D = S.D, t = D.cur, hue = hueOf(t.tm);
     const taken = D.picks.some(x => x.name === p.name);
@@ -384,7 +392,7 @@
     return `<button class="pcard ${D.sel === i ? 'sel' : ''} ${dis ? 'dis' : ''}" style="--h:${hue};${clubStyle(t.tm)}" data-a="sel" data-i="${i}" ${dis ? 'aria-disabled="true"' : ''}>
       <div class="hd">${crest(t.tm, 20)}<span>${t.season} ${esc(t.tm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}" style="font-size:24px">${vis ? dp(p) : '??'}</span></div>
       <div class="bd"><div class="who">${avatar(p.name, t.tm, 46, vis ? dp(p) : null, p.pos, t.season)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
-        ${vis ? `<div class="trow">${traitBadge(p, true)}</div>` : ''}
+        ${vis ? `<div class="trow">${traitBadge(p, true)}</div>${honBadges(p)}` : ''}
         <div class="stats ${vis ? '' : 'hid'}">${st('PTS', dec(p.ppg))}${st('REB', dec(p.rpg))}${st('AST', dec(p.apg))}${st('MIN', dec(p.mpg))}${st('STL', dec(p.spg))}${st('BLK', dec(p.bpg))}${st('FG%', pct(p.fg))}${st('3P%', pct(p.tp))}</div>
       </div>${fitBadge(p, taken, fits)}${needTag(p, fits)}</button>`;
   }
@@ -514,7 +522,7 @@
       return `<div class="starter"><div class="sl">${esc(p.slot)}</div><div class="sw">${crest(p.fromTm, 30)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}${injOf(pi) ? '<span class="inj">Out ' + injOf(pi) + '</span>' : ''}</div><div class="ovr ${ovrCls(dp(p))}" style="margin-left:auto">${dp(p)}</div></div>
         <select data-a="starter" data-k="${k}" aria-label="Starter ${k + 1}">${P.map((q, i) => `<option value="${i}" ${pi === i ? 'selected' : ''}>${esc(q.name)} (${esc(q.slot)})${injOf(i) ? ' - OUT' : ''}</option>`).join('')}</select></div>`;
     }).join('');
-    const rows = P.map((p, i) => `<tr><td><div class="rn">${crest(p.fromTm, 20)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}${injOf(i) ? '<span class="inj">Out ' + injOf(i) + '</span>' : ''}</div></div></td>
+    const rows = P.map((p, i) => `<tr><td><div class="rn">${crest(p.fromTm, 20)}<div><b>${esc(p.name)}</b><span>${p.fromSeason} ${esc(p.fromTm)}</span>${traitBadge(p)}${honBadges(p, 2)}${injOf(i) ? '<span class="inj">Out ' + injOf(i) + '</span>' : ''}</div></div></td>
       <td><span class="pill">${esc(p.slot)}</span></td><td class="r"><span class="ovr ${ovrCls(dp(p))}" style="font-size:20px">${dp(p)}</span></td>
       <td class="r num">${dec(p.ppg)}</td><td class="r num">${dec(p.rpg)}</td><td class="r num">${dec(p.apg)}</td>
       <td><div class="mrow"><input class="mins" type="range" min="0" max="${RL().maxMin}" step="1" value="${plan.mins[i]}" data-a="mins" data-i="${i}" aria-label="Minutes for ${esc(p.name)}"><span class="num mv" id="m${i}">${plan.mins[i]}</span></div></td></tr>`).join('');
@@ -632,7 +640,7 @@
     return `<button class="tcard" style="--h:${hue};${clubStyle(p.fromTm)}" data-a="toffer" data-i="${i}">
       <div class="tch">${crest(p.fromTm, 22)}<span>${p.fromSeason} ${esc(p.fromTm)}</span><span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}">${vis ? dp(p) : '??'}</span></div>
       <div class="tcb"><div class="who">${avatar(p.name, p.fromTm, 46, vis ? dp(p) : null, p.pos, p.fromSeason)}<div><div class="nm">${esc(p.name)}</div>${posChips(p)}</div></div>
-        ${vis ? `<div class="trow">${traitBadge(p, true)}</div>` : ''}
+        ${vis ? `<div class="trow">${traitBadge(p, true)}</div>${honBadges(p)}` : ''}
         <div class="tcg">${TST.map(cell).join('')}</div></div>
       <div class="tcf"><span>Replaces ${esc(out.name)}</span>${vis ? `<em class="${dOvr > 0 ? 'up' : dOvr < 0 ? 'dn' : 'eq'}">OVR ${dOvr > 0 ? '+' : ''}${dOvr}</em>` : ''}</div></button>`;
   }
@@ -765,7 +773,7 @@
       ${trophyCase(L)}
       ${L.po && L.po.champ != null ? `<div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff awards</div>${poAwardsHtml(L)}</div>` : ''}
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
-      <div class="panel" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-a="newgame">New game</button><button class="btn" data-a="copy">Copy result</button><span class="note" id="saveInfo">${S.acct && S.D && S.D.id ? 'Verifying and saving result...' : 'Playing as guest: this result is not saved. Sign in with Google to keep results and achievements.'}</span></div>`;
+      <div class="panel" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-a="newgame">New game</button><button class="btn" data-a="share">Share card</button><button class="btn" data-a="copy">Copy result</button><span class="note" id="saveInfo">${S.acct && S.D && S.D.id ? 'Verifying and saving result...' : 'Playing as guest: this result is not saved. Sign in with Google to keep results and achievements.'}</span></div>`;
   };
 
   // ---------- GAME ----------
@@ -800,6 +808,9 @@
     const T = G.teams;
     const tm = (t, align) => `<div class="tm ${t === side ? 'me' : 'opp'} ${align}"><div class="tn">${t === side ? esc(S.teamName) : esc(T[t].label)}</div><div class="sc led num">${G.score[t]}</div><div class="qs num">${(G.qs[t] || []).join(' &middot; ')}&nbsp;</div><div class="qs">Timeouts ${G.to[t]} &middot; Team fouls ${G.tf[t]}</div></div>`;
     sb.innerHTML = tm(1, '') + `<div class="mid"><div class="qn">${G.over ? 'Final' : (G.q > 4 ? 'Overtime ' + (G.q - 4) : 'Quarter ' + G.q)}</div><div class="clk led num" id="clk">${mmss(Math.max(0, Math.round(shownClock())))}</div><div class="qs">${G.playoff ? 'Playoffs' : 'Regular season'} &middot; away @ home</div></div>` + tm(0, 'r');
+    // a basket makes the number flash in the colour of the team that scored
+    const prevSc = live.prevSc; live.prevSc = G.score.slice();
+    if (prevSc && !full) [0, 1].forEach(t => { if (G.score[t] > prevSc[t]) { const el = sb.querySelectorAll('.sc')[t === 1 ? 0 : 1]; if (el) { el.classList.add('bump'); sb.classList.add('flash' + (t === side ? 'me' : 'opp')); setTimeout(() => sb.classList.remove('flashme', 'flashopp'), 700); } } });
     const feed = document.getElementById('feed');
     if (full) feed.innerHTML = '';
     const log = G.log; let h = '';
@@ -876,11 +887,11 @@
   const ctDir = t => (t === mySide() ? 1 : -1);
   const ctReal = (t, x, y) => ctDir(t) === 1 ? [x, y] : [CT.W - x, CT.H - y];
   const ctHoop = t => ctReal(t, CT.hx, CT.hy);
-  function courtSvg() {
-    const ln = 'fill="none" stroke="#3a4a66" stroke-width="3"';
+  function courtSvg(plain) {
+    const ln = 'fill="none" stroke="#4a5d82" stroke-width="3"';
     const half = (m) => { const X = x => m ? CT.W - x : x, sw = m ? 0 : 1;
       return `<rect x="${m ? CT.W - 190 : 0}" y="170" width="190" height="160" ${ln}/><circle cx="${X(190)}" cy="250" r="60" ${ln}/><path d="M${X(0)} 30H${X(141.5)}A237.5 237.5 0 0 ${sw} ${X(141.5)} 470H${X(0)}" ${ln}/><path d="M${X(52)} 210A40 40 0 0 ${sw} ${X(52)} 290" ${ln}/><path d="M${X(40)} 220V280" stroke="#9fb2d1" stroke-width="5"/><circle cx="${X(52)}" cy="250" r="8" fill="none" stroke="#f97316" stroke-width="4"/>`; };
-    return `<svg viewBox="0 0 ${CT.W} ${CT.H}" role="img" aria-label="Court"><rect x="1.5" y="1.5" width="${CT.W - 3}" height="${CT.H - 3}" rx="10" fill="#111827" stroke="#3a4a66" stroke-width="3"/><path d="M470 0V500" ${ln}/><circle cx="470" cy="250" r="60" ${ln}/>${half(0)}${half(1)}<g id="ctShots"></g><g id="ctTrail"></g><g id="ctDots"></g><g id="ctBall"><circle r="9" fill="#f59e0b" stroke="#fff" stroke-width="2"/><path d="M-9 0H9M0 -9V9" stroke="#7c3a05" stroke-width="1.4"/></g><g id="ctTxt"></g></svg>`;
+    return `<svg viewBox="0 0 ${CT.W} ${CT.H}" role="img" aria-label="Court"><rect x="1.5" y="1.5" width="${CT.W - 3}" height="${CT.H - 3}" rx="10" fill="none" stroke="#4a5d82" stroke-width="3"/><path d="M470 0V500" ${ln}/><circle cx="470" cy="250" r="60" ${ln}/>${half(0)}${half(1)}${plain ? '<g id="scMarks"></g>' : '<g id="ctTrail"></g><g id="ctDots"></g><g id="ctBall"><circle r="9" fill="#f59e0b" stroke="#fff" stroke-width="2"/><path d="M-9 0H9M0 -9V9" stroke="#7c3a05" stroke-width="1.4"/></g><g id="ctTxt"></g>'}</svg>`;
   }
   const ctOrd = (G, t) => G.on[t].slice().sort((a, b) => E.POS.indexOf(G.teams[t].players[a].slot) - E.POS.indexOf(G.teams[t].players[b].slot));
   const ctLay = (G, off) => {
@@ -902,7 +913,7 @@
   }
   function ctInit() {
     const live = S.live; let on = true; try { on = localStorage.getItem('ps_court') !== '0'; } catch (e) { }
-    live.ct = { on, off: mySide(), els: {}, pos: {}, ball: [CT.W / 2, CT.H / 2], basket: ctHoop(mySide()), shots: 0, tm: [] };
+    live.ct = { on, off: mySide(), els: {}, pos: {}, ball: [CT.W / 2, CT.H / 2], basket: ctHoop(mySide()), tm: [] };
     const box = document.getElementById('court'); if (!box) return;
     box.classList.toggle('off', !on);
     const svg = document.getElementById('ctDots'); if (!svg) return;
@@ -940,13 +951,6 @@
     const layer = document.getElementById('ctTxt'); if (!layer) return;
     const t = svgEl('text', { x: Math.round(xy[0]), y: Math.round(xy[1] - 30), 'text-anchor': 'middle', class: 'ctpop ' + (cls || '') }, layer); t.textContent = txt;
     setTimeout(() => t.remove(), 1400);
-  }
-  function ctMark(xy, made, t) {
-    const layer = document.getElementById('ctShots'), ct = S.live.ct; if (!layer) return;
-    const c = ctColor(t).f;
-    if (made) svgEl('circle', { cx: Math.round(xy[0]), cy: Math.round(xy[1]), r: 7, fill: c, stroke: '#fff', 'stroke-width': 1.5, opacity: .9 }, layer);
-    else svgEl('path', { d: `M${Math.round(xy[0]) - 6} ${Math.round(xy[1]) - 6}l12 12m0 -12l-12 12`, stroke: c, 'stroke-width': 3, opacity: .75, fill: 'none' }, layer);
-    if (++ct.shots > 140) { layer.firstChild.remove(); ct.shots--; }
   }
   function ctTrail(a, b) {
     const layer = document.getElementById('ctTrail'); if (!layer) return;
@@ -1109,7 +1113,7 @@
     for (const it of list) if (it.e) it.plan = ctPlan(it.e, it.idx, !batch && dtMs > 0 && wsum > 0 ? dtMs * (WT[it.e.k] || 0) / wsum : 0);
     if (batch) {
       let lastDots = null, lastBall = null;
-      for (const it of list) { if (!it.plan) continue; for (const s of it.plan) { if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]); if (s.dots) lastDots = s.dots; if (s.ball) lastBall = s.ball; } }
+      for (const it of list) { if (!it.plan) continue; for (const s of it.plan) { if (s.dots) lastDots = s.dots; if (s.ball) lastBall = s.ball; } }
       if (lastDots) ctApply(lastDots, 0, null);
       if (lastBall) ctBall(lastBall, 0);
       return none;
@@ -1123,7 +1127,6 @@
           if (!S.live || S.live.ct !== ct) return;
           ctSync(); ctApply(s.dots, ms, s.act, s.lin ? 'linear' : null); ctBall(s.ball, s.bms ? Math.min(ms, Math.round(s.bms / spd)) : ms, s.lin && !s.bms ? 'linear' : null);
           if (s.trail) ctTrail(s.trail[0], s.trail[1]);
-          if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]);
           if (s.pop) ctPop(s.pop[0], s.pop[1], s.pop[2]);
           if (s.rim) ctNet(s.rim);
         }, t0));
@@ -1271,13 +1274,60 @@
     if (G.coachOpen && G.mo.res && G.mo.res.kind === 'run' && G.mo.res.idx === 0) { openWindow('timeout'); updateGame(); return; }
     live.playing = true; live.window = false; live.timer = setTimeout(loop, 300);
   }
+
+
+  // Share card: a 1080x1350 image drawn on a canvas (team, record, result, starting five, key numbers).
+  function shareCanvas() {
+    const L = S.L, r = L.rec[0], G = Math.max(1, r.w + r.l), champ = L.phase === 'champion', P = S.user.players;
+    const cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1350; const c = cv.getContext('2d');
+    const gr = c.createLinearGradient(0, 0, 1080, 1350); gr.addColorStop(0, '#0a1020'); gr.addColorStop(.55, '#101a33'); gr.addColorStop(1, '#1b1230'); c.fillStyle = gr; c.fillRect(0, 0, 1080, 1350);
+    const glow = c.createRadialGradient(540, 430, 20, 540, 430, 620); glow.addColorStop(0, champ ? 'rgba(255,190,60,.30)' : 'rgba(95,140,255,.20)'); glow.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = glow; c.fillRect(0, 0, 1080, 1350);
+    c.strokeStyle = 'rgba(255,255,255,.04)'; c.lineWidth = 2; for (let i = -1350; i < 1080; i += 54) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 1350, 1350); c.stroke(); }
+    const F = 'Barlow Condensed, Oswald, Impact, Arial Narrow, sans-serif', B = 'Inter, Segoe UI, Arial, sans-serif';
+    const txt = (t, x, y, size, col, w, al, font) => { c.font = (w || 700) + ' ' + size + 'px ' + (font || F); c.fillStyle = col; c.textAlign = al || 'left'; c.fillText(t, x, y); };
+    c.fillStyle = '#f59e0b'; c.beginPath(); c.arc(86, 92, 24, 0, 7); c.fill(); c.strokeStyle = '#1a1100'; c.lineWidth = 3; c.beginPath(); c.arc(86, 92, 24, 0, 7); c.moveTo(62, 92); c.lineTo(110, 92); c.moveTo(86, 68); c.lineTo(86, 116); c.stroke();
+    txt('PERFECT', 128, 106, 44, '#f59e0b', 800); c.font = '800 44px ' + F; const w1 = c.measureText('PERFECT ').width; txt('SEASON', 128 + w1, 106, 44, '#dbe5fa', 800);
+    txt((S.hard ? 'HARD' : 'NORMAL') + ' · ' + eraLabel().toUpperCase(), 996, 104, 26, '#8fa3c7', 600, 'right');
+    txt(String(S.teamName || 'My team').toUpperCase(), 540, 250, 54, '#dbe5fa', 700, 'center');
+    c.save(); c.shadowColor = champ ? 'rgba(255,190,60,.6)' : 'rgba(95,140,255,.45)'; c.shadowBlur = 50;
+    txt(r.w + '–' + r.l, 540, 500, 270, champ ? '#ffc94a' : '#ffffff', 800, 'center'); c.restore();
+    const rl = (champ ? 'League champions' : resultLabel(L)).replace(/<[^>]+>/g, ''); 
+    c.fillStyle = champ ? '#f59e0b' : 'rgba(255,255,255,.10)'; const tw = Math.min(900, c.measureText(rl).width + 10); c.font = '800 44px ' + F; const bw = Math.min(940, c.measureText(rl.toUpperCase()).width + 80); c.beginPath(); c.roundRect ? c.roundRect(540 - bw / 2, 545, bw, 76, 38) : c.rect(540 - bw / 2, 545, bw, 76); c.fill();
+    txt(rl.toUpperCase(), 540, 598, 44, champ ? '#1a1100' : '#dbe5fa', 800, 'center');
+    const margin = (r.pf - r.pa) / G, pw = (L.poGames || []).filter(g => g.win).length, pl = (L.poGames || []).filter(g => !g.win).length;
+    const kp = [['SCORE', Core.calcScore(L, S.hard)], ['WIN STREAK', L.longestW], ['MARGIN', (margin > 0 ? '+' : '') + margin.toFixed(1)], ['PLAYOFFS', pw + '-' + pl]];
+    kp.forEach((k, i) => { const x = 90 + i * 240; c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(x, 670, 220, 128); c.fillStyle = '#f59e0b'; c.fillRect(x, 670, 5, 128); txt(String(k[1]), x + 24, 745, 58, '#fff', 800); txt(k[0], x + 24, 782, 22, '#8fa3c7', 600); });
+    txt('STARTING FIVE', 90, 876, 28, '#f59e0b', 700);
+    const five = (S.plan && S.plan.starters ? S.plan.starters.map(i => P[i]) : P.slice(0, 5)).filter(Boolean);
+    five.forEach((p, i) => { const y = 930 + i * 66; c.fillStyle = i % 2 ? 'rgba(255,255,255,.02)' : 'rgba(255,255,255,.05)'; c.fillRect(90, y - 40, 900, 58); txt(p.slot || '', 112, y, 30, '#f59e0b', 700); txt(p.name, 200, y, 34, '#fff', 600, 'left', B); txt(p.fromSeason + ' ' + p.fromTm, 970, y, 28, '#8fa3c7', 600, 'right'); });
+    txt('Draft 10 players. Coach every possession. Go perfect.', 540, 1296, 28, '#8fa3c7', 500, 'center', B);
+    return cv;
+  }
+  // Shot chart of the finished game: every shot at the spot it was taken, both teams' players on the sides, a click on a player filters his shots.
+  function shotChart(G) {
+    const me = mySide(), shots = [];
+    G.log.forEach((e, idx) => { if (e && (e.k === 'make' || e.k === 'miss' || e.k === 'block')) shots.push({ t: e.t, p: e.p, made: e.k === 'make', is3: !!e.is3, xy: ctSpot(e.t, e, idx) }); });
+    const col = t => ctColor(t).f;
+    const side = t => {
+      const P = G.teams[t].players, st = G.st[t];
+      const rows = P.map((p, i) => ({ p, i, s: st[i] })).filter(r => r.s.sec > 0 || r.s.fga > 0).sort((a, b) => b.s.pts - a.s.pts);
+      return `<div class="scs"><div class="sct" style="--c:${col(t)}"><i></i>${t === me ? esc(S.teamName) : esc(G.teams[t].label)}</div>` +
+        rows.map(r => `<button class="scr" data-a="scp" data-v="${t}:${r.i}" style="--c:${col(t)}"><b>${esc(r.p.name)}</b><span class="num">${r.s.pts} pts</span><em class="num">${r.s.fgm}/${r.s.fga}${r.s.tpa ? ' &middot; 3P ' + r.s.tpm + '/' + r.s.tpa : ''}</em></button>`).join('') + '</div>';
+    };
+    const marks = shots.map(x => {
+      const c = col(x.t), px = Math.round(x.xy[0]), py = Math.round(x.xy[1]);
+      return `<g class="mk ${x.made ? 'mkm' : 'mkx'}" data-k="${x.t}:${x.p}">` + (x.made ? `<circle cx="${px}" cy="${py}" r="7.5" fill="${c}" stroke="#fff" stroke-width="1.6"/>` : `<path d="M${px - 6} ${py - 6}l12 12m0 -12l-12 12" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>`) + '</g>';
+    }).join('');
+    const sum = t => { const a = shots.filter(x => x.t === t), m = a.filter(x => x.made).length; return `${m}/${a.length}`; };
+    return `<div class="sc" id="shotchart"><div class="scl">${side(1 - me)}</div><div class="scc"><div class="scc-h"><span>${esc(G.teams[1 - me].label)} <b class="num">${sum(1 - me)}</b></span><span class="note">Click a player to see his shots</span><span>${esc(S.teamName)} <b class="num">${sum(me)}</b></span></div><div class="scv">${courtSvg(true).replace('<g id="scMarks"></g>', `<g id="scMarks">${marks}</g>`)}</div><div class="sclg"><span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#9fb2d1" stroke="#fff" stroke-width="1.4"/></svg> Made</span><span><svg width="14" height="14"><path d="M2 2l10 10m0 -10l-10 10" stroke="#9fb2d1" stroke-width="2.4"/></svg> Missed</span></div></div><div class="scr-side">${side(me)}</div></div>`;
+  }
   function gameOverModal() {
     const G = S.G, side = mySide(), us = G.score[side], them = G.score[1 - side], win = us > them;
     const P = G.teams[side].players, st = G.st[side];
     const top = st.map((s, i) => [i, s]).sort((a, b) => b[1].pts - a[1].pts).slice(0, 3);
-    document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box"><h2 style="color:${win ? 'var(--good)' : 'var(--bad)'}">${win ? 'Win' : 'Loss'} ${us}-${them}${G.ot ? ' (OT)' : ''}</h2>
-      <p class="note">${G.playoff ? 'Playoffs' : 'Regular season'} vs ${esc(G.teams[1 - side].label)}</p>
-      ${top.map(([i, s]) => `<div class="ach"><div><b>${esc(P[i].name)}</b><div class="note">${s.pts} pts, ${s.reb} reb, ${s.ast} ast</div></div></div>`).join('')}
+    document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box gov"><div class="govh ${win ? 'w' : 'l'}"><div><div class="govr">${win ? 'Win' : 'Loss'}${G.ot ? ' (OT)' : ''}</div><p class="note">${G.playoff ? 'Playoffs' : 'Regular season'} vs ${esc(G.teams[1 - side].label)}</p></div><div class="govs num"><b>${us}</b><i>-</i><b>${them}</b></div></div>
+      <div class="govt">${top.map(([i, s]) => `<div class="ach"><div><b>${esc(P[i].name)}</b><div class="note">${s.pts} pts, ${s.reb} reb, ${s.ast} ast</div></div></div>`).join('')}</div>
+      <div class="eyebrow" style="margin:16px 0 8px">Shot chart</div>${shotChart(G)}
       <div class="ctrl"><button class="btn pri" data-a="finish">Continue</button></div></div></div>`);
   }
   const closeModal = () => document.querySelectorAll('.modal').forEach(m => m.remove());
@@ -1445,6 +1495,13 @@
         <div class="ctrl"><button class="btn pri" data-a="tconfirm" data-i="${d.i}">Make the trade</button><button class="btn" data-a="closemodal">Cancel</button></div></div></div>`);
     },
     tconfirm(d) { closeModal(); if (Core.doTrade(S.SE, S.tr.give, +d.i, S.tr.pos)) { S.tr = null; go('hub'); } },
+    scp(d) {
+      const root = document.getElementById('shotchart'); if (!root) return;
+      const was = root.dataset.f === d.v, v = was ? '' : d.v; root.dataset.f = v;
+      root.querySelectorAll('.scr').forEach(b => b.classList.toggle('on', !!v && b.dataset.v === v));
+      root.querySelectorAll('.mk').forEach(m => m.classList.toggle('dim', !!v && m.dataset.k !== v));
+      root.classList.toggle('filt', !!v);
+    },
     ctoggle() { const ct = S.live && S.live.ct; if (!ct) return; ct.on = !ct.on; try { localStorage.setItem('ps_court', ct.on ? '1' : '0'); } catch (e) { } const b = document.getElementById('court'); if (b) b.classList.toggle('off', !ct.on); if (ct.on) { ctSync(); ctApply(ctLay(S.G, ct.off), 0, null); } },
     gocoach() { S.coachBack = S.screen; go('coach'); },
     coachBack() { go(S.coachBack || 'hub'); },
@@ -1492,6 +1549,14 @@
       S.G = null; routeByPhase();
     },
     newgame() { S.saved = false; go('menu'); },
+    async share() {
+      const f = t => { const el = document.getElementById('saveInfo'); if (el) el.textContent = t; };
+      try {
+        const cv = shareCanvas(), blob = await new Promise(res => cv.toBlob(res, 'image/png')), file = new File([blob], 'perfect-season.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: 'My Perfect Season: ' + S.L.rec[0].w + '-' + S.L.rec[0].l }); return; }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'perfect-season.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); f('Image saved.');
+      } catch (e) { if (!e || e.name !== 'AbortError') f('Could not create the image.'); }
+    },
     copy() {
       const L = S.L, r = L.rec[0];
       const txt = `Perfect Season: ${r.w}-${r.l}, ${resultLabel(L)} (${S.hard ? 'Hard' : 'Normal'}, ${eraLabel()}). Roster: ${S.user.players.map(p => p.name).join(', ')}.`;
