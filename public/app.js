@@ -778,7 +778,7 @@
   const mySide = () => S.G.userSide;
   const canCoach = () => S.live.window && S.G.coachOpen && !S.G.over;
   SCREENS.game = () => `<div id="alerts"></div><div id="sb" class="sb"></div>
-    <div class="gm"><div class="panel"><div class="eyebrow">Court <button class="chip" data-a="ctoggle" style="margin-left:auto">Show / hide</button></div><div class="court" id="court">${courtSvg()}<div class="ctft" id="ctft"></div></div><div class="eyebrow" style="margin-top:14px">Play by play</div><div class="feed" id="feed"></div><div class="ctrl" id="ctrl"></div></div>
+    <div class="gm"><div class="panel"><div class="eyebrow">Court <button class="chip" data-a="ctoggle" style="margin-left:auto">Show / hide</button></div><div class="ctcourt" id="court">${courtSvg()}<div class="ctft" id="ctft"></div></div><div class="eyebrow" style="margin-top:14px">Play by play</div><div class="feed" id="feed"></div><div class="ctrl" id="ctrl"></div></div>
     <div class="panel"><div id="sidetabs"></div><div id="sidebody"></div><div class="ctrl" id="sidectl"></div></div></div>`;
   AFTER.game = () => { S.live.fed = 0; ctInit(); updateGame(true); };
 
