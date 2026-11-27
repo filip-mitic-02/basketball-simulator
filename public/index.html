@@ -750,15 +750,10 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 body::before{opacity:.9;background:
   radial-gradient(1100px 520px at 88% -12%,rgba(255,106,43,.16),transparent 62%),
   radial-gradient(900px 520px at -8% 18%,rgba(90,168,255,.12),transparent 62%),
-  radial-gradient(700px 400px at 50% 115%,rgba(255,182,39,.07),transparent 65%);animation:ambient 18s ease-in-out infinite alternate}
-@keyframes ambient{from{filter:hue-rotate(0)}to{filter:hue-rotate(-14deg) brightness(1.12)}}
-body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
-  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:44px 44px;
-  -webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 25%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 30%,#000 25%,transparent 75%)}
-#top{backdrop-filter:blur(10px);background:rgba(10,13,18,.72);position:sticky;top:0;z-index:20}
-#app>*{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
-#app>*:nth-child(2){animation-delay:.05s}#app>*:nth-child(3){animation-delay:.1s}#app>*:nth-child(4){animation-delay:.15s}#app>*:nth-child(n+5){animation-delay:.2s}
-@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  radial-gradient(700px 400px at 50% 115%,rgba(255,182,39,.07),transparent 65%);}
+#top{background:rgba(10,13,18,.94);position:sticky;top:0;z-index:20}
+#app>*{animation:rise .22s ease-out}
+@keyframes rise{from{transform:translateY(6px)}to{transform:none}}
 .panel{position:relative;background:linear-gradient(180deg,rgba(26,33,48,.92),rgba(14,19,27,.92));border-color:rgba(120,140,180,.18);box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05)}
 .panel::before{content:"";position:absolute;left:18px;right:18px;top:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,182,39,.55),transparent);opacity:.6}
 .eyebrow{letter-spacing:.14em}
@@ -790,15 +785,12 @@ a.btn{display:inline-block}
 .ctd.act .ring{stroke:#fff;filter:drop-shadow(0 0 8px rgba(255,255,255,.7))}
 #ctBall circle{filter:drop-shadow(0 0 7px rgba(245,158,11,.9))}
 .final.champ{position:relative}
-.final.champ .rec{background:linear-gradient(180deg,#fff2c4,#ffb627 55%,#ff8a2b);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(255,182,39,.5));animation:champ 3s ease-in-out infinite alternate}
+.final.champ .rec{background:linear-gradient(180deg,#fff2c4,#ffb627 55%,#ff8a2b);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(255,182,39,.5))}
 @keyframes champ{from{filter:drop-shadow(0 0 14px rgba(255,182,39,.35))}to{filter:drop-shadow(0 0 34px rgba(255,182,39,.7))}}
 .kpi{transition:transform .18s,border-color .18s}.kpi:hover{transform:translateY(-3px);border-color:rgba(255,182,39,.5)}
-.kpis .kpi{animation:rise .6s both}.kpis .kpi:nth-child(2){animation-delay:.07s}.kpis .kpi:nth-child(3){animation-delay:.14s}.kpis .kpi:nth-child(4){animation-delay:.21s}.kpis .kpi:nth-child(5){animation-delay:.28s}.kpis .kpi:nth-child(6){animation-delay:.35s}
-.hon.top{animation:shine 3.2s linear infinite;background-size:220% 100%;background-image:linear-gradient(110deg,#ffc94a 30%,#fff1c2 48%,#ffc94a 66%)}
-@keyframes shine{from{background-position:120% 0}to{background-position:-120% 0}}
 .logo svg,.logo i{transition:transform .6s}.logo:hover svg,.logo:hover i{transform:rotate(360deg)}
-.modal{backdrop-filter:blur(6px);animation:fadein .25s both}
-@keyframes fadein{from{opacity:0}to{opacity:1}}
+.modal{animation:fadein .18s ease-out}
+@keyframes fadein{from{background-color:rgba(5,7,10,.3)}to{background-color:rgba(5,7,10,.8)}}
 .modal .box{box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.05)}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:8px;border:2px solid transparent;background-clip:padding-box}::-webkit-scrollbar-thumb:hover{background:#3b4a70;background-clip:padding-box;border:2px solid transparent}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
