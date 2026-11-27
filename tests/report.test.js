@@ -202,6 +202,7 @@ test('trades: any position can be asked for, the last natural player of a positi
       for (const o of C.tradeOffers(SE, g, pos)) {
         const rest = P.filter((_, i) => i !== g).concat([o]);
         for (const x of locks) assert.ok(rest.some(p => nat(p).includes(x)), 'natural ' + x + ' kept');
+        if (locks.length) { assert.ok(locks.includes(pos), 'a locked player is only swapped at his own position'); assert.ok(nat(o).includes(pos), 'for a natural player of it'); }
         assert.equal(o._el[0], pos);
       }
     }

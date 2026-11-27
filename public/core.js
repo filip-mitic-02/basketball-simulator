@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-27.4';
+  const VERSION = 'sim-2026-11-27.5';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -164,6 +164,9 @@
     if (!isIdx(give, P.length)) return [];
     if (pos != null && !E.POS.includes(pos)) return [];
     const out = P[give], rest = P.filter((_, i) => i !== give), have = new Set(P.map(p => p.name)), before = covered(P);
+    // The last natural player of a position can only be swapped for a natural player of that position, playing it.
+    const locks = tradeLocks(SE, give);
+    if (pos != null && locks.length && !locks.includes(pos)) return [];
     let cands = [];
     for (const w of TRADE.win) {
       cands = []; const seen = new Set();
@@ -172,6 +175,7 @@
         const np = Object.assign({}, p, { fromLabel: t.label, fromSeason: t.season, fromTm: t.tm });
         if (pos != null) {
           if (!E.eligible(p).includes(pos)) continue;
+          if (locks.length && !natOf(p).includes(pos)) continue;
           np._el = [pos];
         }
         if (pos == null) { if (!E.canAdd(rest, np)) continue; }

@@ -656,7 +656,7 @@
       const out = P[T.give], poss = Core.tradePositions(S.SE, T.give), locks = Core.tradeLocks(S.SE, T.give);
       if (T.pos != null && !poss.includes(T.pos)) T.pos = null;
       const offs = T.pos != null ? Core.tradeOffers(S.SE, T.give, T.pos) : [];
-      const pbar = `<div class="eyebrow" style="margin-top:22px">Which position do you want back?</div><p class="note" style="margin-bottom:10px">Any position is allowed. ${locks.length ? esc(out.name) + ' is your only natural ' + locks.join('/') + ', so you need a natural ' + locks.join('/') + ' back.' : 'Your roster keeps a natural player at every position it has now.'} Greyed out: nobody suitable is available.</p><div class="posbar">${['PG', 'SG', 'SF', 'PF', 'C'].map(x => `<button class="posb ${T.pos === x ? 'on' : ''}" data-a="tpos" data-p="${x}" ${poss.includes(x) ? '' : 'disabled'}>${x}</button>`).join('')}</div>`;
+      const pbar = `<div class="eyebrow" style="margin-top:22px">Which position do you want back?</div><p class="note" style="margin-bottom:10px">Any position is allowed. ${locks.length ? esc(out.name) + ' is your only natural ' + locks.join('/') + ', so he can only be swapped for another natural ' + locks.join('/') + '.' : 'Your roster keeps a natural player at every position it has now.'} Greyed out: nobody suitable is available.</p><div class="posbar">${['PG', 'SG', 'SF', 'PF', 'C'].map(x => `<button class="posb ${T.pos === x ? 'on' : ''}" data-a="tpos" data-p="${x}" ${poss.includes(x) ? '' : 'disabled'}>${x}</button>`).join('')}</div>`;
       offers = T.pos == null ? pbar : pbar + (offs.length ? `<div class="eyebrow" style="margin-top:22px">Offers at ${T.pos} for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. The small numbers show the difference from ${esc(out.name.split(' ').slice(-1)[0])}: green is better, red is worse.</p><div class="tcards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`);
     }
     return `<div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="font-size:36px">Trade</h2><button class="btn pri" data-a="tback">Back</button></div>
@@ -808,9 +808,6 @@
     const T = G.teams;
     const tm = (t, align) => `<div class="tm ${t === side ? 'me' : 'opp'} ${align}"><div class="tn">${t === side ? esc(S.teamName) : esc(T[t].label)}</div><div class="sc led num">${G.score[t]}</div><div class="qs num">${(G.qs[t] || []).join(' &middot; ')}&nbsp;</div><div class="qs">Timeouts ${G.to[t]} &middot; Team fouls ${G.tf[t]}</div></div>`;
     sb.innerHTML = tm(1, '') + `<div class="mid"><div class="qn">${G.over ? 'Final' : (G.q > 4 ? 'Overtime ' + (G.q - 4) : 'Quarter ' + G.q)}</div><div class="clk led num" id="clk">${mmss(Math.max(0, Math.round(shownClock())))}</div><div class="qs">${G.playoff ? 'Playoffs' : 'Regular season'} &middot; away @ home</div></div>` + tm(0, 'r');
-    // a basket makes the number flash in the colour of the team that scored
-    const prevSc = live.prevSc; live.prevSc = G.score.slice();
-    if (prevSc && !full) [0, 1].forEach(t => { if (G.score[t] > prevSc[t]) { const el = sb.querySelectorAll('.sc')[t === 1 ? 0 : 1]; if (el) { el.classList.add('bump'); sb.classList.add('flash' + (t === side ? 'me' : 'opp')); setTimeout(() => sb.classList.remove('flashme', 'flashopp'), 700); } } });
     const feed = document.getElementById('feed');
     if (full) feed.innerHTML = '';
     const log = G.log; let h = '';
@@ -1311,15 +1308,15 @@
     const side = t => {
       const P = G.teams[t].players, st = G.st[t];
       const rows = P.map((p, i) => ({ p, i, s: st[i] })).filter(r => r.s.sec > 0 || r.s.fga > 0).sort((a, b) => b.s.pts - a.s.pts);
-      return `<div class="scs"><div class="sct" style="--c:${col(t)}"><i></i>${t === me ? esc(S.teamName) : esc(G.teams[t].label)}</div>` +
-        rows.map(r => `<button class="scr" data-a="scp" data-v="${t}:${r.i}" style="--c:${col(t)}"><b>${esc(r.p.name)}</b><span class="num">${r.s.pts} pts</span><em class="num">${r.s.fgm}/${r.s.fga}${r.s.tpa ? ' &middot; 3P ' + r.s.tpm + '/' + r.s.tpa : ''}</em></button>`).join('') + '</div>';
+      return `<div class="shcs"><div class="shct" style="--c:${col(t)}"><i></i>${t === me ? esc(S.teamName) : esc(G.teams[t].label)}</div>` +
+        rows.map(r => `<button class="shcr" data-a="scp" data-v="${t}:${r.i}" style="--c:${col(t)}"><b>${esc(r.p.name)}</b><span class="num">${r.s.pts} pts</span><em class="num">${r.s.fgm}/${r.s.fga}${r.s.tpa ? ' &middot; 3P ' + r.s.tpm + '/' + r.s.tpa : ''}</em></button>`).join('') + '</div>';
     };
     const marks = shots.map(x => {
       const c = col(x.t), px = Math.round(x.xy[0]), py = Math.round(x.xy[1]);
       return `<g class="mk ${x.made ? 'mkm' : 'mkx'}" data-k="${x.t}:${x.p}">` + (x.made ? `<circle cx="${px}" cy="${py}" r="7.5" fill="${c}" stroke="#fff" stroke-width="1.6"/>` : `<path d="M${px - 6} ${py - 6}l12 12m0 -12l-12 12" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>`) + '</g>';
     }).join('');
     const sum = t => { const a = shots.filter(x => x.t === t), m = a.filter(x => x.made).length; return `${m}/${a.length}`; };
-    return `<div class="sc" id="shotchart"><div class="scl">${side(1 - me)}</div><div class="scc"><div class="scc-h"><span>${esc(G.teams[1 - me].label)} <b class="num">${sum(1 - me)}</b></span><span class="note">Click a player to see his shots</span><span>${esc(S.teamName)} <b class="num">${sum(me)}</b></span></div><div class="scv">${courtSvg(true).replace('<g id="scMarks"></g>', `<g id="scMarks">${marks}</g>`)}</div><div class="sclg"><span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#9fb2d1" stroke="#fff" stroke-width="1.4"/></svg> Made</span><span><svg width="14" height="14"><path d="M2 2l10 10m0 -10l-10 10" stroke="#9fb2d1" stroke-width="2.4"/></svg> Missed</span></div></div><div class="scr-side">${side(me)}</div></div>`;
+    return `<div class="shc" id="shotchart"><div class="shcl">${side(1 - me)}</div><div class="shcc"><div class="shcc-h"><span>${esc(G.teams[1 - me].label)} <b class="num">${sum(1 - me)}</b></span><span class="note">Click a player to see his shots</span><span>${esc(S.teamName)} <b class="num">${sum(me)}</b></span></div><div class="shcv">${courtSvg(true).replace('<g id="scMarks"></g>', `<g id="scMarks">${marks}</g>`)}</div><div class="shclg"><span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#9fb2d1" stroke="#fff" stroke-width="1.4"/></svg> Made</span><span><svg width="14" height="14"><path d="M2 2l10 10m0 -10l-10 10" stroke="#9fb2d1" stroke-width="2.4"/></svg> Missed</span></div></div><div class="shcr-side">${side(me)}</div></div>`;
   }
   function gameOverModal() {
     const G = S.G, side = mySide(), us = G.score[side], them = G.score[1 - side], win = us > them;
@@ -1498,7 +1495,7 @@
     scp(d) {
       const root = document.getElementById('shotchart'); if (!root) return;
       const was = root.dataset.f === d.v, v = was ? '' : d.v; root.dataset.f = v;
-      root.querySelectorAll('.scr').forEach(b => b.classList.toggle('on', !!v && b.dataset.v === v));
+      root.querySelectorAll('.shcr').forEach(b => b.classList.toggle('on', !!v && b.dataset.v === v));
       root.querySelectorAll('.mk').forEach(m => m.classList.toggle('dim', !!v && m.dataset.k !== v));
       root.classList.toggle('filt', !!v);
     },
