@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-27.1';
+  const VERSION = 'sim-2026-11-27.2';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -148,12 +148,22 @@
     const last = Math.round(TRADE.lastGame * L.R.games / 82);
     return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= last && used < TRADE.max, left: TRADE.max - used, lastGame: last, played: L.userGames.length };
   }
-  // `pos` (optional) is the position the incoming player must play; the roster must still fill every slot (two per position).
+  // A player's natural positions are the ones listed for him in the data (not the ones he can fill in a pinch).
+  const natOf = p => String(p.elig || p.pos || 'SF').split(',').filter(x => E.POS.includes(x));
+  const covered = list => E.POS.filter(x => list.some(p => natOf(p).includes(x)));
+  // Positions where `give` is the last natural player on the roster (he can only be replaced by another natural player there).
+  function tradeLocks(SE, give) {
+    const P = SE.user.players; if (!isIdx(give, P.length)) return [];
+    const rest = P.filter((_, i) => i !== give);
+    return covered(P).filter(x => !covered(rest).includes(x));
+  }
+  // `pos` (optional) is the position the incoming player will play. Any position is allowed, as long as the roster keeps a natural player
+  // at every position it had one at before the trade. Without `pos` the old rule applies (the roster must still fill every slot).
   function tradeOffers(SE, give, pos) {
     const P = SE.user.players;
     if (!isIdx(give, P.length)) return [];
     if (pos != null && !E.POS.includes(pos)) return [];
-    const out = P[give], rest = P.filter((_, i) => i !== give), have = new Set(P.map(p => p.name));
+    const out = P[give], rest = P.filter((_, i) => i !== give), have = new Set(P.map(p => p.name)), before = covered(P);
     let cands = [];
     for (const w of TRADE.win) {
       cands = []; const seen = new Set();
@@ -164,7 +174,8 @@
           if (!E.eligible(p).includes(pos)) continue;
           np._el = [pos];
         }
-        if (!E.canAdd(rest, np)) continue;
+        if (pos == null) { if (!E.canAdd(rest, np)) continue; }
+        else if (!before.every(x => covered(rest.concat([np])).includes(x))) continue;
         seen.add(p.name); cands.push(np);
       }
       if (cands.length >= 12) break;
@@ -182,7 +193,7 @@
     if (!np) return false;
     const U = SE.user, L = SE.L, old = U.players[give];
     U.players[give] = np;
-    const as = E.assign(U.players);
+    const as = E.assign(U.players) || (pos != null ? U.players.map(p => E.eligible(p)[0]) : null);
     if (!as) { U.players[give] = old; return false; }
     U.players.forEach((p, i) => { p.slot = as[i]; p.guard = as[i] === 'PG' || as[i] === 'SG'; p.big = as[i] === 'PF' || as[i] === 'C'; });
     L.tradedAway.push({ name: old.name, agg: L.agg[give] });
@@ -440,7 +451,7 @@
   return {
     VERSION, DRAFT_ROUNDS, MAX_SKIPS, MIN_Y, MAX_Y, MIN_POOL, Invalid,
     prepData, mkTeams, poolOf, validEra, fitPositions, pickable, rollTeam, makePick,
-    createSeason, tradeState, tradeOffers, tradePositions, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
+    createSeason, tradeState, tradeOffers, tradePositions, tradeLocks, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
     replay, resultLabel, calcScore, achievements, summarize, poWins, poLosses
   };
 });

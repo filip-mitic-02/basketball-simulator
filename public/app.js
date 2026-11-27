@@ -645,10 +645,10 @@
       <span class="ovr ${vis ? ovrCls(dp(p)) : 'tq'}">${vis ? dp(p) : '??'}</span></button>`).join('');
     let offers = '';
     if (T.give != null) {
-      const out = P[T.give], poss = Core.tradePositions(S.SE, T.give);
+      const out = P[T.give], poss = Core.tradePositions(S.SE, T.give), locks = Core.tradeLocks(S.SE, T.give);
       if (T.pos != null && !poss.includes(T.pos)) T.pos = null;
       const offs = T.pos != null ? Core.tradeOffers(S.SE, T.give, T.pos) : [];
-      const pbar = `<div class="eyebrow" style="margin-top:22px">Which position do you want back?</div><p class="note" style="margin-bottom:10px">Your roster always keeps two players at each position, so someone else shifts if you change positions. Greyed out: nobody suitable is available.</p><div class="posbar">${['PG', 'SG', 'SF', 'PF', 'C'].map(x => `<button class="posb ${T.pos === x ? 'on' : ''}" data-a="tpos" data-p="${x}" ${poss.includes(x) ? '' : 'disabled'}>${x}</button>`).join('')}</div>`;
+      const pbar = `<div class="eyebrow" style="margin-top:22px">Which position do you want back?</div><p class="note" style="margin-bottom:10px">Any position is allowed. ${locks.length ? esc(out.name) + ' is your only natural ' + locks.join('/') + ', so you need a natural ' + locks.join('/') + ' back.' : 'Your roster keeps a natural player at every position it has now.'} Greyed out: nobody suitable is available.</p><div class="posbar">${['PG', 'SG', 'SF', 'PF', 'C'].map(x => `<button class="posb ${T.pos === x ? 'on' : ''}" data-a="tpos" data-p="${x}" ${poss.includes(x) ? '' : 'disabled'}>${x}</button>`).join('')}</div>`;
       offers = T.pos == null ? pbar : pbar + (offs.length ? `<div class="eyebrow" style="margin-top:22px">Offers at ${T.pos} for ${esc(out.name)}</div><p class="note" style="margin-bottom:10px">Three players of similar quality from your era. The small numbers show the difference from ${esc(out.name.split(' ').slice(-1)[0])}: green is better, red is worse.</p><div class="tcards">${offs.map((p, i) => tradeCard(p, i, out)).join('')}</div>` : `<p class="note" style="margin-top:16px">Nobody on the market is close enough to ${esc(out.name)}. Pick someone else.</p>`);
     }
     return `<div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="font-size:36px">Trade</h2><button class="btn pri" data-a="tback">Back</button></div>
@@ -769,7 +769,7 @@
   };
 
   // ---------- GAME ----------
-  function stopLive() { if (S.live && S.live.timer) clearTimeout(S.live.timer); }
+  function stopLive() { if (S.live && S.live.timer) clearTimeout(S.live.timer); if (S.live && S.live.defer) clearTimeout(S.live.defer); }
   function beginGame(G) {
     S.G = G;
     S.live = { timer: null, playing: false, speed: 1, tab: 'rot', sel: null, fed: 0, run: { t: -1, pts: 0 }, alert: '', window: true, winLabel: 'Pre-game', runAlerted: false, foulAlerted: {} };
@@ -807,8 +807,8 @@
     for (let i = live.fed; i < log.length; i++) h = evHtml(G, log[i]) + h;
     if (h) feed.insertAdjacentHTML('afterbegin', h);
     live.fed = log.length;
-    courtFeed(fresh, base0, full);
-    const spd = [1, 2, 4, 8].map(s => `<button class="chip ${live.speed === s ? 'on' : ''}" data-a="speed" data-v="${s}">${s}x</button>`).join('');
+    { const cf = Math.max(base0, live.cd || 0); courtFeed(log.slice(cf), cf, full); live.cd = log.length; }
+    const spd = [1, 2, 4, 8].map(s => `<button class="chip ${live.speed === s ? 'on' : ''}" data-a="speed" data-v="${s}" title="${s === 1 ? 'Real time' : s + 'x real time'}">${s}x</button>`).join('');
     setHTML('ctrl', G.over ? '<button class="btn pri" data-a="finish">Continue</button>' :
       `${live.playing ? '<button class="btn pri" data-a="pause">Pause</button>' : '<button class="btn pri" data-a="resume">' + (live.window ? 'Resume game' : 'Resume') + '</button>'}${spd}
        <button class="btn" data-a="skipq">Sim to end of quarter</button><button class="btn" data-a="skipg">Sim to final</button>`);
@@ -958,7 +958,7 @@
     const G = S.G, ct = S.live.ct, nm = (t, i) => (i != null && i >= 0 && G.teams[t].players[i]) ? G.teams[t].players[i].name.split(' ').slice(-1)[0] : '';
     const key = (t, i) => t * 100 + i, st = [];
     const off = e.k === 'qend' || e.k === 'sub' ? (e.k === 'qend' ? mySide() : ct.off) : e.k === 'foul' || e.k === 'out' ? 1 - e.t : e.t, lay = ctLay(G, off), h = ctHoop(off);
-    const near = (xy, away) => [xy[0] + (h[0] - xy[0]) * 0.1, xy[1] + (h[1] - xy[1]) * 0.1 + (away || 0)];
+        const gap = ct.off !== off && (e.k === 'make' || e.k === 'miss' || e.k === 'block') ? 1300 : 0;
     ct.off = off;
     switch (e.k) {
       case 'make': case 'miss': case 'block': {
@@ -968,21 +968,21 @@
         if (dk) mv[dk] = [spot[0] + (h[0] - spot[0]) * 0.1, spot[1] + (h[1] - spot[1]) * 0.1 - 16];
         if (e.k === 'make' && e.a >= 0 && lay[key(e.t, e.a)]) {
           const ap = lay[key(e.t, e.a)];
-          st.push({ f: 0.2, dots: lay, ball: ap, act: key(e.t, e.a) });
-          st.push({ f: 0.28, dots: mv, ball: spot, act: me, trail: [ap, spot] });
-        } else st.push({ f: 0.45, dots: mv, ball: spot, act: me });
+          st.push({ f: 700 + gap, dots: lay, ball: ap, act: key(e.t, e.a) });
+          st.push({ f: 800, dots: mv, ball: spot, act: me, trail: [ap, spot] });
+        } else st.push({ f: 1200 + gap, dots: mv, ball: spot, act: me });
         if (e.k === 'block') {
           const bk = key(1 - e.t, e.b), bp = mv[bk] ? [spot[0] + (h[0] - spot[0]) * 0.12, spot[1]] : spot, away = ctReal(e.t, CT.hx - 340, 250 + (ctHash(idx, 3) - 0.5) * 300);
           if (mv[bk]) mv[bk] = bp;
-          st.push({ f: 0.2, dots: mv, ball: bp, act: bk, pop: ['BLOCK', bp, 'blk'] });
-          st.push({ f: 0.25, dots: mv, ball: away, mark: [spot, false, e.t] });
+          st.push({ f: 500, dots: mv, ball: bp, act: bk, pop: ['BLOCK', bp, 'blk'] });
+          st.push({ f: 800, dots: mv, ball: away, mark: [spot, false, e.t] });
         } else if (e.k === 'make') {
-          st.push({ f: 0.17, dots: mv, ball: h, act: me, trail: [spot, h] });
-          st.push({ f: 0.2, dots: mv, ball: [h[0], h[1] + 16], act: me, rim: 'swish', mark: [spot, true, e.t], pop: [e.is3 ? '3 PT' : e.and1 ? '+2 AND ONE' : '+2', spot, 'mk'] });
+          st.push({ f: 900, dots: mv, ball: h, act: me, trail: [spot, h] });
+          st.push({ f: 600, dots: mv, ball: [h[0], h[1] + 16], act: me, rim: 'swish', mark: [spot, true, e.t], pop: [e.is3 ? '3 PT' : e.and1 ? '+2 AND ONE' : '+2', spot, 'mk'] });
         } else {
-          st.push({ f: 0.17, dots: mv, ball: h, act: me, trail: [spot, h] });
+          st.push({ f: 900, dots: mv, ball: h, act: me, trail: [spot, h] });
           const rb = [h[0] + (ctDir(off) > 0 ? -1 : 1) * (40 + ctHash(idx, 4) * 40), h[1] + (ctHash(idx, 5) - 0.5) * 110];
-          st.push({ f: 0.2, dots: mv, ball: rb, act: me, rim: 'clank', mark: [spot, false, e.t] });
+          st.push({ f: 800, dots: mv, ball: rb, act: me, rim: 'clank', mark: [spot, false, e.t] });
         }
         ct.basket = h; break;
       }
@@ -992,54 +992,70 @@
         const keys = Object.keys(lay).filter(x => x !== String(k));
         // keep the others near the basket they were fighting under for a moment
         for (const x of keys) { const c = ct.pos[x]; if (c) mv[x] = [c[0] + (bk[0] - c[0]) * 0.18, c[1] + (bk[1] - c[1]) * 0.18]; }
-        st.push({ f: 0.6, dots: mv, ball: px, act: k, pop: [e.off ? 'OFF. REBOUND' : 'REBOUND', px, 'rb'] }); break;
+        st.push({ f: 1000, dots: mv, ball: px, act: k, pop: [e.off ? 'OFF. REBOUND' : 'REBOUND', px, 'rb'] }); break;
       }
       case 'tov': {
         const mv = Object.assign({}, lay), me = key(e.t, e.p), bp = lay[me] || [470, 250];
-        if (e.s >= 0 && mv[key(1 - e.t, e.s)]) { const sp = [bp[0] + (h[0] - bp[0]) * -0.06, bp[1] + 12]; mv[key(1 - e.t, e.s)] = sp; st.push({ f: 0.5, dots: mv, ball: sp, act: key(1 - e.t, e.s), pop: ['STEAL', sp, 'stl'] }); }
-        else st.push({ f: 0.5, dots: mv, ball: [bp[0], bp[1] < 250 ? -10 : 510], act: me, pop: ['TURNOVER', bp, 'stl'] });
+        if (e.s >= 0 && mv[key(1 - e.t, e.s)]) { const sp = [bp[0] + (h[0] - bp[0]) * -0.06, bp[1] + 12]; mv[key(1 - e.t, e.s)] = sp; st.push({ f: 900, dots: mv, ball: sp, act: key(1 - e.t, e.s), pop: ['STEAL', sp, 'stl'] }); }
+        else st.push({ f: 800, dots: mv, ball: [bp[0], bp[1] < 250 ? -10 : 510], act: me, pop: ['TURNOVER', bp, 'stl'] });
         break;
       }
       case 'foul': case 'out': {
-        const k = key(e.t, e.p), c = ct.pos[k] || lay[k] || [470, 250]; st.push({ f: 0.4, dots: lay, ball: lay[key(off, G.on[off][0])] || c, act: k, pop: [e.k === 'out' ? 'FOULED OUT' : 'FOUL', c, 'fl'] }); break;
+        const k = key(e.t, e.p), c = ct.pos[k] || lay[k] || [470, 250]; st.push({ f: 800, dots: lay, ball: lay[key(off, G.on[off][0])] || c, act: k, pop: [e.k === 'out' ? 'FOULED OUT' : 'FOUL', c, 'fl'] }); break;
       }
-      case 'sub': st.push({ f: 0.5, dots: lay, ball: ct.ball, act: null }); break;
-      case 'qend': st.push({ f: 0.5, dots: ctLay(G, mySide()), ball: [CT.W / 2, CT.H / 2], act: null }); break;
+      case 'sub': st.push({ f: 400, dots: lay, ball: ct.ball, act: null }); break;
+      case 'qend': st.push({ f: 900, dots: ctLay(G, mySide()), ball: [CT.W / 2, CT.H / 2], act: null }); break;
       default: break;
     }
     return st;
   }
   function ctNet(kind) { const b = document.getElementById('court'); if (!b) return; b.classList.remove('swish', 'clank'); void b.offsetWidth; b.classList.add(kind); }
+  // Free throws: a side view of the shooter, the rim and the net. Each shot lasts 2 s at 1x (the clock is stopped, so this is extra time).
+  const FT_MS = 2000, ftMs = () => Math.max(240, Math.round(FT_MS / S.live.speed));
+  function ftSvg(col, txt) {
+    const xt = [256, 270, 284, 298, 312], xb = [268, 277, 284, 291, 300];
+    const net = xt.map((x, k) => `M${x} 102 ${xb[k]} 168`).join('') + [120, 138, 156].map(y => { const f = (y - 102) / 66; return `M${256 + 12 * f} ${y}H${312 - 12 * f}`; }).join('');
+    return `<svg class="ftsc" viewBox="0 0 360 250" role="img" aria-label="Free throw"><defs><linearGradient id="ftfl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2a18"/><stop offset="1" stop-color="#241810"/></linearGradient><linearGradient id="ftgl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe3ff" stop-opacity=".5"/><stop offset="1" stop-color="#7d9bc9" stop-opacity=".25"/></linearGradient><radialGradient id="ftbl" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#c2410c"/></radialGradient></defs>
+      <rect x="0" y="206" width="360" height="44" fill="url(#ftfl)"/><path d="M0 206H360" stroke="#6b4a2a" stroke-width="3"/><path d="M62 206V250" stroke="#d8c9a8" stroke-width="3" opacity=".6"/>
+      <rect x="326" y="24" width="8" height="182" rx="3" fill="#202a3d"/><rect x="316" y="26" width="10" height="92" rx="2" fill="url(#ftgl)" stroke="#9fb2d1" stroke-width="2.5"/><rect x="312" y="84" width="6" height="24" fill="none" stroke="#e5edf9" stroke-width="2"/>
+      <g class="ftrim"><path d="M254 102H314" stroke="#f97316" stroke-width="6" stroke-linecap="round"/><ellipse cx="284" cy="102" rx="30" ry="5.5" fill="none" stroke="#f97316" stroke-width="3" opacity=".75"/></g>
+      <g class="ftnet"><path d="${net}" stroke="#eef4ff" stroke-width="1.7" fill="none" opacity=".85"/></g>
+      <g class="ftpl"><ellipse cx="72" cy="206" rx="26" ry="5" fill="#000" opacity=".35"/><path d="M62 206 66 168M82 206 78 168" stroke="#e8c9a0" stroke-width="7" stroke-linecap="round"/><path d="M56 168H88L84 112H62Z" fill="${col}" stroke="#0b1220" stroke-width="2.5" stroke-linejoin="round"/><text x="73" y="146" text-anchor="middle" fill="#0b1220" font-size="15" font-weight="800">${esc(txt)}</text><circle cx="73" cy="96" r="12" fill="#e8c9a0" stroke="#0b1220" stroke-width="2.5"/><g class="ftarm"><path d="M80 118 94 112" stroke="#e8c9a0" stroke-width="7" stroke-linecap="round"/></g></g>
+      <g transform="translate(100,112)"><g class="ftx"><g class="fty"><g class="fts"><circle r="13" fill="url(#ftbl)" stroke="#7c2d05" stroke-width="1.8"/><path d="M-13 0H13M0 -13V13M-9 -9Q0 0 -9 9M9 -9Q0 0 9 9" stroke="#5b1f04" stroke-width="1.3" fill="none"/></g></g></g></g></svg>`;
+  }
   function ctFT(e, idx) {
-    const box = document.getElementById('ctft'), ct = S.live.ct, G = S.G; if (!box) return 0;
-    const u = ({ 1: 900, 2: 560, 4: 330 })[S.live.speed]; if (!u || !e.n) return 0;
+    const box = document.getElementById('ctft'), ct = S.live.ct, G = S.G; if (!box || !e.n) return 0;
+    const u = ftMs(), pl = G.teams[e.t].players[e.p], nm = pl ? pl.name : '', ini = nm.split(' ').map(x => x[0] || '').join('').slice(0, 2).toUpperCase(), col = ctColor(e.t).f;
     const order = Array.from({ length: e.n }, (_, k) => k < e.m);
     for (let k = e.n - 1; k > 0; k--) { const j = Math.floor(ctHash(idx, k + 50) * (k + 1)); const x = order[k]; order[k] = order[j]; order[j] = x; }
-    const nm = G.teams[e.t].players[e.p] ? G.teams[e.t].players[e.p].name : '', col = ctColor(e.t).f;
     box.className = 'ctft on';
-    box.innerHTML = `<div class="ftw"><div class="ftl"></div><svg viewBox="0 0 300 270"><rect x="85" y="8" width="130" height="78" rx="4" fill="#1a2438" stroke="#9fb2d1" stroke-width="3"/><rect x="123" y="44" width="54" height="40" fill="none" stroke="#9fb2d1" stroke-width="2.5"/><g class="ftb"><circle cx="150" cy="248" r="15" fill="${col}" stroke="#fff" stroke-width="2"/><path d="M135 248H165M150 233V263" stroke="#0b1220" stroke-width="1.5"/></g><g class="ftnet"><path d="M118 120 132 178M182 120 168 178M134 120 141 178M166 120 159 178M150 120V178M123 140H177M128 160H172" stroke="#e5edf9" stroke-width="1.6" fill="none" opacity=".85"/></g><ellipse cx="150" cy="118" rx="34" ry="8" fill="none" stroke="#f97316" stroke-width="5"/></svg><div class="ftr"></div></div>`;
-    const lab = box.querySelector('.ftl'), ball = box.querySelector('.ftb'), net = box.querySelector('.ftnet'), res = box.querySelector('.ftr');
+    box.innerHTML = `<div class="ftw"><div class="ftl"></div>${ftSvg(col, ini)}<div class="ftdots">${order.map(() => '<i></i>').join('')}</div><div class="ftbig"></div></div>`;
+    const lab = box.querySelector('.ftl'), sc = box.querySelector('.ftsc'), dots = box.querySelectorAll('.ftdots i'), big = box.querySelector('.ftbig'), net = box.querySelector('.ftnet'), rim = box.querySelector('.ftrim');
+    sc.style.setProperty('--ftd', Math.round(u * 0.8) + 'ms');
     order.forEach((mk, k) => {
+      const kind = mk ? 'make' : (ctHash(idx, k + 70) < 0.5 ? 'miss' : 'miss2');
       ct.tm.push(setTimeout(() => {
         lab.textContent = nm + ' · free throw ' + (k + 1) + ' of ' + e.n;
-        ball.setAttribute('class', 'ftb'); net.setAttribute('class', 'ftnet'); void box.offsetWidth;
-        ball.style.animationDuration = Math.round(u * 0.78) + 'ms'; ball.setAttribute('class', 'ftb ' + (mk ? 'make' : 'miss'));
-        if (mk) { ct.tm.push(setTimeout(() => net.setAttribute('class', 'ftnet swish'), Math.round(u * 0.5))); }
-      }, k * u));
-      ct.tm.push(setTimeout(() => { res.insertAdjacentHTML('beforeend', `<span class="${mk ? 'ok' : 'no'}">${mk ? 'Made' : 'Missed'}</span>`); }, k * u + Math.round(u * 0.8)));
+        sc.setAttribute('class', 'ftsc'); net.setAttribute('class', 'ftnet'); rim.setAttribute('class', 'ftrim'); big.textContent = ''; big.className = 'ftbig'; void sc.getBoundingClientRect();
+        sc.setAttribute('class', 'ftsc go ' + kind);
+      }, k * u + 60));
+      ct.tm.push(setTimeout(() => {
+        if (mk) net.setAttribute('class', 'ftnet swish'); else rim.setAttribute('class', 'ftrim shake');
+        dots[k].className = mk ? 'ok' : 'no'; big.textContent = mk ? 'Good' : 'No good'; big.className = 'ftbig ' + (mk ? 'ok' : 'no');
+      }, k * u + Math.round(u * 0.62)));
     });
-    ct.tm.push(setTimeout(() => { box.className = 'ctft'; }, e.n * u + 260));
-    return e.n * u + 260;
+    const total = e.n * u + 420;
+    ct.tm.push(setTimeout(() => { box.className = 'ctft'; }, total));
+    return total;
   }
+  // Draws the new events and returns { total, lead } in ms: how long the animation takes, and when the result (score, feed) should show.
   function courtFeed(evs, base, full) {
-    const live = S.live, ct = live.ct; if (!ct || !ct.on || !document.getElementById('ctDots')) return;
-    if (!evs.length) { ctSync(); return; }
+    const live = S.live, ct = live.ct, none = { total: 0, lead: 0 }; if (!ct || !ct.on || !document.getElementById('ctDots')) return none;
+    if (!evs.length) { ctSync(); return none; }
     ct.tm.forEach(clearTimeout); ct.tm = [];
-    document.getElementById('ctft') && (document.getElementById('ctft').className = 'ctft');
+    const ftb = document.getElementById('ctft'); if (ftb) ftb.className = 'ctft';
     ctSync();
-    const T = Math.max(0, delay() * 0.85), batch = full || evs.length > 4 || T < 150, relevant = ['make', 'miss', 'block', 'reb', 'tov', 'foul', 'out', 'sub', 'qend'];
-    let extra = 0;
-    const list = [], skip = Math.max(0, evs.length - 70);
+    const spd = live.speed || 1, batch = full || evs.length > 4, relevant = ['make', 'miss', 'block', 'reb', 'tov', 'foul', 'out', 'sub', 'qend'], list = [], skip = Math.max(0, evs.length - 70);
     evs.forEach((e, n) => {
       if (n < skip) return;
       if (e.k === 'ft') { list.push({ ft: e, idx: base + n }); return; }
@@ -1048,16 +1064,15 @@
     if (batch) {
       let lastDots = null, lastBall = null;
       for (const it of list) { if (!it.plan) continue; for (const s of it.plan) { if (s.mark) ctMark(s.mark[0], s.mark[1], s.mark[2]); if (s.dots) lastDots = s.dots; if (s.ball) lastBall = s.ball; } }
-      if (lastDots) ctApply(lastDots, T > 40 ? Math.round(T * 0.8) : 0, null);
-      if (lastBall) ctBall(lastBall, T > 40 ? Math.round(T * 0.8) : 0);
-      return;
+      if (lastDots) ctApply(lastDots, 0, null);
+      if (lastBall) ctBall(lastBall, 0);
+      return none;
     }
-    const per = T / Math.max(1, list.filter(x => x.plan).length || 1); let at = 0;
+    let at = 0, lead = 0;
     for (const it of list) {
-      if (it.ft) { extra += ctFT(it.ft, it.idx); continue; }
-      const tot = it.plan.reduce((a, s) => a + s.f, 0) || 1;
+      if (it.ft) { const tt = (() => { const d = ctFT(it.ft, it.idx); return d; })(); at += tt; lead = at; continue; }
       for (const s of it.plan) {
-        const ms = Math.round(per * s.f / tot * 0.95), t0 = Math.round(at);
+        const ms = Math.max(60, Math.round(s.f / spd)), t0 = Math.round(at);
         ct.tm.push(setTimeout(() => {
           if (!S.live || S.live.ct !== ct) return;
           ctSync(); ctApply(s.dots, ms, s.act); ctBall(s.ball, ms);
@@ -1066,14 +1081,15 @@
           if (s.pop) ctPop(s.pop[0], s.pop[1], s.pop[2]);
           if (s.rim) ctNet(s.rim);
         }, t0));
-        at += per * s.f / tot;
+        at += ms;
+        if (s.mark || s.rim || s.pop) lead = at;
       }
     }
-    live.extra = (live.extra || 0) + extra;
+    return { total: Math.round(at), lead: list.some(x => x.ft || (x.e && ['make', 'miss', 'block', 'tov', 'reb'].includes(x.e.k))) ? Math.round(lead) : 0 };
   }
 
   // live loop
-  const delay = () => ({ 1: 900, 2: 450, 4: 200, 8: 70 }[S.live.speed] || 600);
+  const delay = () => 900 / (S.live.speed || 1);
   function runTrack(evs) {
     const live = S.live;
     for (const e of evs) {
@@ -1093,15 +1109,16 @@
   function loop() {
     const G = S.G, live = S.live;
     if (!live.playing) return;
-    const q = G.q;
+    const q = G.q, c0 = G.clock, b0 = G.log.length;
     stepOnce(); live.alert = '';
+    const dt = G.q === q ? Math.max(0, c0 - G.clock) : Math.max(0, c0);
     if (G.over) { live.playing = false; updateGame(); gameOverModal(); return; }
     if (G.q !== q) { live.playing = false; openWindow('end of ' + (q <= 4 ? 'Q' + q : 'overtime')); updateGame(); return; }
     if (G.mo && G.mo.pending) { live.playing = false; updateGame(); showMoment(); return; }
     if (checkAlerts()) { live.playing = false; updateGame(); return; }
-    updateGame();
-    const ex = live.extra || 0; live.extra = 0;
-    live.timer = setTimeout(loop, delay() + ex);
+    const info = courtFeed(G.log.slice(b0), b0, false); live.cd = G.log.length;
+    if (info.lead > 0) { clearTimeout(live.defer); live.defer = setTimeout(() => { live.defer = null; if (S.live === live && S.screen === 'game') updateGame(); }, info.lead); } else updateGame();
+    live.timer = setTimeout(loop, Math.max(Math.round(dt * 1000 / (live.speed || 1)), info.total + 80));
   }
   function simUntil(cond) {
     const G = S.G, live = S.live; let n = 0; const q = G.q;

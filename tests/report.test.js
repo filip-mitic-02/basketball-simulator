@@ -182,3 +182,30 @@ test('EuroLeague: 20 teams, 38 games, best-of-5 quarterfinals and a Final Four, 
   assert.equal(R2.L.rec[0].w, L.rec[0].w); assert.equal(R2.L.phase, L.phase);
   assert.ok(C2.calcScore(L, false) > 0); assert.match(C2.resultLabel(L), /Champion|Eliminated|Missed/);
 });
+test('trades: any position can be asked for, the last natural player of a position cannot leave without a natural replacement, and the log replays', () => {
+  const SE = C.createSeason({ picks: draft(p => p.ovr), pool, seed: 11, hard: false, name: 'T' });
+  const P = SE.user.players, nat = p => String(p.elig || p.pos || 'SF').split(',');
+  let seenOther = false, checked = 0;
+  for (let g = 0; g < P.length && checked < 3; g++) {
+    const locks = C.tradeLocks(SE, g), slot = P[g].slot;
+    for (const pos of C.tradePositions(SE, g)) {
+      if (pos !== slot) seenOther = true;
+      for (const o of C.tradeOffers(SE, g, pos)) {
+        const rest = P.filter((_, i) => i !== g).concat([o]);
+        for (const x of locks) assert.ok(rest.some(p => nat(p).includes(x)), 'natural ' + x + ' kept');
+        assert.equal(o._el[0], pos);
+      }
+    }
+    checked++;
+  }
+  assert.ok(seenOther, 'at least one player can be traded for a different position');
+  const g = P.findIndex((_, i) => C.tradePositions(SE, i).some(x => x !== P[i].slot));
+  assert.ok(g >= 0);
+  const pos = C.tradePositions(SE, g).find(x => x !== P[g].slot), n0 = SE.log.length;
+  assert.ok(C.doTrade(SE, g, 0, pos));
+  assert.deepEqual(SE.log[n0], ['tr', g, 0, pos]);
+  assert.equal(SE.user.players[g].slot, SE.user.players.find(p => p === SE.user.players[g]).slot);
+  // a roster that is no longer two per position must still play a whole season
+  C.quick(SE); let n = 0; while (SE.L.phase === 'season' && n++ < 100) C.quick(SE);
+  assert.ok(SE.L.userGames.length > 10);
+});

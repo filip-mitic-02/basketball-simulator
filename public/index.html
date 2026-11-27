@@ -677,18 +677,38 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 @keyframes ctup{0%{opacity:0;transform:translateY(8px)}15%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateY(-26px)}}
 .ctft{display:none;position:absolute;inset:0;background:rgba(7,11,20,.86);align-items:center;justify-content:center}
 .ctft.on{display:flex}
-.ctft .ftw{width:min(320px,70%);text-align:center}
-.ctft .ftl{font:700 15px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--amber);min-height:22px}
-.ctft svg{max-height:300px}
-.ctft .ftr{display:flex;gap:8px;justify-content:center;min-height:26px}
-.ctft .ftr span{padding:2px 10px;border-radius:6px;font:700 13px var(--display);letter-spacing:.06em;text-transform:uppercase}
-.ctft .ftr .ok{background:rgba(52,211,153,.2);color:#34d399}.ctft .ftr .no{background:rgba(248,113,113,.2);color:#f87171}
-.ftb.make{animation:ftmake .7s ease-in forwards}.ftb.miss{animation:ftmiss .7s ease-in forwards}
-@keyframes ftmake{0%{transform:translate(0,0)}55%{transform:translate(0,-178px)}72%{transform:translate(0,-128px)}100%{transform:translate(0,-48px)}}
-@keyframes ftmiss{0%{transform:translate(0,0)}52%{transform:translate(0,-150px)}62%{transform:translate(30px,-134px)}80%{transform:translate(78px,-176px)}100%{transform:translate(120px,-30px);opacity:.25}}
-.ftnet{transform-origin:150px 118px}.ftnet.swish{animation:netw .5s}
-@keyframes netw{30%{transform:scale(.82,1.16)}65%{transform:scale(1.08,.95)}}
 .ctcourt.swish #ctBall{filter:drop-shadow(0 0 6px #fbbf24)}
+.ctft .ftw{width:min(560px,94%);height:96%;display:flex;flex-direction:column;text-align:center}
+.ctft .ftl{font:700 15px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--amber);min-height:22px;margin-bottom:4px}
+.ctft svg{display:block;width:100%;flex:1 1 0;min-height:0;border-radius:12px;background:linear-gradient(#18243a,#0e1626);border:1px solid var(--line)}
+.ftdots{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.ftdots i{width:14px;height:14px;border-radius:50%;border:2px solid #4b5d7d;background:transparent}
+.ftdots i.ok{background:#34d399;border-color:#34d399}.ftdots i.no{background:#f87171;border-color:#f87171}
+.ftbig{font:800 20px var(--display);letter-spacing:.08em;text-transform:uppercase;min-height:26px;margin-top:2px}
+.ftbig.ok{color:#34d399}.ftbig.no{color:#f87171}
+.ftsc .ftx,.ftsc .fty,.ftsc .fts,.ftsc .ftarm,.ftsc .ftpl{animation-duration:var(--ftd,1.6s);animation-fill-mode:forwards;animation-timing-function:linear}
+.ftsc .ftnet,.ftsc .ftrim{transform-origin:284px 102px}
+.ftsc .ftarm{transform-origin:80px 118px}
+.ftsc.go .fts{animation-name:ftspin;animation-timing-function:linear}
+@keyframes ftspin{to{transform:rotate(-620deg)}}
+.ftsc.go .ftarm{animation-name:ftarm}
+@keyframes ftarm{0%{transform:rotate(30deg)}25%{transform:rotate(-40deg)}60%{transform:rotate(-70deg)}100%{transform:rotate(-20deg)}}
+.ftsc.go .ftpl{animation-name:ftbob}
+@keyframes ftbob{0%{transform:translateY(0)}25%{transform:translateY(3px)}45%{transform:translateY(-5px)}100%{transform:translateY(0)}}
+.ftsc.go.make .ftx{animation-name:ftxm}.ftsc.go.make .fty{animation-name:ftym}
+.ftsc.go.miss .ftx{animation-name:ftx1}.ftsc.go.miss .fty{animation-name:fty1}
+.ftsc.go.miss2 .ftx{animation-name:ftx2}.ftsc.go.miss2 .fty{animation-name:fty2}
+@keyframes ftxm{0%{transform:translateX(0)}86%{transform:translateX(184px)}100%{transform:translateX(184px)}}
+@keyframes ftym{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.25,.7,.4,1)}42%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.5,0,.9,.6)}86%{transform:translateY(-10px);animation-timing-function:cubic-bezier(.4,0,1,1)}100%{transform:translateY(58px)}}
+@keyframes ftx1{0%{transform:translateX(0)}80%{transform:translateX(158px)}100%{transform:translateX(104px)}}
+@keyframes fty1{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.25,.7,.4,1)}42%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.5,0,.9,.6)}80%{transform:translateY(-14px);animation-timing-function:cubic-bezier(.2,.6,.4,1)}90%{transform:translateY(-62px);animation-timing-function:cubic-bezier(.5,0,1,.6)}100%{transform:translateY(92px)}}
+@keyframes ftx2{0%{transform:translateX(0)}88%{transform:translateX(206px)}100%{transform:translateX(150px)}}
+@keyframes fty2{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.25,.7,.4,1)}42%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.5,0,.9,.6)}88%{transform:translateY(-6px);animation-timing-function:cubic-bezier(.2,.6,.4,1)}94%{transform:translateY(-40px);animation-timing-function:cubic-bezier(.5,0,1,.6)}100%{transform:translateY(96px)}}
+.ftnet.swish{animation:netw .6s}
+@keyframes netw{25%{transform:scale(.86,1.2)}55%{transform:scale(1.07,.94)}80%{transform:scale(.98,1.04)}}
+.ftrim.shake{animation:rimk .45s}
+@keyframes rimk{20%{transform:translateY(3px)}45%{transform:translateY(-2px)}70%{transform:translateY(1px)}}
+@media(max-width:600px){.ctcourt:has(.ctft.on){min-height:340px}.ctcourt:has(.ctft.on)>svg{height:340px}}
 </style>
 </head>
 <body>

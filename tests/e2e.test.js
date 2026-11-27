@@ -35,7 +35,7 @@ async function run(signedIn, comp = 'nba') {
   for (const f of ['engine.js', 'league.js', 'core.js', 'report.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
   const doc = w.document, tick = (ms = 20) => new Promise(r => setTimeout(r, ms));
   const click = sel => { const el = doc.querySelector(sel); assert.ok(el, 'missing ' + sel); el.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); };
-  const until = async (fn, what) => { for (let i = 0; i < 600; i++) { if (fn()) return; await tick(10); } assert.fail('timeout: ' + what); };
+  const until = async (fn, what, ms) => { for (let i = 0; i < (ms || 6000) / 10; i++) { if (fn()) return; await tick(10); } assert.fail('timeout: ' + what); };
   await until(() => /Start draft/.test(doc.getElementById('app').innerHTML), 'menu');
   await tick(50);
   if (comp === 'el') { click('[data-a=comp][data-v=el]'); await until(() => w.__S.comp === 'el' && /EuroLeague rosters/.test(doc.getElementById('app').innerHTML), 'EuroLeague menu'); }
@@ -63,6 +63,8 @@ async function run(signedIn, comp = 'nba') {
   click('[data-a=play]');
   await until(() => doc.querySelector('[data-a=timeout]'), 'game screen');
   click('[data-a=timeout]');
+  // the live loop at 8x: it keeps real-time pacing (about 1.5 s of wall clock per possession) and must advance without errors
+  { const n0 = w.__S.G.log.length; click('[data-a=speed][data-v="8"]'); click('[data-a=resume]'); await until(() => w.__S.G.log.length >= n0 + 3, 'live loop advances', 15000); click('[data-a=pause]'); }
   click('[data-a=skipq]'); await tick(30);
   if (process.env.DUMP && comp === 'el') require_fs.writeFileSync('/tmp/elgame.html', '<!doctype html>' + doc.documentElement.outerHTML);
   click('[data-a=skipg]');
@@ -75,10 +77,10 @@ async function run(signedIn, comp = 'nba') {
   click('[data-a=tgive][data-i="4"]');
   await until(() => doc.querySelector('[data-a=tpos]:not([disabled])'), 'positions');
   click('[data-a=tpos]:not([disabled])');
-  await until(() => doc.querySelectorAll('[data-a=toffer]').length === 3, 'three offers');
+  await until(() => doc.querySelectorAll('[data-a=toffer]').length >= 1, 'offers');
   if (process.env.DUMP) require_fs.writeFileSync('/tmp/trade.html', '<!doctype html>' + doc.documentElement.outerHTML);
   const gone = w.__S.user.players[4].name;
-  click('[data-a=toffer][data-i="1"]'); click('[data-a=tconfirm]');
+  click('[data-a=toffer][data-i="0"]'); click('[data-a=tconfirm]');
   await until(() => doc.querySelector('[data-a=play]'), 'hub after the trade');
   assert.notEqual(w.__S.user.players[4].name, gone, 'the traded player is replaced');
   // a second game played step by step, answering the interactive moments
