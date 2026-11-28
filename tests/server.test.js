@@ -75,7 +75,7 @@ test('the client never learns the draft secret or the future rolls', async () =>
   const store = memStore();
   const { id } = await opStart(store, U, { hard: false, from: 1990, to: 2012, ver: sim.version });
   const r = await opSpin(store, U, { id });
-  assert.deepEqual(Object.keys(r).sort(), ['round', 'skips', 'team']);
+  assert.deepEqual(Object.keys(r).sort(), ['bonus', 'round', 'skips', 'team']);
   const st = await opState(store, U, { id });
   assert.ok(!('secret' in st) && st.seed === null, 'no seed before the draft is complete');
 });

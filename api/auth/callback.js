@@ -1,12 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { env, baseUrl } from '../../lib/env.js';
 import { redirect, parseCookies, cookieName, clearCookie } from '../../lib/http.js';
 import { verifyToken, startSession, currentUserId } from '../../lib/session.js';
-import { sql } from '../../lib/db.js';
-import { publicName } from '../../lib/validate.js';
+import { verifyGoogleIdToken, upsertGoogleUser } from '../../lib/google.js';
 
-const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const same = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && timingSafeEqual(x, y); };
 
 export default async function handler(req, res) {
@@ -38,15 +35,9 @@ export default async function handler(req, res) {
     });
     if (!tr.ok) return await fail();
     const tok = await tr.json();
-    const { payload } = await jwtVerify(tok.id_token, JWKS, {
-      issuer: ['https://accounts.google.com', 'accounts.google.com'], audience: env('GOOGLE_CLIENT_ID')
-    });
-    if (!same(payload.nonce, ck.nonce) || typeof payload.sub !== 'string') return await fail();
-
-    const name = publicName(payload.given_name || String(payload.name || '').split(' ')[0], payload.family_name);
-    const rows = await sql()`insert into users (google_sub, name) values (${payload.sub}, ${name})
-      on conflict (google_sub) do update set name = excluded.name returning id`;
-    await startSession(res, rows[0].id);
+    let payload; try { payload = await verifyGoogleIdToken(tok.id_token); } catch { return await fail(); }
+    if (!same(payload.nonce, ck.nonce)) return await fail();
+    await startSession(res, await upsertGoogleUser(payload));
     clearCookie(res, cookieName('oauth'));
     redirect(res, baseUrl() + '/');
   } catch {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Perfect Season</string>
+    <string name="title_activity_main">Perfect Season</string>
+    <string name="package_name">app.perfectseason.coach</string>
+    <string name="custom_url_scheme">app.perfectseason.coach</string>
+</resources>

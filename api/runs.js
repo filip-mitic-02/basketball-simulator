@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       if (!String(req.headers['content-type'] || '').startsWith('application/json')) return send(res, 415, { error: 'type' });
       const b = await readJson(req, 260000);
       const out = await opSubmit(pgStore, id, { id: b && b.id, log: b && b.log }, true);
-      return send(res, 201, { run: shape(out.run), summary: out.summary });
+      return send(res, 201, { run: shape(out.run), summary: out.summary, reward: out.reward });
     }
     send(res, 405, { error: 'method' });
   } catch (e) {

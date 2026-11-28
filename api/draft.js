@@ -1,7 +1,7 @@
 import { send, assertSameOrigin, readJson } from '../lib/http.js';
 import { currentUserId } from '../lib/session.js';
 import { pgStore } from '../lib/store.js';
-import { ApiError, opStart, opSpin, opPick, opState } from '../lib/draftlogic.js';
+import { ApiError, opStart, opSpin, opPick, opState, opBonus } from '../lib/draftlogic.js';
 
 // POST /api/draft  { op: 'start' | 'spin' | 'respin' | 'pick' | 'state', ... }
 export default async function handler(req, res) {
@@ -17,6 +17,7 @@ export default async function handler(req, res) {
       case 'start': out = await opStart(pgStore, userId, b); break;
       case 'spin': out = await opSpin(pgStore, userId, b, false); break;
       case 'respin': out = await opSpin(pgStore, userId, b, true); break;
+      case 'bonus': out = await opBonus(pgStore, userId, b); break;
       case 'pick': out = await opPick(pgStore, userId, b); break;
       case 'state': out = await opState(pgStore, userId, b); break;
       default: throw new ApiError(400, 'op');

@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-28.2';
+  const VERSION = 'sim-2026-11-28.3';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -163,9 +163,14 @@
   // the number of trades already made and the player you give, so the server regenerates the same three and checks the pick.
   const TRADE = { max: 2, lastGame: 55, win: [4, 6, 9], offers: 3, minMpg: 18 };
   function tradeState(SE) {
-    const L = SE.L, used = L.trades.length;
+    const L = SE.L, used = L.trades.length, max = TRADE.max + (SE.bt ? 1 : 0);
     const last = Math.round(TRADE.lastGame * L.R.games / 82);
-    return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= last && used < TRADE.max, left: TRADE.max - used, lastGame: last, played: L.userGames.length };
+    return { open: L.phase === 'season' && !SE.cur && L.userGames.length <= last && used < max, left: max - used, lastGame: last, played: L.userGames.length };
+  }
+  // One extra trade, earned by watching a rewarded ad. It is part of the decision log ('bt'), so the server replay allows exactly one.
+  function bonusTrade(SE) {
+    if (SE.bt || SE.L.phase !== 'season' || SE.cur) return false;
+    SE.bt = true; SE.log.push(['bt']); return true;
   }
   // A player's natural positions are the ones listed for him in the data (not the ones he can fill in a pinch).
   const natOf = p => String(p.elig || p.pos || 'SF').split(',').filter(x => E.POS.includes(x));
@@ -396,6 +401,7 @@
           }
           break;
         }
+        case 'bt': if (SE.bt || L.phase !== 'season') bad('bonus'); SE.bt = true; break;
         case 'tr': if (!Number.isInteger(c[1]) || !Number.isInteger(c[2]) || !(c[3] == null || typeof c[3] === 'string') || !doTrade(SE, c[1], c[2], c[3])) bad('trade'); break;
         case 'sp': if (L.phase !== 'seasonDone') bad('phase'); LG.startPlayoffs(L); break;
         case 'lg': case 'lp': {
@@ -441,6 +447,8 @@
   // ---------- results ----------
   const poWins = L => (L.poGames || []).filter(g => g.win).length;
   const poLosses = L => (L.poGames || []).filter(g => !g.win).length;
+  // playoff rounds the user's team won: all of them for a champion, otherwise the rounds before the one he lost
+  const poRounds = L => !L.po || !L.userInPlayoffs ? 0 : L.phase === 'champion' ? L.R.po.rounds.length : (L.po.elimRound != null ? L.po.elimRound : 0);
   function resultLabel(L) { return L.phase === 'champion' ? 'Champion' : !L.userInPlayoffs ? 'Missed playoffs' : 'Eliminated: ' + LG.roundName(L.po.elimRound != null ? L.po.elimRound : L.po.round, L.R); }
   function calcScore(L, hard) {
     const w = L.rec[0].w, R = L.R;
@@ -466,7 +474,7 @@
     if (L.po && L.po.champ != null && !L.poAwards) LG.poAwards(L);
     const r = L.rec[0];
     return {
-      w: r.w, l: r.l, poW: poWins(L), champ: L.phase === 'champion', res: resultLabel(L), score: calcScore(L, SE.hard), hard: SE.hard,
+      w: r.w, l: r.l, poW: poWins(L), poL: poLosses(L), poR: poRounds(L), champ: L.phase === 'champion', res: resultLabel(L), score: calcScore(L, SE.hard), hard: SE.hard,
       names: SE.user.players.map(p => p.name), ach: achievements(L, SE.hard).map(x => x[0])
     };
   }
@@ -474,7 +482,7 @@
   return {
     VERSION, DRAFT_ROUNDS, MAX_SKIPS, MIN_Y, MAX_Y, MIN_POOL, Invalid,
     prepData, mkTeams, poolOf, validEra, fitPositions, pickable, rollTeam, makePick,
-    origElig, rearrange, fixPicks, createSeason, tradeState, tradeOffers, tradePositions, tradeLocks, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
+    origElig, rearrange, fixPicks, createSeason, tradeState, bonusTrade, tradeOffers, tradePositions, tradeLocks, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
     replay, resultLabel, calcScore, achievements, summarize, poWins, poLosses
   };
 });

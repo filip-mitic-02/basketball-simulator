@@ -176,6 +176,11 @@
     };
     return `<svg class="trophy" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true">${shapes[kind] || shapes.cup}</svg>`;
   }
+  async function shopOp(op, item) {
+    try { const r = await api('/api/shop', { method: 'POST', body: JSON.stringify({ op, item }) }); setProg(r.prog); }
+    catch (e) { /* not enough coins or already owned: the screen below shows the real state */ try { const me = await api('/api/me'); if (me.prog) setProg(me.prog); } catch (e2) { } }
+    if (S.screen === 'profile') { const y = window.scrollY; render(); window.scrollTo(0, y); }
+  }
   function go(screen) { S.screen = screen; render(); window.scrollTo(0, 0); }
   function render() {
     if (S.screen !== 'game') stopLive();
@@ -196,10 +201,25 @@
     if (!r.ok) { const err = new Error('http ' + r.status); err.status = r.status; try { err.code = (await r.json()).error; } catch (e) { } throw err; }
     return r.json();
   }
+  // ---------- progression and cosmetics (the server awards XP and coins; the client only shows them) ----------
+  const PG = window.Progress;
+  const eqItem = (eq, slot) => PG.byId[(eq || {})[slot]] || PG.byId[PG.DEFAULTS[slot]];
+  const fxStyle = id => { const c = ((PG.byId[id] || {}).css || {}).c; return !c ? '' : c.startsWith('linear') ? `background:${c};-webkit-background-clip:text;background-clip:text;color:transparent` : `color:${c}`; };
+  const titleOf = id => (PG.byId[id] || {}).text || '';
+  function applyCosmetics() {
+    const eq = S.prog && S.prog.equipped, st = document.body.style, c = eqItem(eq, 'court').css, fr = eqItem(eq, 'frame').css.c;
+    st.setProperty('--cc-bg', c.bg); st.setProperty('--cc-line', c.line);
+    if (fr) { st.setProperty('--frm', fr); document.body.dataset.frame = '1'; } else { st.removeProperty('--frm'); delete document.body.dataset.frame; }
+  }
+  function setProg(p) { S.prog = p; applyCosmetics(); renderAcct(); }
   function renderAcct() {
     const el = document.getElementById('acct');
-    if (S.acct) el.innerHTML = '<span class="as">Signed in as </span><b>' + esc(S.acct.name) + '</b> <button class="btn sm" data-a="logout">Sign out</button>';
-    else el.innerHTML = '<a class="btn sm pri" href="/api/auth/login">Sign in<span class="lg"> with Google</span></a>';
+    if (S.acct) {
+      const p = S.prog, eq = p && p.equipped;
+      const chip = p ? `<button class="lvbtn" data-a="profile" title="Level, coins and shop"><span class="lv">Lv ${p.level}</span><span class="lvbar"><i style="width:${p.max ? 100 : Math.round(100 * p.into / p.span)}%"></i></span><span class="cn">${p.coins}</span></button>` : '';
+      el.innerHTML = chip + '<span class="as">Signed in as </span><b style="' + fxStyle(eqItem(eq, 'namefx').id) + '">' + esc(S.acct.name) + '</b> <button class="btn sm" data-a="logout">Sign out</button>';
+    } else el.innerHTML = window.Ads && Ads.native ? '<button class="btn sm pri" data-a="nativelogin">Sign in<span class="lg"> with Google</span></button>'
+      : '<a class="btn sm pri" href="/api/auth/login">Sign in<span class="lg"> with Google</span></a>';
   }
   async function initAccount() {
     // The OAuth callback may leave ?login=failed in the address bar; show it only to guests and always clean the URL.
@@ -210,9 +230,9 @@
     } catch (e) { }
     try {
       const me = await api('/api/me');
-      if (me && me.user) S.acct = { id: me.user.id, name: me.user.name };
+      if (me && me.user) { S.acct = { id: me.user.id, name: me.user.name }; if (me.prog) S.prog = me.prog; }
     } catch (e) { /* guest or no backend */ }
-    renderAcct();
+    applyCosmetics(); renderAcct();
     if (loginFailed && !S.acct) { const el = document.getElementById('acct'); if (el) el.insertAdjacentHTML('afterbegin', '<span class="lf">Sign-in failed, try again. </span>'); }
     await loadProfile();
     if (S.screen === 'menu') render();
@@ -227,8 +247,9 @@
     if (!S.acct || !S.D || !S.D.id) return { state: 'guest' };
     try {
       const r = await api('/api/runs', { method: 'POST', body: JSON.stringify({ id: S.D.id, log: S.SE.log }) });
+      if (r.reward && S.prog) setProg({ ...S.prog, ...r.reward.state, coins: r.reward.coinsTotal });
       await loadProfile();
-      return { state: 'saved', summary: r.summary };
+      return { state: 'saved', summary: r.summary, reward: r.reward };
     } catch (e) {
       return { state: e && e.status === 409 && e.code === 'version' ? 'version' : e && e.status === 409 ? 'dup' : e && e.status === 400 ? 'invalid' : 'error' };
     }
@@ -298,7 +319,7 @@
   function boardHtml() {
     if (!S.board.length) return '<p class="note">No entries yet. Finish a season to get on the board.</p>';
     return '<div class="tw"><table><tr><th>#</th><th>Coach</th><th class="r">Record</th><th>Result</th><th class="r">Score</th></tr>' +
-      S.board.map((b, i) => `<tr><td>${i + 1}</td><td>${esc(b.name)}</td><td class="r num">${b.w}-${b.l}</td><td>${esc(trRes(b.res))}${b.hard ? ' &middot; Hard' : ''}</td><td class="r num">${b.score}</td></tr>`).join('') + '</table></div>';
+      S.board.map((b, i) => `<tr><td>${i + 1}</td><td><span style="${fxStyle(b.fx)}">${esc(b.name)}</span>${titleOf(b.title) ? ` <small class="ptl">${esc(titleOf(b.title))}</small>` : ''}</td><td class="r num">${b.w}-${b.l}</td><td>${esc(trRes(b.res))}${b.hard ? ' &middot; Hard' : ''}</td><td class="r num">${b.score}</td></tr>`).join('') + '</table></div>';
   }
   function runsHtml() {
     if (!S.acct) return '<p class="note">Sign in with Google to save your seasons and achievements.</p>';
@@ -338,7 +359,7 @@
     if (D.id) {                                   // signed in: the server rolls with a secret only it knows
       try {
         const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: isRespin ? 'respin' : 'spin', id: D.id }) });
-        final = S.byId.get(r.team); D.skips = Core.MAX_SKIPS - r.skips;
+        final = S.byId.get(r.team); D.skips = Core.MAX_SKIPS + (r.bonus || 0) - r.skips; D.bonus = r.bonus || 0;
         if (!final) throw new Error('team');
       } catch (e) { return draftError(e); }
     } else {                                      // guest: local roll, nothing is saved anyway
@@ -515,6 +536,7 @@
     const acts = D.phase === 'choose'
       ? `<div class="actions"><button class="btn pri" data-a="confirm" ${D.sel == null ? 'disabled' : ''}>Draft player</button>
          <button class="btn ghost" data-a="respin" ${D.skips <= 0 ? 'disabled' : ''}>Re-spin &middot; ${D.skips} left</button>
+         ${D.skips <= 0 && !D.bonus ? '<button class="btn sm" data-a="bonusspin">+1 re-spin &middot; watch an ad</button>' : ''}
          ${S.hard ? `<button class="btn sm" data-a="scout" ${(D.scouts <= 0 || D.scoutedId === D.cur.id) ? 'disabled' : ''}>Scout this roll &middot; ${D.scouts} left</button>` : ''}</div>`
       : D.phase === 'idle' ? `<div class="actions"><button class="btn pri" data-a="spin">Spin</button><button class="btn ghost" disabled>Re-spin &middot; ${D.skips} left</button></div>`
         : '<div class="actions"><div class="spinlbl">Spinning<span>.</span><span>.</span><span>.</span></div></div>';
@@ -661,7 +683,10 @@
   };
   const tradeBtn = () => {
     const st = Core.tradeState(S.SE);
-    return st.open ? `<button data-a="gotrade">${IC.trade}Trade <em>${st.left} left</em></button>` : '';
+    if (st.open) return `<button data-a="gotrade">${IC.trade}Trade <em>${st.left} left</em></button>`;
+    // all trades used but the deadline has not passed: one more can be earned with a rewarded ad
+    const L = S.SE.L;
+    return !S.SE.bt && !S.SE.cur && L.phase === 'season' && st.left <= 0 && st.played <= st.lastGame ? `<button data-a="bonustrade">${IC.trade}+1 trade <em>watch an ad</em></button>` : '';
   };
   // Trade screen: every player shows his season averages, and each offer shows how it compares with the man going out.
   const TST = [['PTS', 'ppg', 1], ['REB', 'rpg', 1], ['AST', 'apg', 1], ['STL', 'spg', 1], ['BLK', 'bpg', 1], ['FG%', 'fg', 100], ['MIN', 'mpg', 1]];
@@ -786,14 +811,18 @@
       submitRun().then(v => {
         S.verdict = v;
         const el = document.getElementById('saveInfo'); if (el) el.textContent = msg[v.state];
+        const rb = document.getElementById('rewardBox'); if (rb) rb.innerHTML = v.reward ? rewardHtml(v.reward, null) : S.acct ? '' : rb.innerHTML;
+        if (v.state === 'saved' || v.state === 'guest') setTimeout(() => window.Ads && Ads.interstitial(), 1200);
       });
     }
     const margin = (r.pf - r.pa) / G, pw = (L.poGames || []).filter(g => g.win).length, pl = (L.poGames || []).filter(g => !g.win).length;
     const tile = (lb, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="kl">${lb}</div><div class="kv led num">${v}</div><div class="ks">${sub || ''}</div></div>`;
+    const guestPrev = !S.acct ? PG.xpFor(Core.summarize(S.SE), L.R.games) : null;
     return `<div class="final ${champ ? 'champ' : ''}">
         <div class="fh"><span>${esc(S.teamName)}</span><span>${S.hard ? 'Hard' : 'Normal'} &middot; ${eraLabel()}</span></div>
         <div class="fm"><div class="rec led num">${r.w}&ndash;${r.l}</div><div class="fr"><div class="frl">${champ ? 'League champions' : r.w === 0 ? '' : (L.userInPlayoffs ? 'Season over' : 'Season over')}</div><h2>${esc(champ ? 'Champion' : res.replace('Eliminated: ', 'Eliminated in the '))}</h2><div class="fs">${champ ? 'Playoff record ' + pw + '-' + pl : (L.userInPlayoffs ? 'Playoff record ' + pw + '-' + pl : 'Finished ' + seedOf(L) + ' in the conference')}</div></div></div>
       </div>
+      <div id="rewardBox" class="reward">${S.verdict ? (S.verdict.reward ? rewardHtml(S.verdict.reward, null) : S.acct ? '' : rewardHtml(null, guestPrev)) : rewardHtml(null, guestPrev)}</div>
       <div class="kpis">
         ${tile('Score', score, S.hard ? 'Hard bonus x1.5 included' : 'Wins, playoffs and titles', 'hot')}
         ${tile('Longest win streak', L.longestW, 'games in a row')}
@@ -810,6 +839,43 @@
       ${L.po && L.po.champ != null ? `<div class="panel" style="margin-top:16px"><div class="eyebrow">Playoff awards</div>${poAwardsHtml(L)}</div>` : ''}
       <div class="panel" style="margin-top:16px"><div class="eyebrow">Regular season awards</div>${awardsHtml(L)}</div>
       <div class="panel" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-a="newgame">New game</button><button class="btn" data-a="share">Share card</button><button class="btn" data-a="copy">Copy result</button><span class="note" id="saveInfo">${S.acct && S.D && S.D.id ? 'Verifying and saving result...' : 'Playing as guest: this result is not saved. Sign in with Google to keep results and achievements.'}</span></div>`;
+  };
+
+  // XP and coins from the season the server verified; guests only see what they would have earned.
+  function rewardHtml(rw, preview) {
+    if (rw) {
+      const up = rw.to > rw.from, st = rw.state;
+      return `<div class="rwh"><div class="rwt"><b>+${rw.xp} XP</b><span>+${rw.coins} coins</span>${up ? `<span class="rwup">Level ${rw.from} to ${rw.to}</span>` : ''}</div>
+        <div class="lvbar big"><i style="width:${st.max ? 100 : Math.round(100 * st.into / st.span)}%"></i></div>
+        <div class="rwl">Level ${st.level} &middot; ${st.max ? 'max level' : st.into + ' / ' + st.span + ' XP to next level'}</div>
+        <div class="rwp">${rw.parts.map(p => `<span><em>${esc(p[0])}</em> +${p[1]}</span>`).join('')}</div></div>`;
+    }
+    if (preview && !S.acct) return `<div class="rwh"><div class="rwt"><b>${preview.xp} XP</b><span>this season</span></div><div class="rwl">Sign in with Google to keep XP, level up and unlock cosmetics.</div></div>`;
+    return `<div class="rwh"><div class="rwl">Saving your result...</div></div>`;
+  }
+
+  // ---------- profile and shop ----------
+  function itemPreview(it) {
+    if (it.slot === 'court') return `<svg viewBox="0 0 100 56" aria-hidden="true"><rect width="100" height="56" rx="6" fill="${it.css.bg}"/><g fill="none" stroke="${it.css.line}" stroke-width="2"><rect x="3" y="3" width="94" height="50" rx="4"/><path d="M50 3v50"/><circle cx="50" cy="28" r="9"/><rect x="3" y="17" width="20" height="22"/><rect x="77" y="17" width="20" height="22"/></g></svg>`;
+    if (it.slot === 'frame') return `<div class="fprev" style="border-color:${it.css.c || '#2c3a52'}"><span>Player</span></div>`;
+    if (it.slot === 'title') return `<div class="tprev">${esc(it.text || 'No title')}</div>`;
+    return `<div class="nprev" style="${fxStyle(it.id)}">${esc((S.acct && S.acct.name) || 'Coach')}</div>`;
+  }
+  SCREENS.profile = () => {
+    const p = S.prog; if (!S.acct || !p) return '<div class="panel"><p class="note">Sign in with Google to earn XP and unlock cosmetics.</p><button class="btn" data-a="profback">Back</button></div>';
+    const eq = p.equipped || {}, pct = p.max ? 100 : Math.round(100 * p.into / p.span), title = titleOf(eqItem(eq, 'title').id);
+    const own = it => it.price === 0 || p.owned.includes(it.id);
+    return `<div class="phead"><h2>Profile</h2><button class="btn pri" data-a="profback">Back</button></div>
+      <div class="panel prof"><div class="pn"><b style="${fxStyle(eqItem(eq, 'namefx').id)}">${esc(S.acct.name)}</b>${title ? `<span class="ptl">${esc(title)}</span>` : ''}</div>
+        <div class="plv"><div class="pl1">Level <b>${p.level}</b></div><div class="pcoins"><b>${p.coins}</b> coins</div></div>
+        <div class="lvbar big"><i style="width:${pct}%"></i></div>
+        <div class="rwl">${p.max ? 'Max level' : p.into + ' / ' + p.span + ' XP to level ' + (p.level + 1)} &middot; ${p.xp} XP total</div>
+        <p class="note">Finish seasons to earn XP and coins. Hard mode, titles and perfect seasons pay more. Cosmetics change how the game looks, never how it plays.</p><button class="btn sm" data-a="logout">Sign out</button></div>
+      ${PG.SLOTS.map(sl => `<div class="panel" style="margin-top:16px"><div class="eyebrow">${esc(sl.name)}<span class="eh">${esc(sl.hint)}</span></div><div class="shop">${PG.ITEMS.filter(i => i.slot === sl.id).map(it => {
+        const on = eqItem(eq, sl.id).id === it.id, has = own(it), can = p.coins >= it.price;
+        return `<div class="sitem ${on ? 'on' : ''}">${itemPreview(it)}<div class="sn">${esc(it.name)}</div><div class="sd">${esc(it.desc)}</div>
+          ${on ? '<button class="btn sm" disabled>Equipped</button>' : has ? `<button class="btn sm pri" data-a="shopequip" data-i="${it.id}">Equip</button>` : `<button class="btn sm ${can ? '' : 'poor'}" data-a="shopbuy" data-i="${it.id}" ${can ? '' : 'disabled'}>Buy &middot; ${it.price}</button>`}</div>`;
+      }).join('')}</div></div>`).join('')}`;
   };
 
   // ---------- GAME ----------
@@ -1422,6 +1488,23 @@
   // ---------- actions ----------
   const ACTIONS = {
     home() { if (S.screen === 'loading' || S.screen === 'menu') return; if (S.screen === 'game') { locked(); return; } go('menu'); },
+    profile() { if (S.screen === 'game') { locked(); return; } if (S.screen !== 'profile') S.back = S.screen; go('profile'); },
+    profback() { go(S.back && S.back !== 'profile' ? S.back : 'menu'); },
+    async shopbuy(d) { await shopOp('buy', d.i); },
+    async shopequip(d) { await shopOp('equip', d.i); },
+    // Android app: Google gives the app an ID token natively (the web redirect flow is not allowed inside a WebView); the server verifies it.
+    async nativelogin() {
+      try {
+        const SL = window.Capacitor.registerPlugin('SocialLogin');
+        const cfg = await (await fetch('/api/auth/native')).json();
+        await SL.initialize({ google: { webClientId: cfg.clientId } });
+        const r = await SL.login({ provider: 'google', options: { scopes: ['profile'] } });
+        const idToken = r && r.result && r.result.idToken;
+        if (!idToken) throw new Error('no token');
+        await api('/api/auth/native', { method: 'POST', body: JSON.stringify({ idToken }) });
+        await initAccount();
+      } catch (e) { const el = document.getElementById('acct'); if (el) el.insertAdjacentHTML('afterbegin', '<span class="lf">Sign-in failed. </span>'); }
+    },
     rules() {
       document.body.insertAdjacentHTML('beforeend', `<div class="modal"><div class="box"><h2>Rules</h2>
       <p><b>Draft.</b> Ten times, spin a random team and season from your chosen era and take one player from that roster. Every position (PG, SG, SF, PF, C) needs exactly two players. Versatile players can fill more than one position. You get 2 re-spins. Hard mode hides stats and overalls, with one Scout to reveal a full roll.</p>
@@ -1431,7 +1514,7 @@
       <p><b>Injuries.</b> Now and then one of your players is hurt for one to three games, never more than one at a time. He sits out in quick sims and coached games alike, and the rotation covers for him.</p>
       <p><b>Trades.</b> Until game 55 you can make up to two trades from the hub: choose a player to give up and pick one of three offers of similar quality from your era. The new player takes the old one's minutes and spot. A trade cannot be undone.</p>
       <p><b>Playoffs.</b> ${S.comp === 'el' ? 'The top eight of the table play best-of-five quarterfinals, then the Final Four: two single-game semifinals and the final on neutral ground.' : 'Top eight in each conference, best-of-seven series up to the Finals.'}</p>
-      <p><b>Saving.</b> Results and achievements are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID and your finished seasons, nothing else. <button class="btn sm" data-a="delacct">Delete my account and data</button></p>
+      <p><b>Saving.</b> Results and achievements are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID and your finished seasons, nothing else. <button class="btn sm" data-a="delacct">Delete my account and data</button> <a href="/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>
       <div class="ctrl"><button class="btn pri" data-a="closemodal">Close</button></div></div></div>`);
     },
     closemodal() { closeModal(); },
@@ -1462,6 +1545,21 @@
     },
     spin() { doSpin(false); },
     respin() { doSpin(true); },
+    async bonusspin() {
+      const D = S.D; if (D.phase !== 'choose' || D.skips > 0 || D.bonus || D.busy) return;
+      D.busy = true;
+      try {
+        if (!(await Ads.rewarded('You get one extra re-spin when this ends.'))) { D.busy = false; return; }
+        if (D.id) { const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'bonus', id: D.id }) }); D.skips = Core.MAX_SKIPS + (r.bonus || 0) - r.skips; D.bonus = r.bonus || 1; }
+        else { D.skips++; D.bonus = 1; }
+      } catch (e) { D.err = 'Could not add the bonus re-spin. Try again.'; }
+      D.busy = false; render();
+    },
+    async bonustrade() {
+      if (S.adBusy) return; S.adBusy = true;
+      try { if (await Ads.rewarded('You get one extra trade when this ends.')) Core.bonusTrade(S.SE); } catch (e) { }
+      S.adBusy = false; render();
+    },
     scout() { const D = S.D; if (D.scouts > 0 && D.cur) { D.scouts--; D.scoutedId = D.cur.id; render(); } },
     sel(d) {
       const D = S.D, p = D.cur.players[+d.i]; if (D.picks.some(x => x.name === p.name) || !E.canAdd(D.picks, p)) return;
@@ -1493,12 +1591,12 @@
         go('prep');
       } else render();
     },
-    async logout() { try { await api('/api/auth/logout', { method: 'POST', body: '{}' }); } catch (e) { } S.acct = null; S.runs = []; renderAcct(); render(); },
+    async logout() { try { await api('/api/auth/logout', { method: 'POST', body: '{}' }); } catch (e) { } S.acct = null; S.prog = null; S.runs = []; applyCosmetics(); renderAcct(); render(); },
     async delacct() {
       if (!S.acct) return;
       if (!window.confirm('Delete your account and all saved seasons? This cannot be undone.')) return;
       try { await api('/api/me', { method: 'DELETE' }); } catch (e) { return; }
-      S.acct = null; S.runs = []; renderAcct(); render();
+      S.acct = null; S.prog = null; S.runs = []; applyCosmetics(); renderAcct(); render();
     },
     stand(d) { S.standAll = d.v === '1'; render(); },
     tempo(d) { if (S.screen === 'game' && !canCoach()) return locked(); S.plan.tempo = d.v; refreshCoach(); },

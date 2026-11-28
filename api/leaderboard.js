@@ -6,13 +6,13 @@ export default async function handler(req, res) {
   try {
     const comp = new URL(req.url, 'http://x').searchParams.get('comp') === 'el' ? 'el' : 'nba';
     const rows = await sql()`select * from (
-        select distinct on (r.user_id) u.name, r.wins, r.losses, r.result, r.hard, r.era_label, r.score
+        select distinct on (r.user_id) u.name, u.equipped, r.wins, r.losses, r.result, r.hard, r.era_label, r.score
         from runs r join users u on u.id = r.user_id
         where r.verified and r.comp = ${comp}
         order by r.user_id, r.score desc
       ) t order by score desc limit 20`;
     res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
     res.statusCode = 200; res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ board: rows.map(b => ({ name: b.name, w: b.wins, l: b.losses, res: b.result, hard: b.hard, era: b.era_label, score: b.score })) }));
+    res.end(JSON.stringify({ board: rows.map(b => ({ name: b.name, w: b.wins, l: b.losses, res: b.result, hard: b.hard, era: b.era_label, score: b.score, title: (b.equipped || {}).title || null, fx: (b.equipped || {}).namefx || null })) }));
   } catch { send(res, 500, { error: 'server' }); }
 }

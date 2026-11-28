@@ -32,7 +32,7 @@ async function run(signedIn, comp = 'nba') {
     } catch (e) { if (e instanceof ApiError) return json(e.status, { error: e.code }); throw e; }
     return json(404, {});
   };
-  for (const f of ['engine.js', 'league.js', 'core.js', 'report.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
+  for (const f of ['engine.js', 'league.js', 'core.js', 'progress.js', 'ads.js', 'report.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
   const doc = w.document, tick = (ms = 20) => new Promise(r => setTimeout(r, ms));
   const click = sel => { const el = doc.querySelector(sel); assert.ok(el, 'missing ' + sel); el.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); };
   const until = async (fn, what, ms) => { for (let i = 0; i < (ms || 6000) / 10; i++) { if (fn()) return; await tick(10); } assert.fail('timeout: ' + what); };

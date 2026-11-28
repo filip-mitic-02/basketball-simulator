@@ -1,0 +1,12 @@
+{
+  "appId": "app.perfectseason.coach",
+  "appName": "Perfect Season",
+  "webDir": "www",
+  "server": {
+    "url": "https://REPLACE-WITH-YOUR-VERCEL-DOMAIN.vercel.app",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

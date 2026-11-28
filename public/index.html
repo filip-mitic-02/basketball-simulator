@@ -756,6 +756,49 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 @media(max-width:600px){.ctcourt:has(.ctft.on){min-height:340px}.ctcourt:has(.ctft.on)>svg{height:340px}}
 
 
+
+/* ===== progression and cosmetics ===== */
+.lvbtn{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--text);cursor:pointer;font:inherit}
+.lvbtn:hover{border-color:var(--amber)}
+.lvbtn .lv{font-family:var(--display);font-weight:800;letter-spacing:.05em;color:var(--amber);font-size:15px}
+.lvbtn .cn{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.lvbtn .cn::after{content:" c"}
+.lvbar{display:inline-block;flex:none;width:46px;height:6px;border-radius:3px;background:#1b2740;overflow:hidden}
+.lvbar i{display:block;height:100%;background:var(--amber)}
+.lvbar.big{display:block;width:100%;height:10px;border-radius:5px;margin:8px 0 6px}
+.reward{margin:16px 0 0}
+.rwh{padding:14px 16px;border-radius:12px;border:1px solid rgba(255,182,39,.4);background:rgba(255,182,39,.06)}
+.rwt{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.rwt b{font-family:var(--display);font-size:30px;color:var(--amber);letter-spacing:.03em}
+.rwt span{color:var(--text);font-size:15px}
+.rwt .rwup{color:#1a1100;background:var(--amber);border-radius:6px;padding:1px 9px;font-family:var(--display);font-weight:800;letter-spacing:.05em;text-transform:uppercase;font-size:13px}
+.rwl{font-size:13px;color:var(--mute)}
+.rwp{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.rwp span{font-size:12px;padding:3px 9px;border-radius:99px;background:#101a2e;border:1px solid var(--line2);color:var(--text)}
+.rwp em{font-style:normal;color:var(--mute);margin-right:4px}
+.phead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.prof .pn{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.prof .pn b{font-family:var(--display);font-size:30px;text-transform:uppercase;letter-spacing:.04em}
+.ptl{color:var(--amber);font-size:13px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--display)}
+.plv{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-size:15px}
+.plv b{font-family:var(--display);font-size:26px;color:var(--amber)}
+.eyebrow .eh{margin-left:auto;font-size:12px;color:var(--mute);text-transform:none;letter-spacing:0;font-family:inherit}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.sitem{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line2)}
+.sitem.on{border-color:var(--amber)}
+.sitem svg{width:100%;height:auto;display:block;border-radius:6px}
+.sitem .sn{font-family:var(--display);font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+.sitem .sd{font-size:12px;color:var(--mute);flex:1}
+.sitem .btn.poor{opacity:.5}
+.fprev{height:56px;border-radius:8px;border:3px solid;display:grid;place-items:center;font-family:var(--display);text-transform:uppercase;color:var(--text);background:#0e1626}
+.tprev,.nprev{height:56px;display:grid;place-items:center;font-family:var(--display);font-size:18px;text-transform:uppercase;letter-spacing:.05em;text-align:center;background:#0e1626;border-radius:8px;color:var(--amber)}
+.nprev{color:var(--text);font-size:20px}
+/* equipped court and frame */
+.ctcourt{background:var(--cc-bg,#0d1422)}
+.ctcourt svg [stroke="#4a5d82"],.shcc svg [stroke="#4a5d82"]{stroke:var(--cc-line,#4a5d82)}
+.shcc svg{background:var(--cc-bg,transparent);border-radius:10px}
+body[data-frame] .spot.filled,body[data-frame] .starter,body[data-frame] .pcard{border-color:var(--frm)}
+
 /* ===== phone layer ===== */
 .dbar,.mini{display:none}
 @media(max-width:700px){
@@ -815,7 +858,8 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
   #top{gap:8px;padding:8px 12px;backdrop-filter:none;background:#0f141d}
   #top .logo{font-size:17px;min-width:0}
   #top .logo svg{width:22px;height:22px}
-  .acct .as,.acct .lg{display:none}
+  .acct .as,.acct .lg,.acct b,.acct [data-a="logout"]{display:none}
+  .lvbtn .cn{display:none}
   .acct{display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap}
   .acct b{max-width:84px;overflow:hidden;text-overflow:ellipsis}
   .acct .lf{display:none}
@@ -849,6 +893,8 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 <script src="engine.js"></script>
 <script src="league.js"></script>
 <script src="core.js"></script>
+<script src="progress.js"></script>
+<script src="ads.js"></script>
 <script src="report.js"></script>
 <script src="app.js"></script>
 </body>

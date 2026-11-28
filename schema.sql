@@ -68,3 +68,20 @@ end $$;
 alter table runs drop constraint if exists runs_games_check;
 alter table runs add constraint runs_games_check check (wins >= 0 and losses >= 0 and po_wins between 0 and 16 and wins + losses = case comp when 'el' then 38 else 82 end);
 create index if not exists runs_comp_score on runs(comp, score desc);
+
+-- Progression: XP and coins are only ever added by the server from a verified season; cosmetics are appearance only.
+alter table users add column if not exists xp       integer not null default 0 check (xp >= 0);
+alter table users add column if not exists coins    integer not null default 0 check (coins >= 0);
+alter table users add column if not exists equipped jsonb   not null default '{}'::jsonb;
+alter table runs  add column if not exists xp       integer not null default 0;
+create table if not exists user_items (
+  user_id uuid not null references users(id) on delete cascade,
+  item    text not null check (char_length(item) <= 40),
+  bought_at timestamptz not null default now(),
+  primary key (user_id, item)
+);
+
+-- One bonus re-spin per draft, earned by watching a rewarded ad (the client asks, the server counts it).
+alter table drafts add column if not exists bonus smallint not null default 0 check (bonus between 0 and 1);
+alter table drafts drop constraint if exists drafts_skips_check;
+alter table drafts add constraint drafts_skips_check check (skips between 0 and 3);
