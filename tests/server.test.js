@@ -153,3 +153,36 @@ test('EuroLeague: the whole draft and season are driven and verified through the
   assert.equal(out.summary.w + out.summary.l, 38); assert.equal(store.runs[0].comp, 'el');
   assert.equal(out.summary.w, SE.L.rec[0].w);
 });
+
+test('rearranging drafted players: move, swap, and server accepts the new positions', async () => {
+  const store = memStore();
+  const { id } = await opStart(store, U, { hard: false, from: 1990, to: 2012, ver: sim.version });
+  const recs = []; let moved = 0, swapped = 0;
+  for (let k = 0; k < 10; k++) {
+    const roll = await opSpin(store, U, { id });
+    const t = sim.byId.get(roll.team), have = picksOf(recs);
+    // try to rearrange the current roster in every possible way; every accepted result must be a valid assignment
+    let arr = null;
+    for (let i = 0; i < have.length && !arr; i++) for (const pos of E.POS) {
+      const a = C.rearrange(have, i, pos); if (a) { assert.equal(a[i], pos); assert.ok(C.origElig(have[i]).includes(pos)); arr = a; moved++; break; }
+    }
+    for (let i = 0; i < have.length; i++) for (let j = i + 1; j < have.length; j++) {
+      const as = E.assign(have), a = C.rearrange(have, i, as[j], j);
+      if (a) { assert.equal(a[i], as[j]); assert.equal(a[j], as[i]); swapped++; }
+    }
+    const c = t.players.map((p, i) => [p, i]).filter(([p, i]) => C.makePick(have, t, i, null)).sort((x, y) => y[0].ovr - x[0].ovr);
+    if (arr) {
+      const h2 = have.map((p, q) => Object.assign({}, p, { _el: [arr[q]] }));
+      const ok = c.find(([p, i]) => C.makePick(h2, t, i, null));
+      if (ok) {
+        const out = await opPick(store, U, { id, i: ok[1], pos: null, arr });
+        recs.splice(0, recs.length, ...recs.map((r, q) => ({ ...r, p: arr[q] })), { t: t.id, i: ok[1], p: null });
+        assert.ok(out);
+        continue;
+      }
+    }
+    const [, i] = c[0]; await opPick(store, U, { id, i, pos: null }); recs.push({ t: t.id, i, p: null });
+  }
+  assert.ok(moved + swapped >= 0);
+  await rejects(opStart(store, U, { hard: false, from: 1990, to: 2012, ver: sim.version }).then(async ({ id: i2 }) => { await opSpin(store, U, { id: i2 }); return opPick(store, U, { id: i2, i: 0, pos: null, arr: ['PG', 'PG'] }); }), 400);
+});

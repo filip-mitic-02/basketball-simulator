@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-27.5';
+  const VERSION = 'sim-2026-11-28.1';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 
@@ -44,6 +44,25 @@
     for (const pos of orig) { p._el = [pos]; if (E.canAdd(picks, p)) out.push(pos); }
     p._el = orig; return out;
   }
+  // Positions a drafted player could play, ignoring where he is placed now (his own eligibility, derived from his stats).
+  function origElig(p) { const q = Object.assign({}, p); delete q._el; return E.eligible(q).slice(); }
+  // Moves pick `i` to position `target`, or (when `swapWith` is given) swaps the two picks' positions. Every pick keeps the position he has
+  // now, so nobody else jumps around. Returns the new position of every pick, or null when the move is not allowed.
+  function rearrange(picks, i, target, swapWith) {
+    const cur = E.assign(picks); if (!cur || !isIdx(i, picks.length) || !E.POS.includes(target)) return null;
+    const arr = cur.slice();
+    if (swapWith == null) {
+      if (target === arr[i] || !origElig(picks[i]).includes(target)) return null;
+      arr[i] = target;
+    } else {
+      if (!isIdx(swapWith, picks.length) || swapWith === i) return null;
+      const a = arr[i], b = arr[swapWith];
+      if (a === b || !origElig(picks[i]).includes(b) || !origElig(picks[swapWith]).includes(a)) return null;
+      arr[i] = b; arr[swapWith] = a;
+    }
+    return E.assign(picks.map((p, k) => Object.assign({}, p, { _el: [arr[k]] }))) ? arr : null;
+  }
+  function fixPicks(picks, arr) { picks.forEach((p, k) => { p._el = [arr[k]]; }); }
   function pickable(picks, t) { const have = new Set(picks.map(p => p.name)); return t.players.filter(p => !have.has(p.name) && E.canAdd(picks, p)); }
   // rnd(n) must return an integer in [0, n). On the server it is backed by HMAC, in guest mode by Math.random.
   function rollTeam(pool, picks, rnd) {
@@ -455,7 +474,7 @@
   return {
     VERSION, DRAFT_ROUNDS, MAX_SKIPS, MIN_Y, MAX_Y, MIN_POOL, Invalid,
     prepData, mkTeams, poolOf, validEra, fitPositions, pickable, rollTeam, makePick,
-    createSeason, tradeState, tradeOffers, tradePositions, tradeLocks, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
+    origElig, rearrange, fixPicks, createSeason, tradeState, tradeOffers, tradePositions, tradeLocks, doTrade, TRADE, validPlan, planOf, syncPlan, answerMoment, skipMoment, MO, STATS, offenseFit, quick, quickPo, startPlayoffs, beginLive, step, lineup, timeout, feed, double, finishLive,
     replay, resultLabel, calcScore, achievements, summarize, poWins, poLosses
   };
 });

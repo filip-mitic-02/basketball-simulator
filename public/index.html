@@ -222,7 +222,7 @@ select,input[type=text]{background:var(--panel2);border:1px solid var(--line2);b
 .modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:24px;max-width:620px;width:100%;max-height:90vh;overflow:auto}
 .modal h2{font-size:32px;margin-bottom:10px}
 .modal .box.gov .ctrl{position:sticky;bottom:-22px;padding:12px 0 2px;background:linear-gradient(transparent,var(--panel) 35%)}
-.modal .box.gov{max-width:1080px;padding:22px 24px;animation:govin .45s cubic-bezier(.2,.8,.2,1)}
+.modal .box.gov{max-width:1080px;padding:22px 24px}
 @keyframes govin{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
 .govh{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;border-radius:10px;border:1px solid var(--line2);background:linear-gradient(100deg,rgba(255,255,255,.04),transparent)}
 .govh.w{border-color:rgba(60,200,120,.5);background:linear-gradient(100deg,rgba(60,200,120,.16),transparent 70%)}
@@ -529,6 +529,14 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .spot.pick .ring,.spot.ghost.pick .gh{box-shadow:0 0 0 3px rgba(255,182,39,.45),0 0 22px rgba(255,182,39,.5)}
 .spot.pick .ring{border:2px solid var(--amber);background:rgba(255,182,39,.2);color:#fff}
 .spot.lock{opacity:.32}
+.spot.movable,.spot.swap,.spot.mv,.spot.mvok{cursor:pointer}
+.spot.movable::after{content:"\21C4";position:absolute;top:0;right:6px;font:700 14px/1 var(--display);color:var(--amber);background:#0b1220;border:1px solid rgba(255,182,39,.55);border-radius:50%;width:20px;height:20px;display:grid;place-items:center}
+.bench .spot.filled{position:relative}
+.spot.mv .avatar{filter:drop-shadow(0 0 10px rgba(255,182,39,.9))}
+.spot.mv .nm,.spot.swap .nm{color:var(--amber)}
+.spot.swap .avatar{filter:drop-shadow(0 0 8px rgba(255,182,39,.7))}
+.spot.mvok .ring{border:2px solid var(--amber);color:var(--amber);background:rgba(255,182,39,.12)}
+.spot.mvok .pp{color:var(--amber)}
 .spot.lock .ring{border-style:dotted}
 .spot.ghost .gh{opacity:.85;border-radius:8px;display:block;animation:spotp 1.3s ease-in-out infinite}
 .spot.ghost .pp{color:var(--amber)}
@@ -746,6 +754,78 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .ctft.good .ftfront path:first-child{stroke:#34d399}
 @media(max-width:600px){.ctcourt:has(.ctft.on){min-height:340px}.ctcourt:has(.ctft.on)>svg{height:340px}}
 
+
+/* ===== phone layer ===== */
+.dbar,.mini{display:none}
+@media(max-width:700px){
+  .dbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;align-items:center;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#0b1220;border-top:2px solid var(--amber)}
+  .mini{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:0 0 10px}
+  .mc{background:#0e1626;border:1px solid var(--line2);border-radius:8px;padding:4px 5px;min-width:0}
+  .mc b{display:block;font-family:var(--display);font-size:12px;letter-spacing:.1em;color:var(--amber)}
+  .mp{display:block;font-size:11px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#dbe5f6}
+  .mp i{font-style:normal;color:var(--mute)}
+  .mp.e{color:#52617d}
+  h2{font-size:26px!important}
+  .reelbox{padding:10px 14px}
+  .reelbox .t div{font-size:22px}
+  .dbi{flex:1;min-width:0}
+  .dbh{color:var(--mute);font-size:14px}
+  .dbn{font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+  .dbn .ovr{font-size:16px;min-width:0;padding:1px 6px}
+  .dbp{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+  .pchip{font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:.06em;min-width:44px;min-height:36px;padding:0 10px;border-radius:8px;border:2px solid #3a4a68;background:#101a2e;color:#cfdaf0}
+  .pchip.on{border-color:var(--amber);background:rgba(255,182,39,.18);color:var(--amber)}
+  .dbar .btn.pri{min-height:48px;padding:0 22px;font-size:18px}
+  .dbar .btn.ghost{min-height:44px}
+  body:has(.dbar){padding-bottom:84px}
+  .stage{display:block}
+  .stage .actions{flex-direction:row;flex-wrap:wrap;min-width:0;margin-top:10px}
+  .stage .actions .btn{flex:1 1 40%;width:auto;min-height:44px}
+  .stage .actions [data-a="confirm"]{display:none}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .pcard .hd{padding:6px 8px;font-size:12px}
+  .pcard .hd .ovr{font-size:18px!important}
+  .pcard .bd{padding:8px;gap:6px}
+  .pcard .who{gap:6px;flex-direction:column;align-items:flex-start}
+  .pcard .who svg.avatar{width:38px;height:38px}
+  .pcard .nm{font-size:17px}
+  .pcard .stats{grid-template-columns:repeat(3,1fr);gap:2px}
+  .pcard .stats>div:nth-child(n+4){display:none}
+  .pcard .trow,.pcard .hons{display:none}
+  .pcard.sel .trow,.pcard.sel .hons{display:block}
+  .pcard .need{margin:6px 8px 8px;font-size:11px}
+  .pcard .fit{padding:5px 8px;font-size:12px}
+  .pcard .fit em{display:none}
+  .coach-grid{grid-template-columns:minmax(0,1fr)}
+  .coach-grid>*,.grid2>*,.panel{min-width:0}
+  .five{grid-template-columns:minmax(0,1fr)}
+  .tiles{grid-template-columns:minmax(0,1fr)}
+  .rot-t,.rot-t tbody,.rot-t tr,.rot-t td{display:block;width:100%}
+  .rot-t tr:first-child{display:none}
+  .rot-t tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .rot-t td{padding:0!important;border:0!important;width:auto}
+  .rot-t td:nth-child(2),.rot-t td:nth-child(n+4):nth-child(-n+6){display:none}
+  .rot-t td:last-child{grid-column:1/-1}
+  .rot-t .mins{width:100%;min-width:70px}
+  .mrow{gap:6px}
+  .rot-t th,.rot-t td{padding:6px 4px}
+  .recbar{flex-direction:column;align-items:stretch}
+  html,body{overflow-x:hidden}
+  .tw table th,.tw table td{padding:6px 4px;font-size:13px}
+  .trh{display:none}
+  .trrow2{grid-template-columns:28px minmax(0,1fr) 40px 54px;gap:6px;padding:8px}
+  .trrow2>.st{display:none}
+  .trrow2>.st:nth-child(3){display:block}
+  .trrow2 .trn b{font-size:16px}
+  .sb{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;padding:10px 12px}
+  .sb .tn{font-size:15px}
+  .sb .sc{font-size:50px}
+  .sb .clk{font-size:30px}
+  .sb .tm{min-width:0}
+  .sb .tm small,.sb .tm .sub{font-size:11px}
+  .feed{height:260px}
+  .panel{padding:14px}
+}
 </style>
 </head>
 <body>

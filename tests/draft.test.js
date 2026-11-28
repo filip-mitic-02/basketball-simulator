@@ -33,4 +33,10 @@ test('draft screen shows jersey cards and ratings, and hides ratings in Hard mod
   lit.forEach(el => assert.ok(!el.disabled, 'lit spot is clickable'));
   assert.equal(doc.querySelectorAll('.court .spot').length, 5);
   assert.equal(doc.querySelectorAll('.bench .spot').length, 5);
+  // phone bar shows the chosen player and a Draft button; a drafted versatile player can be moved to another position
+  assert.ok(doc.querySelector('.dbar.sel [data-a="confirm"]'), 'sticky draft bar');
+  assert.ok(doc.querySelector('.mini .mc'), 'mini roster strip');
+  doc.querySelector('[data-a="confirm"]').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 100));
+  assert.equal(doc.querySelectorAll('.court .spot.filled').length, 1, 'first pick placed');
 });

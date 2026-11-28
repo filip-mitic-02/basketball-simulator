@@ -437,15 +437,16 @@
   const JERSEY = 'M14 3h5c0 6 10 6 10 0h5c2 6 4 11 4 17v25H10V20c0-6 2-11 4-17z';
   // Empty spot: an outline of the same jersey that a drafted player will occupy.
   const emptyJersey = (pos, size) => `<svg class="avatar ej" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><path d="${JERSEY}" class="ejb"/><text x="24" y="34" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="15" class="ejt">${pos}</text></svg>`;
-  function spotHtml(pos, p, st, ghost, bench) {
+  function spotHtml(pos, p, st, ghost, bench, pi) {
     // st: '' | 'ok' (can be placed here) | 'lock' (selected player cannot play here) | 'pick' (chosen target)
     const vis = !S.hard || S.revealed;
-    const act = st === 'ok' || st === 'pick' ? `data-a="place" data-v="${pos}"` : 'disabled';
+    const act = st === 'mvok' ? `data-a="mvto" data-v="${pos}"` : st === 'ok' || st === 'pick' ? `data-a="place" data-v="${pos}"` : 'disabled';
     const tag = bench ? 'onbench' : 'oncourt', sz = bench ? 54 : 64;
     const pos0 = bench ? '' : `style="left:${SPOT[pos][0]}%;top:${SPOT[pos][1]}%"`;
     const lab = (pl, who) => `<span class="pp"><span class="pl">${pl}</span>${who && vis ? `<span class="ovr ${ovrCls(dp(who))}">${dp(who)}</span>` : ''}</span>`;
     if (p) {
-      return `<button class="spot filled ${tag} ${st}" ${pos0} disabled aria-label="${esc(p.name)} at ${pos}">${avatar(p.name, p.fromTm, sz, vis ? dp(p) : null, p.pos, p.fromSeason)}<span class="nm">${esc(shortName(p.name))}</span>${lab(pos, p)}</button>`;
+      const fa = st === 'mv' ? `data-a="mvcancel" title="Click again to cancel"` : st === 'swap' ? `data-a="mvswap" data-i="${pi}" title="Swap positions"` : st === 'movable' ? `data-a="mvsel" data-i="${pi}" title="Click to move him to another position"` : 'disabled';
+      return `<button class="spot filled ${tag} ${st}" ${pos0} ${fa} aria-label="${esc(p.name)} at ${pos}">${avatar(p.name, p.fromTm, sz, vis ? dp(p) : null, p.pos, p.fromSeason)}<span class="nm">${esc(shortName(p.name))}</span>${lab(pos, p)}</button>`;
     }
     if (ghost) {
       return `<button class="spot ghost ${tag} ${st}" ${pos0} ${act} aria-label="Place ${esc(ghost.name)} at ${pos}"><span class="gh">${avatar(ghost.name, S.D.cur.tm, sz, vis ? dp(ghost) : null, ghost.pos, S.D.cur.season)}</span><span class="nm">${esc(shortName(ghost.name))}</span>${lab(pos, ghost)}</button>`;
@@ -468,18 +469,31 @@
     const byPos = {}; E.POS.forEach(x => byPos[x] = []);
     P.forEach((p, i) => { byPos[as[i] || E.eligible(p)[0]].push(p); });
     const vis = !S.hard || S.revealed;
-    const sp = D.phase === 'choose' && D.sel != null ? D.cur.players[D.sel] : null;
+    const mover = D.mv != null && P[D.mv] ? P[D.mv] : null, moverPos = mover ? as[D.mv] : null;
+    const sp = !mover && D.phase === 'choose' && D.sel != null ? D.cur.players[D.sel] : null;
     const fp = sp ? fitPositions(sp) : [];
+    const mvT = mover ? Core.origElig(mover).filter(x => x !== moverPos) : [];
     const stOf = pos => !sp ? '' : (fp.includes(pos) ? (D.selPos === pos ? 'pick' : 'ok') : 'lock');
+    const alts = p => Core.origElig(p).filter(x => x !== as[P.indexOf(p)]).length > 0;
     const cell = (pos, k) => {
-      const p = byPos[pos][k], st = stOf(pos);
+      const p = byPos[pos][k], pi = p ? P.indexOf(p) : -1;
+      if (mover) {
+        if (p) {
+          if (pi === D.mv) return spotHtml(pos, p, 'mv', null, k === 1, pi);
+          if (mvT.includes(pos) && Core.origElig(p).includes(moverPos) && Core.rearrange(P, D.mv, pos, pi)) return spotHtml(pos, p, 'swap', null, k === 1, pi);
+          return spotHtml(pos, p, alts(p) ? 'movable' : '', null, k === 1, pi);
+        }
+        const free = mvT.includes(pos) && byPos[pos].length === k && Core.rearrange(P, D.mv, pos);
+        return spotHtml(pos, null, free ? 'mvok' : 'lock', null, k === 1);
+      }
+      const st = stOf(pos);
       const target = sp && fp.includes(pos) && !p && byPos[pos].length === k;   // next free spot at this position
-      if (p) return spotHtml(pos, p, '', null, k === 1);
+      if (p) return spotHtml(pos, p, alts(p) && D.phase !== 'spinning' ? 'movable' : '', null, k === 1, pi);
       if (target) return spotHtml(pos, null, st, D.selPos === pos ? sp : null, k === 1);
       return spotHtml(pos, null, sp ? 'lock' : '', null, k === 1);
     };
     const avg = P.length && vis ? (P.reduce((a, p) => a + dp(p), 0) / P.length).toFixed(1) : '--';
-    const hint = sp ? `<b>${esc(sp.name)}</b> can play ${fp.length ? fp.map(x => `<b>${x}</b>`).join(', ') : 'nowhere (no open spot)'}. Click a lit spot to choose where he goes.` : 'Draft two players at every position. Versatile players can fill more than one spot, so you cannot stack five centers.';
+    const hint = mover ? `Moving <b>${esc(mover.name)}</b> (now ${moverPos}). Click a lit spot to move him there, or a player to swap places. Click him again to cancel.` : sp ? `<b>${esc(sp.name)}</b> can play ${fp.length ? fp.map(x => `<b>${x}</b>`).join(', ') : 'nowhere (no open spot)'}. Click a lit spot to choose where he goes.` : 'Draft two players at every position. Versatile players can fill more than one spot, so you cannot stack five centers.';
     return `<div class="panel courtp"><div class="eyebrow">Your team &middot; ${P.length}/10</div>
       <div class="court ${sp ? 'picking' : ''}">${COURT_SVG}${E.POS.map(pos => cell(pos, 0)).join('')}</div>
       <div class="bench-h"><span>Bench</span></div>
@@ -503,8 +517,23 @@
     return `<div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:36px">Draft &middot; pick ${Math.min(D.round + 1, 10)} of 10</h2>
       <div class="row"><span class="pill">${S.hard ? 'Hard' : 'Normal'}</span><span class="pill">${eraLabel()}</span></div></div>
       ${D.err ? `<div class="banner" role="alert">${esc(D.err)}</div>` : ''}
-      <div class="grid2"><div><div class="stage">${reel}${acts}</div>${cards}</div><div>${rosterPanel()}${teamReport(D.picks, 'Team report')}</div></div>`;
+      ${miniRoster()}<div class="grid2"><div><div class="stage">${reel}${acts}</div>${cards}</div><div>${rosterPanel()}${teamReport(D.picks, 'Team report')}</div></div>${draftBar()}`;
   };
+  // Phone-only strip: who is on each position so far (tap the court below to move players).
+  function miniRoster() {
+    const D = S.D, P = D.picks, as = P.length ? E.assign(P) : [], vis = !S.hard || S.revealed;
+    return `<div class="mini">${E.POS.map(pos => { const ps = P.filter((p, i) => as[i] === pos); return `<div class="mc"><b>${pos}</b>${[0, 1].map(k => ps[k] ? `<span class="mp">${esc(shortName(ps[k].name))}${vis ? ` <i>${dp(ps[k])}</i>` : ''}</span>` : '<span class="mp e">&ndash;</span>').join('')}</div>`; }).join('')}</div>`;
+  }
+  // Phone-only sticky bar: the chosen player, where he goes, and the Draft button, always in reach.
+  function draftBar() {
+    const D = S.D; if (D.phase !== 'choose') return '';
+    const sp = D.sel != null ? D.cur.players[D.sel] : null, vis = statsVisible();
+    if (!sp) return `<div class="dbar"><div class="dbi"><span class="dbh">Tap a player to select him</span></div></div>`;
+    const fp = fitPositions(sp);
+    return `<div class="dbar sel"><div class="dbi"><div class="dbn">${esc(shortName(sp.name))}${vis ? ` <span class="ovr ${ovrCls(dp(sp))}">${dp(sp)}</span>` : ''}</div>
+      <div class="dbp">${fp.length > 1 ? fp.map(x => `<button class="pchip ${D.selPos === x ? 'on' : ''}" data-a="place" data-v="${x}">${x}</button>`).join('') : `<span class="pchip on">${esc(fp[0] || '')}</span>`}</div></div>
+      <button class="btn pri" data-a="confirm">Draft</button></div>`;
+  }
 
   // ---------- coach panel ----------
   const fitOf = () => (S.hard && !S.revealed) || !S.user ? null : Report.tacticFit(S.user.players, S.plan);
@@ -1429,9 +1458,13 @@
     scout() { const D = S.D; if (D.scouts > 0 && D.cur) { D.scouts--; D.scoutedId = D.cur.id; render(); } },
     sel(d) {
       const D = S.D, p = D.cur.players[+d.i]; if (D.picks.some(x => x.name === p.name) || !E.canAdd(D.picks, p)) return;
-      D.sel = +d.i; const fp = fitPositions(p), main = String(p.elig || p.pos || '').split(',')[0];
+      D.mv = null; D.sel = +d.i; const fp = fitPositions(p), main = String(p.elig || p.pos || '').split(',')[0];
       D.selPos = fp.includes(main) ? main : fp[0]; render();
     },
+    mvsel(d) { const D = S.D, i = +d.i; if (!D.picks[i] || D.busy) return; D.mv = i; render(); },
+    mvcancel() { S.D.mv = null; render(); },
+    mvto(d) { const D = S.D; if (D.mv == null) return; const arr = Core.rearrange(D.picks, D.mv, d.v); if (!arr) return; Core.fixPicks(D.picks, arr); D.dirty = true; D.mv = null; render(); },
+    mvswap(d) { const D = S.D; if (D.mv == null) return; const arr = Core.rearrange(D.picks, D.mv, E.assign(D.picks)[+d.i], +d.i); if (!arr) return; Core.fixPicks(D.picks, arr); D.dirty = true; D.mv = null; render(); },
     place(d) { const D = S.D; if (D.sel == null) return; if (fitPositions(D.cur.players[D.sel]).includes(d.v)) { D.selPos = d.v; render(); } },
     async confirm() {
       const D = S.D; if (D.sel == null || D.phase !== 'choose' || D.busy) return;
@@ -1441,11 +1474,11 @@
       let seed = null;
       if (D.id) {
         D.busy = true;
-        try { const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'pick', id: D.id, i, pos }) }); if (r.done) seed = r.seed; }
+        try { const r = await api('/api/draft', { method: 'POST', body: JSON.stringify({ op: 'pick', id: D.id, i, pos, ...(D.dirty ? { arr: E.assign(D.picks) } : {}) }) }); if (r.done) seed = r.seed; }
         catch (e) { return draftError(e); }
         D.busy = false;
       }
-      D.picks.push(np); D.selPos = null;
+      D.picks.push(np); D.selPos = null; D.dirty = false; D.mv = null;
       D.round++; D.sel = null; D.cur = null; D.phase = 'idle'; D.reel = null;
       if (D.round >= 10) {
         S.revealed = true; S.seed = D.id ? seed : newSeed();
