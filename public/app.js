@@ -203,6 +203,7 @@
   }
   // ---------- progression and cosmetics (the server awards XP and coins; the client only shows them) ----------
   const PG = window.Progress;
+  const COIN = '<svg class="coin" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#ffb627" stroke="#b8790a" stroke-width="1.4"/><circle cx="8" cy="8" r="4.2" fill="none" stroke="#b8790a" stroke-width="1.2"/></svg>';
   const eqItem = (eq, slot) => PG.byId[(eq || {})[slot]] || PG.byId[PG.DEFAULTS[slot]];
   const fxStyle = id => { const c = ((PG.byId[id] || {}).css || {}).c; return !c ? '' : c.startsWith('linear') ? `background:${c};-webkit-background-clip:text;background-clip:text;color:transparent` : `color:${c}`; };
   const titleOf = id => (PG.byId[id] || {}).text || '';
@@ -216,8 +217,8 @@
     const el = document.getElementById('acct');
     if (S.acct) {
       const p = S.prog, eq = p && p.equipped;
-      const chip = p ? `<button class="lvbtn" data-a="profile" title="Level, coins and shop"><span class="lv">Lv ${p.level}</span><span class="lvbar"><i style="width:${p.max ? 100 : Math.round(100 * p.into / p.span)}%"></i></span><span class="cn">${p.coins}</span></button>` : '';
-      el.innerHTML = chip + '<span class="as">Signed in as </span><b style="' + fxStyle(eqItem(eq, 'namefx').id) + '">' + esc(S.acct.name) + '</b> <button class="btn sm" data-a="logout">Sign out</button>';
+      const chip = p ? `<button class="lvbtn" data-a="profile" title="Level, coins and shop"><span class="lv">Lv ${p.level}</span><span class="lvbar"><i style="width:${p.max ? 100 : Math.round(100 * p.into / p.span)}%"></i></span><span class="cn">${COIN}${p.coins}</span></button>` : '';
+      el.innerHTML = chip + '<b style="' + fxStyle(eqItem(eq, 'namefx').id) + '">' + esc(S.acct.name) + '</b> <button class="btn sm" data-a="logout">Sign out</button>';
     } else el.innerHTML = window.Ads && Ads.native ? '<button class="btn sm pri" data-a="nativelogin">Sign in<span class="lg"> with Google</span></button>'
       : '<a class="btn sm pri" href="/api/auth/login">Sign in<span class="lg"> with Google</span></a>';
   }
@@ -845,7 +846,7 @@
   function rewardHtml(rw, preview) {
     if (rw) {
       const up = rw.to > rw.from, st = rw.state;
-      return `<div class="rwh"><div class="rwt"><b>+${rw.xp} XP</b><span>+${rw.coins} coins</span>${up ? `<span class="rwup">Level ${rw.from} to ${rw.to}</span>` : ''}</div>
+      return `<div class="rwh"><div class="rwt"><b>+${rw.xp} XP</b><span class="rwc">${COIN}+${rw.coins} coins</span>${up ? `<span class="rwup">Level ${rw.from} to ${rw.to}</span>` : ''}</div>
         <div class="lvbar big"><i style="width:${st.max ? 100 : Math.round(100 * st.into / st.span)}%"></i></div>
         <div class="rwl">Level ${st.level} &middot; ${st.max ? 'max level' : st.into + ' / ' + st.span + ' XP to next level'}</div>
         <div class="rwp">${rw.parts.map(p => `<span><em>${esc(p[0])}</em> +${p[1]}</span>`).join('')}</div></div>`;
@@ -867,7 +868,7 @@
     const own = it => it.price === 0 || p.owned.includes(it.id);
     return `<div class="phead"><h2>Profile</h2><button class="btn pri" data-a="profback">Back</button></div>
       <div class="panel prof"><div class="pn"><b style="${fxStyle(eqItem(eq, 'namefx').id)}">${esc(S.acct.name)}</b>${title ? `<span class="ptl">${esc(title)}</span>` : ''}</div>
-        <div class="plv"><div class="pl1">Level <b>${p.level}</b></div><div class="pcoins"><b>${p.coins}</b> coins</div></div>
+        <div class="plv"><div class="pl1">Level <b>${p.level}</b></div><div class="pcoins">${COIN}<b>${p.coins}</b> coins</div></div>
         <div class="lvbar big"><i style="width:${pct}%"></i></div>
         <div class="rwl">${p.max ? 'Max level' : p.into + ' / ' + p.span + ' XP to level ' + (p.level + 1)} &middot; ${p.xp} XP total</div>
         <p class="note">Finish seasons to earn XP and coins. Hard mode, titles and perfect seasons pay more. Cosmetics change how the game looks, never how it plays.</p><button class="btn sm" data-a="logout">Sign out</button></div>
@@ -1514,7 +1515,9 @@
       <p><b>Injuries.</b> Now and then one of your players is hurt for one to three games, never more than one at a time. He sits out in quick sims and coached games alike, and the rotation covers for him.</p>
       <p><b>Trades.</b> Until game 55 you can make up to two trades from the hub: choose a player to give up and pick one of three offers of similar quality from your era. The new player takes the old one's minutes and spot. A trade cannot be undone.</p>
       <p><b>Playoffs.</b> ${S.comp === 'el' ? 'The top eight of the table play best-of-five quarterfinals, then the Final Four: two single-game semifinals and the final on neutral ground.' : 'Top eight in each conference, best-of-seven series up to the Finals.'}</p>
-      <p><b>Saving.</b> Results and achievements are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID and your finished seasons, nothing else. <button class="btn sm" data-a="delacct">Delete my account and data</button> <a href="/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>
+      <p><b>Progress.</b> Each finished season earns XP and coins. Levels give more coins, and coins buy cosmetics in the shop (court, card frame, title, name color). Cosmetics only change how the game looks. Two optional ads can give one extra re-spin in the draft and one extra trade in a season.</p>
+      <p><b>Saving.</b> Results, achievements, XP and coins are saved only when you are signed in with Google. Guests play normally, but nothing is saved. We store your first name and last initial, your Google account ID, your finished seasons and your progress, nothing else.</p>
+      <div class="rulesacts"><button class="btn sm" data-a="delacct">Delete my account and data</button><a href="/privacy" target="_blank" rel="noopener">Privacy policy</a></div>
       <div class="ctrl"><button class="btn pri" data-a="closemodal">Close</button></div></div></div>`);
     },
     closemodal() { closeModal(); },

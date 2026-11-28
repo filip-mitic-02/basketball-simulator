@@ -145,9 +145,9 @@
 
   // Competition rules. Everything the engine needs to know about the league it is playing in; the NBA numbers are the defaults.
   const RULES = {
-    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, tform: 0.07, cmp: 30, sat: 0.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
+    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, tform: 0.07, aiB: 0.016, cmp: 30, sat: 0.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
       po: { conf: 2, seeds: 8, rounds: [{ name: 'First Round', need: 4 }, { name: 'Conference Semifinals', need: 4 }, { name: 'Conference Finals', need: 4 }, { name: 'NBA Finals', need: 4 }], confMvp: true } },
-    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, tform: 0.10, cmp: 24, sat: 0.50, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
+    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, tform: 0.10, aiB: 0.016, cmp: 24, sat: 0.50, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
       po: { conf: 1, seeds: 8, rounds: [{ name: 'Quarterfinals', need: 3 }, { name: 'Final Four semifinals', need: 1, neutral: true }, { name: 'Final', need: 1, neutral: true }], confMvp: false } }
   };
   function defaultPlan(team, R) {
@@ -324,6 +324,7 @@
     if (!is3) p += (A.spc >= 3.2 ? K.spcUp : A.spc < 1.6 ? K.spcDn : 0);
     p += K.hndP * A.hl;
     p += G.tform[o];
+    if (G.R.aiB && withUser(G) && G.aiTeam[o]) p += G.R.aiB;   // opponents of the user play a little above their ratings, so even a weak side of the league is a real test
     p += 0.012 * (A.e.ast - 1);
     const defScore = (0.45 * (D.e.blk - 1) + 0.35 * (D.e.stl - 1) + 0.20 * (D.e.drb - 1)) * (is3 ? 0.55 : 1);
     p -= 0.09 * defScore;

@@ -9,7 +9,7 @@
 
   // Bump whenever engine.js, league.js, core.js or data.json change in a way that can alter a result.
   // tests/sim-lock.test.js fails if the files change without a bump.
-  const VERSION = 'sim-2026-11-28.3';
+  const VERSION = 'sim-2026-11-28.4';
   const DRAFT_ROUNDS = 10, MAX_SKIPS = 2, MIN_Y = 1950, MAX_Y = 2026, MIN_POOL = 60;
   const PLAN_AUTO = ['auto', 'forced', 'manual'];
 

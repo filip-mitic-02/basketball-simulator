@@ -13,8 +13,8 @@
   const THRESHOLDS = []; for (let n = 2; n <= MAX_LEVEL; n++) THRESHOLDS.push(need(n));   // THRESHOLDS[i] = XP for level i + 2
   const levelOf = xp => { let l = 1; while (l < MAX_LEVEL && xp >= THRESHOLDS[l - 1]) l++; return l; };
   // Coins for reaching level n, and the running total up to level L (level 1 gives nothing).
-  const levelCoins = n => 100 + 20 * n;
-  const cumCoins = L => L <= 1 ? 0 : 100 * (L - 1) + 10 * L * (L + 1) - 20;
+  const levelCoins = n => 25 + 5 * n;
+  const cumCoins = L => L <= 1 ? 0 : 25 * (L - 1) + Math.round(2.5 * (L * (L + 1) - 2));
 
   // XP for one finished season. `s` is the server's own summary: { w, l, poW, poR (playoff rounds won), poL (playoff losses), champ, hard }, `games` = 82 or 38.
   function xpFor(s, games) {

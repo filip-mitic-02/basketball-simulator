@@ -33,7 +33,7 @@ a{color:var(--amber)}
 .logo span{color:var(--text)}
 .logo svg{width:26px;height:26px}
 #top .sp{flex:1}
-.acct{font-size:13px;color:var(--mute)}
+.acct{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--mute)}
 .acct b{color:var(--text);font-weight:600}
 .acct .lf{color:var(--bad,#ff6b6b);margin-right:6px}
 #app{max-width:1280px;margin:0 auto;padding:22px 16px 70px}
@@ -762,7 +762,13 @@ input[type=range].mins::-moz-range-thumb{width:14px;height:14px;border-radius:50
 .lvbtn:hover{border-color:var(--amber)}
 .lvbtn .lv{font-family:var(--display);font-weight:800;letter-spacing:.05em;color:var(--amber);font-size:15px}
 .lvbtn .cn{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
-.lvbtn .cn::after{content:" c"}
+.coin{width:15px;height:15px;flex:none;vertical-align:-2px}
+.lvbtn .cn{display:inline-flex;align-items:center;gap:5px}
+.pcoins{display:inline-flex;align-items:center;gap:7px}
+.rwc{display:inline-flex;align-items:center;gap:6px}
+.rulesacts{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:14px 0 6px}
+.rulesacts a{color:var(--amber)}
+.modal .ctrl{margin-top:18px}
 .lvbar{display:inline-block;flex:none;width:46px;height:6px;border-radius:3px;background:#1b2740;overflow:hidden}
 .lvbar i{display:block;height:100%;background:var(--amber)}
 .lvbar.big{display:block;width:100%;height:10px;border-radius:5px;margin:8px 0 6px}
