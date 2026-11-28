@@ -198,15 +198,22 @@
   }
   function renderAcct() {
     const el = document.getElementById('acct');
-    if (S.acct) el.innerHTML = 'Signed in as <b>' + esc(S.acct.name) + '</b> <button class="btn sm" data-a="logout">Sign out</button>';
-    else el.innerHTML = '<a class="btn sm pri" href="/api/auth/login">Sign in with Google</a>';
+    if (S.acct) el.innerHTML = '<span class="as">Signed in as </span><b>' + esc(S.acct.name) + '</b> <button class="btn sm" data-a="logout">Sign out</button>';
+    else el.innerHTML = '<a class="btn sm pri" href="/api/auth/login">Sign in<span class="lg"> with Google</span></a>';
   }
   async function initAccount() {
+    // The OAuth callback may leave ?login=failed in the address bar; show it only to guests and always clean the URL.
+    let loginFailed = false;
+    try {
+      const u = new URL(location.href);
+      if (u.searchParams.has('login')) { loginFailed = u.searchParams.get('login') === 'failed'; u.searchParams.delete('login'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); }
+    } catch (e) { }
     try {
       const me = await api('/api/me');
       if (me && me.user) S.acct = { id: me.user.id, name: me.user.name };
     } catch (e) { /* guest or no backend */ }
     renderAcct();
+    if (loginFailed && !S.acct) { const el = document.getElementById('acct'); if (el) el.insertAdjacentHTML('afterbegin', '<span class="lf">Sign-in failed, try again. </span>'); }
     await loadProfile();
     if (S.screen === 'menu') render();
   }

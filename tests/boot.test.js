@@ -15,7 +15,7 @@ test('page boots as a guest and offers Google sign-in', async () => {
   };
   for (const f of ['engine.js', 'league.js', 'core.js', 'report.js', 'app.js']) w.eval(readFileSync(new URL(f, dir), 'utf8'));
   await new Promise(r => setTimeout(r, 1500));
-  assert.match(w.document.getElementById('acct').innerHTML, /Sign in with Google/);
+  assert.match(w.document.getElementById('acct').innerHTML, /Sign in(<span class="lg"> with Google<\/span>)?/);
   assert.match(w.document.getElementById('app').innerHTML, /Start draft/);
   assert.ok(!/claude\.ai/.test(w.document.body.innerHTML));
 });
