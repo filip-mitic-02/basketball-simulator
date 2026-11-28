@@ -145,9 +145,9 @@
 
   // Competition rules. Everything the engine needs to know about the league it is playing in; the NBA numbers are the defaults.
   const RULES = {
-    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, cmp: 30, sat: 0.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
+    nba: { id: 'nba', q: 720, ot: 300, late: 300, fo: 6, to: 7, dur: 1, mins: 240, maxMin: 48, pf: 1, tov: 1, stretch: 1.55, tform: 0.07, cmp: 30, sat: 0.55, threes: 0.30, tg: [34, 33, 32, 30, 29, 24, 20, 16, 12, 10], avgPts: 112, games: 82, teams: 30, winPts: 10, poPts: 8,
       po: { conf: 2, seeds: 8, rounds: [{ name: 'First Round', need: 4 }, { name: 'Conference Semifinals', need: 4 }, { name: 'Conference Finals', need: 4 }, { name: 'NBA Finals', need: 4 }], confMvp: true } },
-    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, cmp: 24, sat: 0.50, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
+    el: { id: 'el', q: 600, ot: 300, late: 240, fo: 5, to: 5, dur: 1.135, mins: 200, maxMin: 40, pf: 1.9, tov: 1.15, stretch: 1.55, tform: 0.10, cmp: 24, sat: 0.50, threes: 0.46, tg: [31, 29, 27, 25, 23, 19, 15, 13, 10, 8], avgPts: 82, games: 38, teams: 20, winPts: 21.6, poPts: 25,
       po: { conf: 1, seeds: 8, rounds: [{ name: 'Quarterfinals', need: 3 }, { name: 'Final Four semifinals', need: 1, neutral: true }, { name: 'Final', need: 1, neutral: true }], confMvp: false } }
   };
   function defaultPlan(team, R) {
@@ -198,7 +198,7 @@
       G.st[t] = teams[t].players.map(() => ({ sec: 0, pts: 0, reb: 0, oreb: 0, ast: 0, stl: 0, blk: 0, tov: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, pf: 0, pm: 0 }));
       G.en[t] = new Array(n).fill(100);
       G.form[t] = teams[t].players.map(() => (r() + r() + r() - 1.5) * K.formSd);
-    G.tform[t] = (r() + r() + r() - 1.5) * K.tform;
+    G.tform[t] = (r() + r() + r() - 1.5) * (R.tform != null ? R.tform : K.tform);   // game-to-game form of a whole team: keeps even a dream roster from being unbeatable
     G.es[t] = clamp(1 + (r() + r() + r() - 1.5) * K.es, 0.3, 1.8);
       G.heat[t] = new Array(n).fill(0);
       G.on[t] = plans[t].starters.slice();
